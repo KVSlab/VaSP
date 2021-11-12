@@ -18,3 +18,5 @@ This folder contains a short simulation of a coarse cylinder. The folder "Script
 ./Scripts_Desktop/c_fenics_postprocess_local.sh Scripts_Desktop/config_files/Cyl.config \
 ./Scripts_Desktop/d_spectral.sh Scripts_Desktop/config_files/Cyl.config \
 ./Scripts_Desktop/e_test_flow_rate.sh Scripts_Desktop/config_files/Cyl.config \
+
+The script "compute_flow_metrics.py" is completely untested, and is a copy from the old KVS aneurysm workflow. It seems that script is still under development. 
