@@ -618,7 +618,7 @@ def create_transformed_matrix(input_path, output_folder,meshFile, case_name, sta
 
 	# Get shape of output data
 	num_rows = vectorArray.shape[0]
-	num_cols = int((end_t-start_t)/(time_between_files*stride)) 
+	num_cols = int((end_t-start_t)/(time_between_files*stride))-1 
 
 	# Pre-allocate the arrays for the formatted data
 	if dvp == "v" or dvp == "d":
