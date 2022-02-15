@@ -4,6 +4,7 @@ from turtleFSI.problems import *
 from turtleFSI.utils import make_womersley_bcs, compute_boundary_geometry_acrn
 import numpy as np
 from os import path, makedirs, getcwd
+#from fenicstools import Probes
 from Probe import Probes
 from pprint import pprint
 
@@ -115,6 +116,35 @@ def get_mesh_domain_and_boundaries(mesh_file, fsi_id, rigid_id, outer_wall_id, f
     return mesh, domains, boundaries
 
 
+def initiate(mesh, DVP, probe_points, results_folder, **namespace):
+    # Function space
+    DG = FunctionSpace(mesh, 'DG', 0)
+
+    # Mesh info
+    h = CellDiameter(mesh)
+    characteristic_edge_length = project(h, DG)
+
+    # CFL
+    CFL = Function(DG)
+
+    # Convert probe_points to numpy array if given as a list
+    if isinstance(probe_points, list):
+        probe_points = np.array(probe_points)
+
+    # Store points file in checkpoint
+    if MPI.rank(MPI.comm_world) == 0:
+        probe_points.dump(path.join(results_folder, "Checkpoint", "points"))
+
+    # Create dict for evaluation of probe points
+    eval_dict = {}
+    eval_dict["centerline_u_x_probes"] = Probes(probe_points.flatten(), DVP.sub(1).sub(0))
+    eval_dict["centerline_u_y_probes"] = Probes(probe_points.flatten(), DVP.sub(1).sub(1))
+    eval_dict["centerline_u_z_probes"] = Probes(probe_points.flatten(), DVP.sub(1).sub(2))
+    eval_dict["centerline_p_probes"] = Probes(probe_points.flatten(), DVP.sub(2))
+
+    return dict(DG=DG, CFL=CFL, characteristic_edge_length=characteristic_edge_length, eval_dict=eval_dict, probe_points=probe_points)
+
+
 class InnerP(UserExpression):
     def __init__(self, t, t_ramp, n, u, dsi, resistance, p_0, **kwargs):
         self.t = t
@@ -194,24 +224,7 @@ def sigmoid(x, k=-0.75, a=0.125, b=8):
     return y
 
 
-def pre_solve(t, v_, DVP, inlet, p_out_bc_val, probe_points, mesh, results_folder, **namespace):
-    # Convert probe_points to numpy array if given as a list
-    if isinstance(probe_points, list):
-        probe_points = np.array(probe_points)
-
-    # Create point for evaluation
-    n = FacetNormal(mesh)
-    eval_dict = {}
-
-    # Store points file in checkpoint
-    if MPI.rank(MPI.comm_world) == 0:
-        probe_points.dump(path.join(results_folder, "Checkpoint", "points"))
-
-    eval_dict["centerline_u_x_probes"] = Probes(probe_points.flatten(), DVP)
-    eval_dict["centerline_u_y_probes"] = Probes(probe_points.flatten(), DVP)
-    eval_dict["centerline_u_z_probes"] = Probes(probe_points.flatten(), DVP)
-    eval_dict["centerline_p_probes"] = Probes(probe_points.flatten(), DVP)
-
+def pre_solve(t, v_, DVP, inlet, p_out_bc_val, **namespace):
     # Update the time variable used for the inlet boundary condition
     for uc in inlet:
         uc.set_t(t)
@@ -224,14 +237,13 @@ def pre_solve(t, v_, DVP, inlet, p_out_bc_val, probe_points, mesh, results_folde
     p_out_bc_val.u = v_["n"]
     p_out_bc_val.update(t)
 
-    return dict(inlet=inlet, p_out_bc_val=p_out_bc_val, probe_points=probe_points, eval_dict=eval_dict)
+    return dict(inlet=inlet, p_out_bc_val=p_out_bc_val)
 
 
-def post_solve(t, dvp_, verbose, results_folder, eval_dict, counter, dump_probe_frequency, **namespace):
-    # Get deformation, velocity, and pressure
-    d = dvp_["n"].sub(0, deepcopy=True)
-    v = dvp_["n"].sub(1, deepcopy=True)
-    p = dvp_["n"].sub(2, deepcopy=True)
+def post_solve(t, dt, dvp_, verbose, results_folder, eval_dict, counter, dump_probe_frequency,
+               DG, CFL, characteristic_edge_length, **namespace):
+    # Get deformation, velocity and pressure
+    d, v, p = dvp_["n"].split(deepcopy=True)
 
     # Sample velocity and pressure in points/probes
     eval_dict["centerline_u_x_probes"](v.sub(0))
@@ -267,6 +279,13 @@ def post_solve(t, dvp_, verbose, results_folder, eval_dict, counter, dump_probe_
         eval_dict["centerline_u_z_probes"].clear()
         eval_dict["centerline_p_probes"].clear()
 
+    # Compute CFL
+    v_mag = project(sqrt(inner(v, v)), DG)
+    CFL.vector().set_local(v_mag.vector().get_local() / characteristic_edge_length.vector().get_local() * dt)
+    CFL.vector().apply("insert")
+
+    vec = CFL.vector()
+    info_red("CFL --> min: {:e}, mean: {:e}, max: {:e}".format(vec.min(), np.mean(vec.get_local()), vec.max()))
 
 def print_mesh_information(mesh):
     comm = MPI.comm_world
