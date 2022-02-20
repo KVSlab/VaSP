@@ -146,9 +146,8 @@ def initiate(mesh, DVP, probe_points, results_folder, **namespace):
 
 
 class InnerP(UserExpression):
-    def __init__(self, t, t_ramp, n, u, dsi, resistance, p_0, **kwargs):
+    def __init__(self, t, n, u, dsi, resistance, p_0, **kwargs):
         self.t = t
-        self.t_ramp = t_ramp
         self.n = n # Mesh Normal
         self.u = u
         self.p_0 = p_0 # Initial pressure
@@ -157,14 +156,17 @@ class InnerP(UserExpression):
         self.resistance = resistance
         super().__init__(**kwargs)
 
-    def update(self, t):
+    def update(self, t, u):
         self.t = t
+        self.u = u
 
         # Caclulate flow rate
         Q = np.abs(assemble(inner(self.u, self.n) * self.dsi))
+        info_green("Instantaneous flow rate Q = {} m^3/s".format(Q))
 
         # Caclulate P as resistance boundary condition
         self.P = self.p_0 + self.resistance * Q
+        info_green("Instantaneous normal stress prescribed at the FSI interface {} Pa".format(self.P))
 
     def eval(self, value, x):
         value[0] = self.P
@@ -173,7 +175,7 @@ class InnerP(UserExpression):
         return ()
 
 
-def create_bcs(t, DVP, mesh, boundaries, domains, mu_f,
+def create_bcs(t, v_, DVP, mesh, boundaries, domains, mu_f,
                fsi_id, outlet_id1, inlet_id, inlet_outlet_s_id,
                rigid_id, psi, F_solid_linear, p_deg, Q_mean, **namespace):
     info_red("Creating boundary conditions")
@@ -211,31 +213,26 @@ def create_bcs(t, DVP, mesh, boundaries, domains, mu_f,
     bcs = u_inlet + [d_inlet, u_inlet_s, d_inlet_s, d_rigid]
 
     # Define the pressure condition (apply to inner surface, numerical instability results from applying to outlet, or using outlet flow rate)
-    p_out_bc_val = InnerP(t=0.0, t_ramp=0.02, n=n, u=None, dsi=dsi, resistance=1e10, p_0=0.0, degree=p_deg)
+    p_out_bc_val = InnerP(t=0.0, n=n, u=v_["n"], dsi=dsi, resistance=1e10, p_0=0.0, degree=p_deg)
     dSS = Measure("dS", domain=mesh, subdomain_data=boundaries)
     F_solid_linear += p_out_bc_val * inner(n('+'), psi('+'))*dSS(fsi_id)  # defined on the reference domain
 
     return dict(bcs=bcs, inlet=inlet, p_out_bc_val=p_out_bc_val, F_solid_linear=F_solid_linear)
 
 
-def sigmoid(x, k=-0.75, a=0.125, b=8):
-    x = b*(x - a)
-    y = (x - k*x) / (k - 2*k*abs(x) + 1)
-    return y
-
-
 def pre_solve(t, v_, DVP, inlet, p_out_bc_val, **namespace):
-    # Update the time variable used for the inlet boundary condition
     for uc in inlet:
+        # Update the time variable used for the inlet boundary condition
         uc.set_t(t)
 
+        # Multiply by cosine function to ramp up smoothly over time interval 0-250 ms
         if t < 0.25:
-            uc.scale_value = sigmoid(t) * 0.5 + 0.5
+            uc.scale_value = -0.5 * np.cos(np.pi * t / 0.25) + 0.5
         else:
             uc.scale_value = 1.0
 
-    p_out_bc_val.u = v_["n"]
-    p_out_bc_val.update(t)
+    # Update pressure condition
+    p_out_bc_val.update(t, v_["n"])
 
     return dict(inlet=inlet, p_out_bc_val=p_out_bc_val)
 
