@@ -1,11 +1,9 @@
 from dolfin import *
 import os, math
 from turtleFSI.problems import *
-from turtleFSI.utils import make_womersley_bcs, compute_boundary_geometry_acrn
+from turtleFSI.utils import make_womersley_bcs, compute_boundary_geometry_acrn, Probes
 import numpy as np
 from os import path, makedirs, getcwd
-#from fenicstools import Probes
-from Probe import Probes
 from pprint import pprint
 
 # BM will look at the IDs. Oringinal drawing :) Discuss drawing as well...
@@ -205,12 +203,15 @@ def create_bcs(t, v_, DVP, mesh, boundaries, domains, mu_f,
     u_inlet_s = DirichletBC(DVP.sub(1), ((0.0, 0.0, 0.0)), boundaries, inlet_outlet_s_id)
 
     # Solid Displacement BCs
-    d_inlet = DirichletBC(DVP.sub(0), ((0.0, 0.0, 0.0)), boundaries, inlet_id)
-    d_inlet_s = DirichletBC(DVP.sub(0), ((0.0, 0.0, 0.0)), boundaries, inlet_outlet_s_id)
-    d_rigid = DirichletBC(DVP.sub(0), ((0.0, 0.0, 0.0)), boundaries, rigid_id)
+    d_inlet = DirichletBC(DVP.sub(0), (0.0, 0.0, 0.0), boundaries, inlet_id)
+    d_inlet_s = DirichletBC(DVP.sub(0), (0.0, 0.0, 0.0), boundaries, inlet_outlet_s_id)
+    d_rigid = DirichletBC(DVP.sub(0), (0.0, 0.0, 0.0), boundaries, rigid_id)
+
+    # Create pressure boundary condition at outlet
+    p_outlet = DirichletBC(DVP.sub(2), 0, boundaries, outlet_id1)
 
     # Assemble boundary conditions
-    bcs = u_inlet + [d_inlet, u_inlet_s, d_inlet_s, d_rigid]
+    bcs = u_inlet + [d_inlet, u_inlet_s, d_inlet_s, d_rigid, p_outlet]
 
     # Define the pressure condition (apply to inner surface, numerical instability results from applying to outlet, or using outlet flow rate)
     p_out_bc_val = InnerP(t=0.0, n=n, u=v_["n"], dsi=dsi, resistance=1e10, p_0=0.0, degree=p_deg)
@@ -322,5 +323,5 @@ def print_mesh_information(mesh):
         print("Number of faces: {}".format(sum(num_faces)))
         print("Number of facets: {}".format(sum(num_facets)))
         print("Number of vertices: {}".format(sum(num_vertices)))
-        print("Volume: {:.4f}".format(volume))
+        print("Volume: {:.9f}".format(volume))
         print("Number of cells per volume: {:.4f}".format(sum(num_cells) / volume))
