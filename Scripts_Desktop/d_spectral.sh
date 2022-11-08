@@ -15,8 +15,8 @@ echo $str
 
 python postprocessing_h5py/plot_compute_time.py --case=$case_path
 python postprocessing_h5py/compute_spi.py --case=$case_path --mesh=$mesh_path --end_t=$end_t --save_deg=$save_deg
-python postprocessing_h5py/create_spectrograms.py --case=$case_path --mesh=$mesh_path --end_t=$end_t --save_deg=$save_deg --r_sphere=$r_sphere --x_sphere=$x_sphere --y_sphere=$y_sphere --z_sphere=$z_sphere
+python postprocessing_h5py/create_spectrograms_chromagrams.py --case=$case_path --mesh=$mesh_path --end_t=$end_t --save_deg=$save_deg --r_sphere=$r_sphere --x_sphere=$x_sphere --y_sphere=$y_sphere --z_sphere=$z_sphere
 python postprocessing_h5py/compute_spi.py --case=$case_path --mesh=$mesh_path --end_t=$end_t --save_deg=$save_deg --dvp=d
-python postprocessing_h5py/create_spectrograms.py --case=$case_path --mesh=$mesh_path --end_t=$end_t --save_deg=$save_deg --r_sphere=$r_sphere --x_sphere=$x_sphere --y_sphere=$y_sphere --z_sphere=$z_sphere --dvp=d
+python postprocessing_h5py/create_spectrograms_chromagrams.py --case=$case_path --mesh=$mesh_path --end_t=$end_t --save_deg=$save_deg --r_sphere=$r_sphere --x_sphere=$x_sphere --y_sphere=$y_sphere --z_sphere=$z_sphere --dvp=d
 python postprocessing_h5py/compute_spi.py --case=$case_path --mesh=$mesh_path --end_t=$end_t --save_deg=$save_deg --dvp=p
-python postprocessing_h5py/create_spectrograms.py --case=$case_path --mesh=$mesh_path --end_t=$end_t --save_deg=$save_deg --r_sphere=$r_sphere --x_sphere=$x_sphere --y_sphere=$y_sphere --z_sphere=$z_sphere --dvp=p
+python postprocessing_h5py/create_spectrograms_chromagrams.py --case=$case_path --mesh=$mesh_path --end_t=$end_t --save_deg=$save_deg --r_sphere=$r_sphere --x_sphere=$x_sphere --y_sphere=$y_sphere --z_sphere=$z_sphere --dvp=p

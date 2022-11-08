@@ -56,6 +56,7 @@ def get_eig(T):
     NOTE:
     The method implemented here, implicitly assumes that the polynomial has
     only real roots, since imaginary ones should not occur in this use case.
+    This method only works for symmetrical (Hermetian) matrices.
 
     In order to ensure eigenvalues with algebraic multiplicity of 1, the idea
     of numerical perturbations is adopted from "Computation of isotropic tensor

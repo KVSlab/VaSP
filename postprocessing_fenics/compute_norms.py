@@ -1,3 +1,5 @@
+import matplotlib as mpl
+mpl.use('Agg')
 import numpy as np
 import h5py
 from dolfin import *
@@ -5,6 +7,8 @@ import os
 from postprocessing_common import read_command_line_stress, get_time_between_files
 import stress_strain
 from pathlib import Path
+import matplotlib.pyplot as plt
+
 
 # set compiler arguments
 parameters["form_compiler"]["quadrature_degree"] = 6 # Not investigated thorougly. See MSc theses of Gjertsen. 
@@ -26,7 +30,8 @@ def format_output_data(case_path, mesh_name, dt, stride, save_deg):
         save_deg (int): element degree saved from P2-P1 simulation (save_deg = 1 is corner nodes only)
 
     """
-
+    cycle_length = 0.951
+    compare_cycle=2 # compare 3rd and 4th cycle to cycle #2
     # File paths
 
     for file in os.listdir(case_path):
@@ -37,12 +42,12 @@ def format_output_data(case_path, mesh_name, dt, stride, save_deg):
             visualization_separate_domain_path = os.path.join(file_path, "Visualization_separate_domain")
         elif os.path.exists(os.path.join(file_path, "Visualization_separate_domain")):
             visualization_separate_domain_path = os.path.join(file_path, "Visualization_separate_domain") 
+    
+    imageFolder = os.path.join(visualization_separate_domain_path, "../Images") 
 
 
     file_path_d = Path(os.path.join(visualization_separate_domain_path, "displacement_save_deg_"+str(save_deg)+'.h5'))
-    d_path_in = str(os.path.join(visualization_separate_domain_path,"d.h5")) 
     file_path_v = Path(os.path.join(visualization_separate_domain_path, "velocity_save_deg_"+str(save_deg)+'.h5')) 
-    v_path_in = str(os.path.join(visualization_separate_domain_path,"v.h5")) 
     xdmf_file = Path(os.path.join(visualization_separate_domain_path, "velocity_save_deg_"+str(save_deg)+'.xdmf')) 
 
 
@@ -89,7 +94,13 @@ def format_output_data(case_path, mesh_name, dt, stride, save_deg):
 
     # Create lower-order function for visualization on refined mesh
     v_viz = Function(FSv_viz)
+    v_viz_cycle_0 = Function(FSv_viz)
     
+    Difference_v=Function(FSv_viz)
+    Difference_v_vec = Difference_v.vector() 
+    norm_v_l2_list = []
+    norm_v_linf_list = []
+    t_list = []
 
     if sim_type == "fsi": # If this is an FSI simulation, we also read in displacement
         # Read refined solid mesh saved as HDF5 format
@@ -102,6 +113,10 @@ def format_output_data(case_path, mesh_name, dt, stride, save_deg):
         de_viz = VectorElement('CG', mesh_viz_solid.ufl_cell(), 1)
         FSd_viz = FunctionSpace(mesh_viz_solid, de_viz)   # Visualisation FunctionSpace for d 
         d_viz = Function(FSd_viz)
+        d_viz_cycle_0 = Function(FSd_viz)
+        Difference_d=Function(FSd_viz)
+        norm_d_l2_list = []
+        norm_d_linf_list = []
 
     if MPI.rank(MPI.comm_world) == 0:
         print("=" * 10, "Start post processing", "=" * 10)
@@ -111,6 +126,8 @@ def format_output_data(case_path, mesh_name, dt, stride, save_deg):
     t_0, time_between_files = get_time_between_files(xdmf_file)
     save_step = round(time_between_files/dt) # This is the output frequency of the simulation
     t = t_0 # Initial time of simulation
+    files_per_cycle = round(cycle_length/(save_step*dt))
+    print(files_per_cycle)
 
     while True:
 
@@ -138,24 +155,97 @@ def format_output_data(case_path, mesh_name, dt, stride, save_deg):
                 print("=" * 10, "Finished reading solutions", "=" * 10)
             break
 
-        file_mode = "w" if file_counter == 0 else "a"
+        # Get the first cycle same timestep
+        
+#        if t>=cycle_length*compare_cycle:
+        if t>=cycle_length:
+            # Read in solution to vector function 
+            vel_file = h5py.File(file_path_v, 'r')
+            #vec_name = "VisualisationVector/" + str(file_counter % files_per_cycle + files_per_cycle*(compare_cycle-1)) # Get the first cycle same timestep
+            vec_name = "VisualisationVector/" + str(file_counter - files_per_cycle) # Get the first cycle same timestep
+            vector_np = vel_file.get(vec_name)[()]
+            vector_np_flat = vector_np.flatten('F')
+            v_viz_cycle_0.vector().set_local(vector_np_flat)  # Set u vector
 
-        # Save velocity
-        viz_v_file = HDF5File(MPI.comm_world, v_path_in, file_mode=file_mode)
-        viz_v_file.write(v_viz, "/velocity", t)
-        viz_v_file.close()
+            if sim_type == "fsi": # If this is an FSI simulation, we also read in displacement
+                # Read in solution to vector function 
+                disp_file = h5py.File(file_path_d, 'r')
+                #vec_name = "VisualisationVector/" + str(file_counter % files_per_cycle + files_per_cycle*(compare_cycle-1)) # Get the first cycle same timestep
+                vec_name = "VisualisationVector/" + str(file_counter - files_per_cycle) # Get the first cycle same timestep
+                vector_np = disp_file.get(vec_name)[()] 
+                vector_np_flat = vector_np.flatten('F')
+                d_viz_cycle_0.vector().set_local(vector_np_flat)  # Set d vector
 
-        if sim_type == "fsi": # If this is an FSI simulation, we also write displacement
-            # Save displacment
-            viz_d_file = HDF5File(MPI.comm_world, d_path_in, file_mode=file_mode)
-            viz_d_file.write(d_viz, "/displacement", t)
-            viz_d_file.close()
+            # Compute Norms
+            Difference_v.vector()[:] = v_viz.vector() - v_viz_cycle_0.vector()
+            norm_v_l2 = norm(Difference_v,'l2')
+            #norm_v_linf = norm(Difference_v,'linf') # Linf doesnt work in dolfin 2018 it seems
+
+            print("{} is the L2 norm of the difference between step {} and {}".format(norm_v_l2, file_counter, file_counter % files_per_cycle))
+            Difference_d.vector()[:] = d_viz.vector() - d_viz_cycle_0.vector()
+            norm_d_l2 = norm(Difference_d,'l2')
+            #norm_d_linf = norm(Difference_d,'linf')
+            print("{} is the L2 norm of the difference between step {} and {}".format(norm_d_l2, file_counter, file_counter % files_per_cycle))
+
+            norm_v_l2_list.append(norm_v_l2)
+            #norm_v_linf_list.append(norm_v_linf)
+            norm_d_l2_list.append(norm_d_l2)
+            #norm_d_linf_list.append(norm_d_linf)
+            t_list.append(t)
+ 
 
         # Update file_counter
         file_counter += stride
         t += time_between_files*stride
 
 
+    # Plot and Save 
+    plt.plot(t_list,norm_v_l2_list)
+    plt.ylabel('L2 Norm - Velocity')
+    plt.xlabel('Simulation Time (s)')
+    imagePath=imageFolder+'/v_L2_norm_compare_to_prev_cycle_log.png'
+    plt.yscale("log")
+    plt.savefig(imagePath)  
+    plt.close()
+    csvPath = imagePath.replace(".png",".csv")
+    np.savetxt(csvPath, np.transpose([t_list[:-1],norm_d_l2_list[:-1]]), delimiter=",")
+
+    # Plot and Save
+    plt.plot(t_list,norm_d_l2_list)
+    plt.ylabel('L2 Norm - Displacement')
+    plt.xlabel('Simulation Time (s)')
+    imagePath=imageFolder+'/d_L2_norm_compare_to_prev_cycle_log.png'
+    plt.yscale("log")
+    plt.savefig(imagePath)  
+    plt.close()
+    csvPath = imagePath.replace(".png",".csv")
+    np.savetxt(csvPath, np.transpose([t_list[:-1],norm_v_l2_list[:-1]]), delimiter=",")
+
+    # Normalize Data and plot
+    norm_v_l2_list_normalized = norm_v_l2_list/np.max(norm_v_l2_list)
+    norm_d_l2_list_normalized = norm_d_l2_list/np.max(norm_d_l2_list)
+
+    # Plot and Save
+    plt.plot(t_list,norm_v_l2_list_normalized)
+    plt.ylabel('L2 Norm - Velocity')
+    plt.xlabel('Simulation Time (s)')
+    imagePath=imageFolder+'/v_L2_norm_compare_to_prev_cycle_log_normalized.png'
+    plt.yscale("log")
+    plt.savefig(imagePath)  
+    plt.close()
+    csvPath = imagePath.replace(".png",".csv")
+    np.savetxt(csvPath, np.transpose([t_list[:-1],norm_v_l2_list_normalized[:-1]]), delimiter=",")
+
+    # Plot and Save
+    plt.plot(t_list,norm_d_l2_list_normalized)
+    plt.ylabel('L2 Norm - Displacement')
+    plt.xlabel('Simulation Time (s)')
+    imagePath=imageFolder+'/d_L2_norm_compare_to_prev_cycle_log_normalized.png'
+    plt.yscale("log")
+    plt.savefig(imagePath)  
+    plt.close()
+    csvPath = imagePath.replace(".png",".csv")
+    np.savetxt(csvPath, np.transpose([t_list[:-1],norm_d_l2_list_normalized[:-1]]), delimiter=",")
 
 if __name__ == '__main__':
     folder, mesh, E_s, nu_s, dt, stride, save_deg = read_command_line_stress()

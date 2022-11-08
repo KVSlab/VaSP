@@ -130,6 +130,7 @@ def compute_wss(case_path,mesh_name, nu, dt, stride, save_deg):
         print("=" * 10, "Start post processing", "=" * 10)
 
     file_counter = 0 # Index of first time step
+    n = 0
     file_1 = 1 # Index of second time step
 
     f = HDF5File(MPI.comm_world, file_path_u.__str__(), "r")
@@ -147,59 +148,63 @@ def compute_wss(case_path,mesh_name, nu, dt, stride, save_deg):
             f = HDF5File(MPI.comm_world, file_path_u.__str__(), "r")
             vec_name = "/velocity/vector_%d" % file_counter
             t = f.attributes(vec_name)["timestamp"]
+
+
             if MPI.rank(MPI.comm_world) == 0:
-                print("=" * 10, "Timestep: {}".format(t), "=" * 10)
+                print("=" * 10, "Calculating WSS at Timestep: {}".format(t), "=" * 10)
             f.read(u_viz, vec_name)
+    
+    
+            # Calculate v in P2 based on visualization refined P1
+            u.vector()[:] = dv_trans*u_viz.vector()
+        
+            # Compute WSS
+            if MPI.rank(MPI.comm_world) == 0:
+                print("Compute WSS (mean)")
+            tau = stress()     
+        
+            # tau.vector()[:] = tau.vector()[:] * 1000 # Removed this line, presumably a unit conversion
+            WSS_mean.vector().axpy(1, tau.vector())
+        
+            if MPI.rank(MPI.comm_world) == 0:
+                print("Compute WSS (absolute value)")
+        
+            wss_abs = project(inner(tau,tau)**(1/2),U_b1) # Calculate magnitude of Tau (wss_abs)
+            WSS_abs.vector().axpy(1, wss_abs.vector())  # WSS_abs (cumulative, added together)
+            # axpy : Add multiple of given matrix (AXPY operation)
+        
+            # Name functions
+            wss_abs.rename("Wall Shear Stress", "WSS_abs")
+        
+            # Write results
+            WSS_file.write(wss_abs, t)
+        
+            # Compute TWSSG
+            if MPI.rank(MPI.comm_world) == 0:
+                print("Compute TWSSG")
+            twssg.vector().set_local((tau.vector().get_local() - tau_prev.vector().get_local()) / dt) # CHECK if this needs to be the time between files or the timestep of the simulation...
+            twssg.vector().apply("insert")
+            twssg_ = project(inner(twssg,twssg)**(1/2),U_b1) # Calculate magnitude of TWSSG vector
+            TWSSG.vector().axpy(1, twssg_.vector())
+        
+            # Update tau
+            if MPI.rank(MPI.comm_world) == 0:
+                print("Update WSS \n")
+            tau_prev.vector().zero()
+            tau_prev.vector().axpy(1, tau.vector())
+            n += 1
+                
+            # Update file_counter
+            file_counter += stride
+
         except:
             if MPI.rank(MPI.comm_world) == 0:
                 print("=" * 10, "Finished reading solutions", "=" * 10)
             break   
 
-        # Calculate v in P2 based on visualization refined P1
-        u.vector()[:] = dv_trans*u_viz.vector()
-
-        # Compute WSS
-        if MPI.rank(MPI.comm_world) == 0:
-            print("Compute WSS (mean)")
-        tau = stress()     
-
-        # tau.vector()[:] = tau.vector()[:] * 1000 # Removed this line, presumably a unit conversion
-        WSS_mean.vector().axpy(1, tau.vector())
-
-        if MPI.rank(MPI.comm_world) == 0:
-            print("Compute WSS (absolute value)")
-
-        wss_abs = project(inner(tau,tau)**(1/2),U_b1) # Calculate magnitude of Tau (wss_abs)
-        WSS_abs.vector().axpy(1, wss_abs.vector())  # WSS_abs (cumulative, added together)
-        # axpy : Add multiple of given matrix (AXPY operation)
-
-        # Name functions
-        wss_abs.rename("Wall Shear Stress", "WSS_abs")
-
-        # Write results
-        WSS_file.write(wss_abs, t)
-
-        # Compute TWSSG
-        if MPI.rank(MPI.comm_world) == 0:
-            print("Compute TWSSG")
-        twssg.vector().set_local((tau.vector().get_local() - tau_prev.vector().get_local()) / dt) # CHECK if this needs to be the time between files or the timestep of the simulation...
-        twssg.vector().apply("insert")
-        twssg_ = project(inner(twssg,twssg)**(1/2),U_b1) # Calculate magnitude of TWSSG vector
-        TWSSG.vector().axpy(1, twssg_.vector())
-
-        # Update tau
-        if MPI.rank(MPI.comm_world) == 0:
-            print("Update WSS \n")
-        tau_prev.vector().zero()
-        tau_prev.vector().axpy(1, tau.vector())
-
-        # Update file_counter
-        file_counter += stride
-
     if MPI.rank(MPI.comm_world) == 0:
         print("=" * 10, "Saving hemodynamic indices", "=" * 10)
 
-    n = (file_counter) // stride
     TWSSG.vector()[:] = TWSSG.vector()[:] / n
     WSS_abs.vector()[:] = WSS_abs.vector()[:] / n
     WSS_mean.vector()[:] = WSS_mean.vector()[:] / n

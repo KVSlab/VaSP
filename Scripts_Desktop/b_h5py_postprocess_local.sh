@@ -11,6 +11,6 @@ echo "case path: $case_path, mesh path: $mesh_path, timestep: $dt, save frequenc
 # Run postprocessing scripts
 str="Running h5py postprocessing scripts!"
 echo $str
-python postprocessing_h5py/compute_domain_specific_viz.py --case=$case_path --mesh=$mesh_path --dt=$dt --end_t=$end_t --save_deg=$save_deg
-python postprocessing_h5py/compute_domain_specific_viz.py --case=$case_path --mesh=$mesh_path --dt=$dt --end_t=$end_t --save_deg=$save_deg --dvp=d
-python postprocessing_h5py/compute_domain_specific_viz.py --case=$case_path --mesh=$mesh_path --dt=$dt --end_t=$end_t --save_deg=$save_deg --dvp=p
+python postprocessing_h5py/create_visualizations.py --case=$case_path --mesh=$mesh_path --dt=$dt --end_t=$end_t --save_deg=$save_deg --dvp=v
+python postprocessing_h5py/create_visualizations.py --case=$case_path --mesh=$mesh_path --dt=$dt --end_t=$end_t --save_deg=$save_deg --dvp=d
+python postprocessing_h5py/create_visualizations.py --case=$case_path --mesh=$mesh_path --dt=$dt --end_t=$end_t --save_deg=$save_deg --dvp=p
