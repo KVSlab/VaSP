@@ -96,19 +96,16 @@ def compute_wss(case_path,mesh_name, dt, stride, save_deg):
     # Inlet/outlet differential
     dsi = ds(2, domain=mesh, subdomain_data=boundaries)
     dso3 = ds(3, domain=mesh, subdomain_data=boundaries)
-    dso4 = ds(4, domain=mesh, subdomain_data=boundaries)
     n = FacetNormal(mesh)
 
     area_inlet = assemble(Constant(1.0, name="one") * dsi) # Get error: ufl.log.UFLException: This integral is missing an integration domain.
     area_outlet3 = assemble(Constant(1.0, name="one") * dso3) # Get error: ufl.log.UFLException: This integral is missing an integration domain.
-    area_outlet4 = assemble(Constant(1.0, name="one") * dso4) # Get error: ufl.log.UFLException: This integral is missing an integration domain.
 
     print("Inlet/Outlet area for ID# {} is: {:e} m^2\n".format(2,area_inlet))
     flow_rate_output.append("Inlet/Outlet area for ID# {} is: {:e} m^2\n".format(2,area_inlet))
     print("Inlet/Outlet area for ID# {} is: {:e} m^2\n".format(3,area_outlet3))
     flow_rate_output.append("Inlet/Outlet area for ID# {} is: {:e} m^2\n".format(3,area_outlet3))
-    print("Inlet/Outlet area for ID# {} is: {:e} m^2\n".format(4,area_outlet4))
-    flow_rate_output.append("Inlet/Outlet area for ID# {} is: {:e} m^2\n".format(4,area_outlet4))
+
 
     # Get range of inlet and outlet ids in model
     inlet_outlet_min = 2 # lower bound for inlet and outlet IDs (inlet is usually 2)
@@ -116,24 +113,30 @@ def compute_wss(case_path,mesh_name, dt, stride, save_deg):
     bd_ids = np.unique(boundaries.array()[:])
     inlet_outlet_ids = bd_ids[(bd_ids >= inlet_outlet_min) & (bd_ids <=inlet_outlet_max)]
 
+    if len(inlet_outlet_ids) > 2:
+        dso4 = ds(4, domain=mesh, subdomain_data=boundaries)
+        area_outlet4 = assemble(Constant(1.0, name="one") * dso4) # Get error: ufl.log.UFLException: This integral is missing an integration domain.
+        print("Inlet/Outlet area for ID# {} is: {:e} m^2\n".format(4,area_outlet4))
+        flow_rate_output.append("Inlet/Outlet area for ID# {} is: {:e} m^2\n".format(4,area_outlet4))
+
     if len(inlet_outlet_ids) > 3:
         dso5 = ds(5, domain=mesh, subdomain_data=boundaries)
-        area_outlet5 = assemble(Constant(1.0, name="one") * dso4) # Get error: ufl.log.UFLException: This integral is missing an integration domain.
+        area_outlet5 = assemble(Constant(1.0, name="one") * dso5) # Get error: ufl.log.UFLException: This integral is missing an integration domain.
         print("Inlet/Outlet area for ID# {} is: {:e} m^2\n".format(5,area_outlet5))
         flow_rate_output.append("Inlet/Outlet area for ID# {} is: {:e} m^2\n".format(5,area_outlet5))   
 
     if len(inlet_outlet_ids) > 4:
         dso6 = ds(6, domain=mesh, subdomain_data=boundaries)
-        area_outlet6 = assemble(Constant(1.0, name="one") * dso4) # Get error: ufl.log.UFLException: This integral is missing an integration domain.
+        area_outlet6 = assemble(Constant(1.0, name="one") * dso6) # Get error: ufl.log.UFLException: This integral is missing an integration domain.
         print("Inlet/Outlet area for ID# {} is: {:e} m^2\n".format(6,area_outlet6))
         flow_rate_output.append("Inlet/Outlet area for ID# {} is: {:e} m^2\n".format(6,area_outlet6))      
 
     while True:
 
+        
+        if MPI.rank(MPI.comm_world) == 0:
+            print("=" * 10, "Timestep: {}".format(t), "=" * 10)
         try:
-            if MPI.rank(MPI.comm_world) == 0:
-                print("=" * 10, "Timestep: {}".format(t), "=" * 10)
-    
             # Read in solution to vector function 
             vel_file = h5py.File(file_path_v, 'r')
             vec_name = "VisualisationVector/" + str(file_counter)
@@ -149,16 +152,19 @@ def compute_wss(case_path,mesh_name, dt, stride, save_deg):
         flow_rate_output.append("============ Timestep: {} =============\n".format(t))
         flow_rate_inlet = assemble(inner(u, n)*dsi)
         flow_rate_outlet3 = assemble(inner(u, n)*dso3)
-        flow_rate_outlet4 = assemble(inner(u, n)*dso4)
            
         flow_rate_output.append("Inlet/Outlet flow rate for ID# {} is: {:e} m^3/s\n".format(2,flow_rate_inlet))
         flow_rate_output.append("Inlet/Outlet flow rate for ID# {} is: {:e} m^3/s\n".format(3,flow_rate_outlet3))
-        flow_rate_output.append("Inlet/Outlet flow rate for ID# {} is: {:e} m^3/s\n".format(4,flow_rate_outlet4))
 
         if MPI.rank(MPI.comm_world) == 0:
             print("Inlet/Outlet flow rate for ID# {} is: {:e} m^3/s\n".format(2,flow_rate_inlet))
             print("Inlet/Outlet flow rate for ID# {} is: {:e} m^3/s\n".format(3,flow_rate_outlet3))
-            print("Inlet/Outlet flow rate for ID# {} is: {:e} m^3/s\n".format(4,flow_rate_outlet4))
+
+        if 4 in inlet_outlet_ids:
+            flow_rate_outlet4 = assemble(inner(u, n)*dso4)
+            flow_rate_output.append("Inlet/Outlet flow rate for ID# {} is: {:e} m^3/s\n".format(4,flow_rate_outlet4))
+            if MPI.rank(MPI.comm_world) == 0:
+                print("Inlet/Outlet flow rate for ID# {} is: {:e} m^3/s\n".format(4,flow_rate_outlet4))
 
         if 5 in inlet_outlet_ids:
             flow_rate_outlet5 = assemble(inner(u, n)*dso5)

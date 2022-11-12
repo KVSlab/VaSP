@@ -1,5 +1,6 @@
 import common_meshing
 import numpy as np
+import os
 from dolfin import *  # Import order is important here for some reason... import dolfin here last
 
 # This script creates a solid-only mesh in h5 format from a specified mesh. Currently, it only runs in serial (not parallel)
@@ -11,7 +12,7 @@ from dolfin import *  # Import order is important here for some reason... import
 
 
 folder, mesh_name = common_meshing.read_command_line()
-mesh_path = folder + "/mesh/" + mesh_name +".h5"
+mesh_path = os.path.join(folder,"mesh",mesh_name +".h5")
 
 # Read in original FSI mesh
 mesh = Mesh()

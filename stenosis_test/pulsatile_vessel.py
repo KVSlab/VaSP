@@ -45,12 +45,12 @@ def set_problem_parameters(default_variables, **namespace):
     default_variables.update(dict(
         T=T, # Simulation end time
         dt=dt,#0.00033964286, # Timne step size
-        atol=1e-5, # Absolute tolerance in the Newton solver
-        rtol=1e-5,# Relative tolerance in the Newton solver
+        atol=1e-6, # Absolute tolerance in the Newton solver
+        rtol=1e-6,# Relative tolerance in the Newton solver
         inlet_id=2,  # inlet
         inlet_outlet_s_id=11,  # also the "rigid wall" id for the stucture problem
         recompute=30, # Recompute the Jacobian matix within time steps                                                                                    
-        recompute_tstep=5, # Recompute the Jacobian matix over time steps (dangerous!)  
+        recompute_tstep=10, # Recompute the Jacobian matix over time steps (dangerous!)  
         fsi_id=22,  # fsi surface
         rigid_id=11,  # "rigid wall" id for the fluid and mesh problem
         outer_id=33,  # outer surface
@@ -59,19 +59,19 @@ def set_problem_parameters(default_variables, **namespace):
         Q_file="MCA_10", # This is the location of CFD results used to prescribe the inlet velocity profile
         Q_mean=Q_mean,#1.9275E-06, # Problem specific
         theta=0.50+dt, # Theta scheme (implicit/explicit time stepping)
-        rho_f=1.000E3,    # Fluid density [kg/m3]
-        mu_f=3.5E-3,       # Fluid dynamic viscosity [Pa.s]
+        rho_f=[1.000E3,1.000E3],    # Fluid density [kg/m3]
+        mu_f=[3.5E-3,7.0E-2],       # Fluid dynamic viscosity [Pa.s]
         rho_s=1.0E3,    # Solid density [kg/m3]
         mu_s=mu_s_val,     # Solid shear modulus or 2nd Lame Coef. [Pa]
         nu_s=nu_s_val,      # Solid Poisson ratio [-]
         lambda_s=lambda_s_val,  # Solid Young's modulus [Pa]
-        dx_f_id=1,      # ID of marker in the fluid domain
+        dx_f_id=[1,1001],      # ID of marker in the fluid domain
         dx_s_id=2,      # ID of marker in the solid domain
         extrapolation="laplace",  # laplace, elastic, biharmonic, no-extrapolation
         extrapolation_sub_type="constant",  # ["constant", "small_constant", "volume", "volume_change", "bc1", "bc2"]
         compiler_parameters=_compiler_parameters,  # Update the defaul values of the compiler arguments (FEniCS)
         linear_solver="mumps",  # use list_linear_solvers() to check alternatives
-        checkpoint_step=5, # CHANGE
+        checkpoint_step=50, # CHANGE
         save_step=1, # Save frequency of files for visualisation
         save_deg=save_deg_sim,          # Degree of the functions saved for visualisation '1' '2' '3' etc... (high value can slow down simulation significantly!)
         fsi_region=[x_sphere,y_sphere,z_sphere,r_sphere], # X, Y, and Z coordinate of FSI region center, radius of spherical deformable region (outside this region the walls are rigid)
@@ -80,7 +80,7 @@ def set_problem_parameters(default_variables, **namespace):
 
     return default_variables
 
-def get_mesh_domain_and_boundaries(mesh_file,fsi_region, fsi_id, rigid_id, outer_id, folder, **namespace):
+def get_mesh_domain_and_boundaries(mesh_file,fsi_region, dx_f_id, fsi_id, rigid_id, outer_id, folder, **namespace):
     # Read mesh
     mesh = Mesh()
     hdf = HDF5File(mesh.mpi_comm(), "mesh/" + mesh_file + ".h5", "r")
@@ -108,9 +108,20 @@ def get_mesh_domain_and_boundaries(mesh_file,fsi_region, fsi_id, rigid_id, outer
         i += 1
 
     # # Checking boundaries and domains
-    # f = File('toto.pvd')
-    # f << boundaries
-    # f << domains
+    # In this region, make fluid more viscous
+    x_min = 0.023
+    i = 0
+    for cell in cells(mesh):
+        idx_cell = domains.array()[i]
+        if idx_cell ==  dx_f_id[0]:
+            mid = cell.midpoint()
+            if mid.x() > x_min:
+                domains.array()[i] = dx_f_id[1]  # assign this region lowest E
+        i += 1
+
+    # Checking boundaries and domains
+    f = File('mesh/domains.pvd')
+    f << domains
 
     return mesh, domains, boundaries
 
@@ -165,7 +176,7 @@ def create_bcs(t, v_, DVP, mesh, boundaries, domains, mu_f,
     tmp_area, tmp_center, tmp_radius, tmp_normal = compute_boundary_geometry_acrn(mesh, inlet_id, boundaries)
 
     # Create Womersley boundary condition at inlet
-    inlet = make_womersley_bcs(t_values, Q_values, mesh, mu_f, tmp_area, tmp_center, tmp_radius, tmp_normal, DVP.sub(1).sub(0).ufl_element())
+    inlet = make_womersley_bcs(t_values, Q_values, mesh, mu_f[0], tmp_area, tmp_center, tmp_radius, tmp_normal, DVP.sub(1).sub(0).ufl_element())
 
     # Initialize inlet expressions with initial time
     for uc in inlet:

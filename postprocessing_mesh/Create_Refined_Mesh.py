@@ -21,7 +21,7 @@ parameters["refinement_algorithm"] = "plaza_with_parent_facets" # This is requir
 #    -Add domain creation in other meshing scripts
 
 folder, mesh_name = common_meshing.read_command_line()
-mesh_path = folder + "/mesh/" + mesh_name +".h5"
+mesh_path = os.path.join(folder,"mesh",mesh_name +".h5")
 
 """ -----------------------------------------------------------
 ----------------1. Generate refined mesh-----------------------

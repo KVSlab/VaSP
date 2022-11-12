@@ -14,20 +14,22 @@ import numpy as np
 #################
 # USER INPUTS
 # ################################################################################
-file_name = "offset_stenosis"
-ifile_surface = "surfaces/"+file_name+".stl"
+file_name = "stenosis"
+ifile_surface = "surfaces/"+file_name+".vtp"
+#ifile_surface = "surfaces/"+file_name+"_clipped.stl"
 ofile_mesh = "meshes/"+file_name
-TargetEdgeLength_f = 0.6  # more or less minimum edge length of the fluid mesh (These vary for each case, of course)
-TargetEdgeLength_s = 0.640  # more or less minimum edge length of the solid mesh
-Thick_solid = 0.25  # constant tickness of the solid wall
+TargetEdgeLength_f = 1.8  # more or less minimum edge length of the fluid mesh (These vary for each case, of course)
+TargetEdgeLength_s = 1.950  # more or less minimum edge length of the solid mesh
+Thick_solid = 0.3  # constant tickness of the solid wall
 nb_boundarylayers = 2  # number of sub-boundary layers is the solid and fluid mesh
 BoundaryLayerThicknessFactor = Thick_solid / TargetEdgeLength_f  # Wall Thickness == TargetEdgeLength*BoundaryLayerThicknessFactor
 # Refinement parameters
-seedX = (0.0, 0.0, 1.1)  # location of the seed to refine from (distance based)
+seedX = (0.0, 0.0, 0.0)  # location of the seed to refine from (distance based)
 factor_scale = 5  # multiplier for max element size (orig 2)
 factor_shape = 1.0  # 1==linear scale based on distance (orig 0.1)
 rem_it = 50
 iterations = 50
+clip_surface=True
 
 #factor_scale = 2  # multiplier for max element size (orig 2)
 #factor_shape = 1.0  # 1==linear scale based on distance (orig 0.1)
@@ -63,6 +65,16 @@ reader.InputFileName = ifile_surface
 reader.Execute()
 surface = reader.Surface
 ################################################################################
+if clip_surface:
+    clipp = vmtkscripts.vmtkSurfaceClipper()
+    clipp.Surface = surface
+    clipp.Execute()
+    surface = clipp.Surface
+    writ = vmtkscripts.vmtkSurfaceWriter()
+    writ.Surface=surface
+    writ.Format='stl'
+    writ.OutputFileName = "surfaces/"+file_name+"_clipped.stl"
+    writ.Execute()
 
 N = surface.GetNumberOfPoints()
 dist_array = np.zeros(N)

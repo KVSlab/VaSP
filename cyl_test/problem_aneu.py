@@ -26,7 +26,7 @@ def set_problem_parameters(default_variables, **namespace):
     lambda_s_val = nu_s_val * 2. * mu_s_val / (1. - 2. * nu_s_val)
 
     default_variables.update(dict(
-        T=0.2, # Simulation end time
+        T=0.02, # Simulation end time
         dt=0.001, # Timne step size
         theta=0.501, # Theta scheme (implicit/explicit time stepping)
         atol=1e-5, # Absolute tolerance in the Newton solver

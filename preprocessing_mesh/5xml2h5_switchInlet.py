@@ -12,12 +12,12 @@ inlet_id_actual = 3
 #mesh_name = 'case16_el05'
 #inlet_id_actual = 3
 #mesh_names = ['case3','case11','case12']
-mesh_names = ['offset_stenosis']
+mesh_names = ['stenosis']
 
 #mesh_names = ['case8_el042','case9_el047','case16_el06']
 #inlet_ids = [3,2,4]
 
-inlet_ids = [3]
+inlet_ids = [2]
 for idx in range(len(mesh_names)):
 
     mesh_name = mesh_names[idx]
