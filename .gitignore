@@ -12,6 +12,7 @@
 *.csv
 *.pvtu
 *.stl
+*.pickle
 
 # OS specific files
 .DS_Store
