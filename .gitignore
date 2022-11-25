@@ -1,2 +1,17 @@
 # Compiled files
 *.pyc
+
+# Results files 
+*.pvd
+*.vtu
+*.xml
+*.xdmf
+*.h5
+*.npz
+*.png
+*.csv
+*.pvtu
+*.stl
+
+# OS specific files
+.DS_Store

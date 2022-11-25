@@ -1,9 +1,6 @@
 from dolfin import *
 
-
-
-
-mesh_name = "offset_stenosis"
+mesh_name = "stenosis"
 mesh_file = Mesh("meshes/"+mesh_name+"_fsi.xml")
 
 # Rescale the mesh coordinated from [mm] to [m]

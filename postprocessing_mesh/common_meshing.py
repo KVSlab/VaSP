@@ -10,7 +10,7 @@ def read_command_line():
 
     parser.add_argument('--case', type=str, default="cyl_test", help="Path to simulation results",
                         metavar="PATH")
-    parser.add_argument('--mesh', type=str, default="artery_coarse_rescaled", help="Mesh File Name",
+    parser.add_argument('--mesh', type=str, default="file_stenosis", help="Mesh File Name",
                         metavar="PATH")
 
     args = parser.parse_args()

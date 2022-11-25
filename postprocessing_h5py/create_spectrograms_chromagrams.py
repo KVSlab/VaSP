@@ -2,7 +2,6 @@ import os
 import numpy as np
 import postprocessing_common_h5py
 import spectrograms as spec
-#import matplotlib.pyplot as plt
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 

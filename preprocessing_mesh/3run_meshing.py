@@ -17,6 +17,7 @@ import numpy as np
 file_name = "stenosis"
 ifile_surface = "surfaces/"+file_name+".vtp"
 #ifile_surface = "surfaces/"+file_name+"_clipped.stl"
+# FIXME: meshes/ does not exit and we need to create a folder before running this script
 ofile_mesh = "meshes/"+file_name
 TargetEdgeLength_f = 1.8  # more or less minimum edge length of the fluid mesh (These vary for each case, of course)
 TargetEdgeLength_s = 1.950  # more or less minimum edge length of the solid mesh

@@ -3,7 +3,7 @@ from dolfin import *
 
 #mesh_name = 'case8_el042'
 #inlet_id_actual = 4
-mesh_name = 'offset_stenosis'
+mesh_name = 'stenosis'
 inlet_id_actual = 3
 #mesh_name = 'case16_el06'
 #inlet_id_actual = 4
