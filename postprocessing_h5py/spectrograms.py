@@ -8,16 +8,23 @@ import matplotlib.pyplot as plt
 from scipy.signal import butter, lfilter, filtfilt
 from scipy.signal import spectrogram, periodogram
 import scipy
-print(scipy.__version__)
 import random
 from scipy.interpolate import RectBivariateSpline
 from scipy.stats import entropy
+from scipy.spatial import cKDTree as KDTree 
+import random
+import time
 
 from tempfile import mkdtemp
 import os
 import configparser
+from argparse import ArgumentParser
 import postprocessing_common_h5py
-
+try:
+    import postprocessing_common_pv
+    import pyvista as pv
+except:
+    print("Could not import pyvista and/or vtk, install these packages or use 'RandomPoint' sampling for spectrograms.")
 """
 This library contains helper functions for creating spectrograms.
 """
@@ -54,13 +61,43 @@ def read_spec_config(config_file,dvp):
 
     return overlapFrac, window, n_samples, nWindow_per_sec, lowcut, thresh_val, max_plot, amplitude_file_name, flow_rate_file_name
 
+def read_command_line_spec():
+    """Read arguments from commandline"""
+    parser = ArgumentParser()
+
+    parser.add_argument('--case', type=str, default="cyl_test", help="Path to simulation results",
+                        metavar="PATH")
+    parser.add_argument('--mesh', type=str, default="artery_coarse_rescaled", help="Mesh File Name",
+                        metavar="PATH")
+    parser.add_argument('--save_deg', type=int, default=2, help="Input save_deg of simulation, i.e whether the intermediate P2 nodes were saved. Entering save_deg = 1 when the simulation was run with save_deg = 2 will result in only the corner nodes being used in postprocessing")
+    parser.add_argument('--stride', type=int, default=1, help="Desired frequency of output data (i.e to output every second step, stride = 2)")    
+    parser.add_argument('--start_t', type=float, default=0.0, help="Start time of simulation (s)")
+    parser.add_argument('--end_t', type=float, default=0.05, help="End time of simulation (s)")
+    parser.add_argument('--lowcut', type=float, default=25, help="High pass filter cutoff frequency (Hz)")
+    parser.add_argument('--ylim', type=float, default=800, help="y limit of spectrogram graph")
+    parser.add_argument('--r_sphere', type=float, default=1000000, help="Sphere in which to include points for spectrogram, this is the sphere radius")
+    parser.add_argument('--x_sphere', type=float, default=0.0, help="Sphere in which to include points for spectrogram, this is the x coordinate of the center of the sphere (in m)")
+    parser.add_argument('--y_sphere', type=float, default=0.0, help="Sphere in which to include points for spectrogram, this is the y coordinate of the center of the sphere (in m)")
+    parser.add_argument('--z_sphere', type=float, default=0.0, help="Sphere in which to include points for spectrogram, this is the z coordinate of the center of the sphere (in m)")
+    parser.add_argument('--dvp', type=str, default="v", help="Quantity to postprocess, input v for velocity, d for displacement, p for pressure, or wss for wall shear stress")
+    parser.add_argument('--Re_a', type=float, default=0.0, help="Assuming linearly increasing Reynolds number: Re(t) = Re_a*t + Re_b . if both Re_a and Re_b are 0, don't plot against Re.")
+    parser.add_argument('--Re_b', type=float, default=0.0, help="Assuming linearly increasing Reynolds number: Re(t) = Re_a*t + Re_b . if both Re_a and Re_b are 0, don't plot against Re.")
+    parser.add_argument('--interface_only', type=bool, default=False, help="True gives you only spectrogram for the fluid-solid interface, 'False' gives you the volumetric spectrogram for all fluid in the sac or all the nodes thru the wall")
+    parser.add_argument('--sampling_method', type=str, default="RandomPoint", help="'RandomPoint' (choose random nodes), 'SinglePoint' (choose Single Point with ID = 'point_id') or 'Spatial' (ensures uniform spatial sampling, e.g, in the case of fluid boundary layer the sampling will not bias towards the BL)")
+    parser.add_argument('--component', type=str, default="mag", help="x, y, z or mag (magnitude)")
+    parser.add_argument('--n_samples', type=int, default=10000, help="Number of samples for spectrogram (ignored for SinglePoint sampling)")
+    parser.add_argument('--point_id', type=int, default=-1000000, help="Point ID for SinglePoint sampling")
+
+    args = parser.parse_args()
+
+    return args.case, args.mesh, args.save_deg, args.stride, args.start_t, args.end_t, args.lowcut, args.ylim, args.r_sphere, args.x_sphere, args.y_sphere, args.z_sphere, args.dvp, args.Re_a, args.Re_b, args.interface_only, args.sampling_method, args.component, args.n_samples, args.point_id
 
 
-def read_spectrogram_data(case_path, mesh_name, save_deg, stride, start_t, end_t, lowcut, ylim, r_sphere, x_sphere, y_sphere, z_sphere, dvp, p_spec_type,flow_rate_file_name=None):
-
+def read_spectrogram_data(case_path, mesh_name, save_deg, stride, start_t, end_t, n_samples, ylim, r_sphere, x_sphere, y_sphere, z_sphere, dvp, interface_only,component,point_id,flow_rate_file_name=None,sampling_method="RandomPoint"):
     
     case_name = os.path.basename(os.path.normpath(case_path)) # obtains only last folder in case_path
     visualization_path = postprocessing_common_h5py.get_visualization_path(case_path)
+
     
     
     #--------------------------------------------------------
@@ -83,9 +120,8 @@ def read_spectrogram_data(case_path, mesh_name, save_deg, stride, start_t, end_t
         os.makedirs(imageFolder)
     
     #  output folder and filenames (if these exist already, they will not be re-generated)
-    output_file_name = case_name+"_"+ dvp+"_mag.npz" 
+    output_file_name = case_name+"_"+ dvp+"_"+component+".npz" 
     formatted_data_path = formatted_data_folder+"/"+output_file_name
-    
 
     #--------------------------------------------------------
     # 2. Prepare data
@@ -99,11 +135,10 @@ def read_spectrogram_data(case_path, mesh_name, save_deg, stride, start_t, end_t
     else: 
         # Make the output h5 files with dvp magnitudes
         _ = postprocessing_common_h5py.create_transformed_matrix(visualization_path, formatted_data_folder, mesh_path, case_name, start_t,end_t,dvp,stride)
-    
+
     # For spectrograms, we only want the magnitude
-    component = dvp+"_mag"
     df = postprocessing_common_h5py.read_npz_files(formatted_data_path)
-       
+      
     # Get wall and fluid ids
     fluidIDs, wallIDs, allIDs = postprocessing_common_h5py.get_domain_ids(mesh_path)
     interfaceIDs = postprocessing_common_h5py.get_interface_ids(mesh_path)
@@ -121,19 +156,92 @@ def read_spectrogram_data(case_path, mesh_name, save_deg, stride, start_t, end_t
     allIDs=list(set(sphereIDs).intersection(allIDs))
     fluidIDs=list(set(sphereIDs).intersection(fluidIDs))
     wallIDs=list(set(sphereIDs).intersection(wallIDs))
-    
-    if dvp == "d":
-        df = df.iloc[wallIDs]    # For displacement spectrogram, we need to take only the wall IDs
-    elif dvp == "wss":
-        df = df.iloc[sphereIDs]  # for wss spectrogram, we use all the nodes within the sphere because the input df only includes the wall
-    elif dvp == "p" and p_spec_type == "wall":
-        df = df.iloc[interfaceIDs]   # For wall pressure spectrogram, we need to take only the interface IDs
-        dvp=dvp+"_wall"
+    interfaceIDs=list(set(sphereIDs).intersection(interfaceIDs))
+
+
+    if dvp == "wss":
+        region_ids = sphereIDs  # for wss spectrogram, we use all the nodes within the sphere because the input df only includes the wall
+    elif interface_only:
+        region_ids = interfaceIDs   # Use only the interface IDs
+        dvp=dvp+"_interface"
+    elif dvp == "d":
+        region_ids = wallIDs    # For displacement spectrogram, we need to take only the wall IDs
     else:
-        df = df.iloc[fluidIDs]   # For velocity spectrogram, we need to take only the fluid IDs
+        region_ids = fluidIDs   # For pressure and velocity spectrogram, we need to take only the fluid IDs
+
+
+
+    # Sample data (reduce compute time by random sampling)
+    if sampling_method == "RandomPoint":
+        idx_sampled = np.random.choice(region_ids, n_samples)
+    elif sampling_method == "SinglePoint":
+        idx_sampled = [point_id]
+        case_name=case_name+"_"+sampling_method+"_"+str(point_id)
+        print("Single Point spectrogram for point: "+str(point_id))
+    elif sampling_method == "Spatial":
+        mesh, surf = postprocessing_common_pv.assemble_mesh(mesh_path)
+
+        #bounds=surf.bounds
+        # Rectangular bounds of FSI region (for equispaced point cloud generation)
+        bounds = [x_sphere-r_sphere, x_sphere+r_sphere, y_sphere-r_sphere, y_sphere+r_sphere, z_sphere-r_sphere, z_sphere+r_sphere]    
+
+        # Create 50x50x50 point cloud in shape of bounding box (this becomes very slow if >100 subdivisions are used )
+        points = generate_points(bounds,subdivisions=50)
+
+        
+        point_cloud=pv.PolyData(points) # Wrap for use of pyvista
+        sphere = pv.Sphere(radius=r_sphere, center=(x_sphere, y_sphere, z_sphere))
+
+        # shape point cloud using outer aneurysm surface and FSI region sphere
+        surf_sel = point_cloud.select_enclosed_points(surf, tolerance=0.01).threshold(value=0.5,scalars='SelectedPoints')
+        sphere_sel = surf_sel.select_enclosed_points(sphere, tolerance=0.01).threshold(value=0.5,scalars='SelectedPoints')
+
+        tree = KDTree(coords)
+        _, idx = tree.query(sphere_sel.points) #find closest node to the points in the equispaced points  
+
+        # Remove nodes not in fluid region (or solid region if using Spatial sampling for wall)
+        equispaced_fluid_ids = [x for x in idx if x in region_ids]
+        
+        # Sample Equispaced points
+        idx_sampled = np.random.choice(equispaced_fluid_ids, n_samples)
+
+        #idx_sampled_set = set(idx_sampled)
+        ## compare the length and print if the list contains duplicates
+        #if len(idx_sampled) != len(idx_sampled_set):
+        #    print("duplicates found in the list")
+        #else:
+        #    print("No duplicates found in the list")
+        #
+        #sampled_point_cloud=pv.PolyData(coords[idx_sampled])
+        #plotter= pv.Plotter(off_screen=True)
+        #plotter.add_mesh(surf, 
+        #                color='red', 
+        #                show_scalar_bar=False,
+        #                opacity=0.05)
+        #
+        #plotter.add_points(sampled_point_cloud, render_points_as_spheres=True, point_size=0.03)
+        #plotter.show(auto_close=False)  
+        #plotter.show(screenshot=imageFolder + "/points"+str(idx_sampled[0])+".png")
+
+        case_name=case_name+"_"+sampling_method
     
+    df = df.iloc[idx_sampled]
+    dvp=dvp+"_"+component
        
     return dvp, df, case_name, case_path, imageFolder, visualization_hi_pass_folder
+
+def generate_points(bounds, subdivisions=50):
+    x_points=np.linspace(bounds[0], bounds[1],num=subdivisions)
+    y_points=np.linspace(bounds[2], bounds[3],num=subdivisions)
+    z_points=np.linspace(bounds[4], bounds[5],num=subdivisions)
+    points = np.zeros((subdivisions**3,3))
+    for i in range(subdivisions):
+        for j in range(subdivisions):
+            for k in range(subdivisions):
+                ijk = (subdivisions**2)*i + subdivisions*j + k
+                points[ijk,:] = [x_points[i], y_points[j], z_points[k]]
+    return points    
+
 
 def get_location_from_pointID(probeID,polydata):
 	nearestPointLoc = [10000,10000,10000]

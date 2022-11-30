@@ -55,8 +55,8 @@ def compute_spi(case_path, mesh_name, save_deg, stride, start_t, end_t, dvp, ban
         mesh_path = case_path + "/mesh/" + mesh_name +"_refined.h5" # Mesh path. Points to the visualization mesh with intermediate nodes 
         mesh_path_fluid = mesh_path.replace(".h5","_fluid_only.h5")
     
-    formatted_data_folder_name = "res_"+case_name+'_stride_'+str(stride)+"t"+str(start_t)+"_to_"+str(end_t)+"save_deg_"+str(save_deg)
-    formatted_data_folder = os.path.join(case_path,formatted_data_folder_name)
+    
+    formatted_data_folder = "res_"+case_name+'_stride_'+str(stride)+"t"+str(start_t)+"_to_"+str(end_t)+"save_deg_"+str(save_deg)
     visualization_separate_domain_folder = os.path.join(visualization_path,"../Visualization_separate_domain")
     
     # For wall shear stress, pressure, displacement or velocity
@@ -84,6 +84,6 @@ def compute_spi(case_path, mesh_name, save_deg, stride, start_t, end_t, dvp, ban
 
 
 if __name__ == '__main__':
-    case_path, mesh_name, save_deg, stride, start_t, end_t, dvp, bands = postprocessing_common_h5py.read_command_line_spi()
+    case_path, mesh_name, save_deg, stride, _, start_t, end_t, dvp, bands = postprocessing_common_h5py.read_command_line()
     compute_spi(case_path, mesh_name, save_deg, stride, start_t, end_t, dvp, bands)
 
