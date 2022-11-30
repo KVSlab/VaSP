@@ -1,10 +1,10 @@
 import os
 import numpy as np
-import postprocessing_common_h5py
 import spectrograms as spec
 #import matplotlib.pyplot as plt
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from scipy.io import wavfile
 
 """
 This script creates spectrograms, power spectral density and chromagrams from formatted matrices (.npz files)"
@@ -24,13 +24,13 @@ Args:
     y_sphere: Sphere in which to include points for spectrogram, this is the y coordinate of the center of the sphere (in m)
     z_sphere: Sphere in which to include points for spectrogram, this is the z coordinate of the center of the sphere (in m)
     dvp: "d", "v", "p", or "wss", parameter to postprocess
-    p_spec_type: if dvp = p, "wall" results in pressure at the wall only, any other option will result in all fluid nodes being considered
+    interface_only: uses nodes at the interface only. Used for wall pressure spectrogram primarily
 
 """
 
 def create_spectrogram_composite(case_name, dvp, df, start_t, end_t, 
-                                 n_samples, nWindow_per_sec, overlapFrac, 
-                                 window, thresh_val, max_plot, imageFolder, 
+                                 nWindow_per_sec, overlapFrac, 
+                                 window, lowcut, thresh_val, max_plot, imageFolder, 
                                  flow_rate_file=None, amplitude_file=None,
                                  power_scaled=False):
 
@@ -41,8 +41,7 @@ def create_spectrogram_composite(case_name, dvp, df, start_t, end_t,
     # Get sampling constants
     T, _, fs = spec.get_sampling_constants(df,start_t,end_t)
 
-    # Sample data (reduce compute time by random sampling)
-    df = df.sample(n=n_samples)
+
     # High-pass filter dataframe for spectrogram
     df_filtered = spec.filter_time_data(df,fs,
                                         lowcut=lowcut,
@@ -51,6 +50,23 @@ def create_spectrogram_composite(case_name, dvp, df, start_t, end_t,
                                         btype='highpass')
 
     
+
+    #length = end_t - start_t
+    #t = np.linspace(0, length, fs * length)  #  Produces a 5 second Audio-File
+
+    #y2 = df_filtered.iloc[3]/np.max(df_filtered.iloc[3])
+#
+    #fullname2 = dvp+ '_sound_'+str(y2.name)+"_"+case_name
+    #path_to_fig2 = os.path.join(imageFolder, fullname2 + '.wav')
+    #from scipy.io import wavfile
+    #wavfile.write(path_to_fig2, int(fs), y2)
+#
+    #y2 = df_filtered.iloc[10]/np.max(df_filtered.iloc[3])
+    #fullname2 = dvp+ '_sound_'+str(y2.name)+"_"+case_name
+    #path_to_fig2 = os.path.join(imageFolder, fullname2 + '.wav')
+    #from scipy.io import wavfile
+    #wavfile.write(path_to_fig2, int(fs), y2)
+
     # PSD calculation
     Pxx_array, freq_array = spec.get_psd(df_filtered,fs)
     # Plot PSD
@@ -179,10 +195,37 @@ def create_spectrogram_composite(case_name, dvp, df, start_t, end_t,
     path_to_fig = os.path.join(imageFolder, fullname + '.png')
     fig2.savefig(path_to_fig)
 
+
+def sonify_point(case_name, dvp, df, start_t, end_t, overlapFrac, lowcut, imageFolder):
+
+
+    # Get sampling constants
+    T, _, fs = spec.get_sampling_constants(df,start_t,end_t)
+
+    # High-pass filter dataframe for spectrogram
+    df_filtered = spec.filter_time_data(df,fs,
+                                        lowcut=lowcut,
+                                        highcut=15000.0,
+                                        order=6,
+                                        btype='highpass')
+
+
+    length = end_t - start_t
+    t = np.linspace(0, length, int(fs * length))  #  Produces a 5 second Audio-File
+    y2 = df_filtered.iloc[0]/np.max(df_filtered.iloc[0])
+    fullname2 = dvp+ '_sound_'+str(y2.name)+"_"+case_name
+    path_to_fig2 = os.path.join(imageFolder, fullname2 + '.wav')
+    wavfile.write(path_to_fig2, int(fs), y2)
+
+
 if __name__ == '__main__':
     # Load in case-specific parameters
-    case_path, mesh_name, save_deg, stride,  start_t, end_t, lowcut, ylim, r_sphere, x_sphere, y_sphere, z_sphere, dvp, _, _, p_spec_type = postprocessing_common_h5py.read_command_line_spec()
-    
+    case_path, mesh_name, save_deg, stride,  start_t, end_t, lowcut, ylim, r_sphere, x_sphere, y_sphere, z_sphere, dvp, _, _, interface_only, sampling_method, component, _, point_id = spec.read_command_line_spec()
+
+    # Read fixed spectrogram parameters from config file
+    config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),"Spectrogram.config")
+    overlapFrac, window, n_samples, nWindow_per_sec, lowcut, thresh_val, max_plot, amplitude_file_name, flow_rate_file_name = spec.read_spec_config(config_file,dvp)
+
     # Create or read in spectrogram dataframe
     dvp, df, case_name, case_path, imageFolder, visualization_hi_pass_folder  = spec.read_spectrogram_data(case_path, 
                                                                                                            mesh_name, 
@@ -190,35 +233,37 @@ if __name__ == '__main__':
                                                                                                            stride, 
                                                                                                            start_t, 
                                                                                                            end_t, 
-                                                                                                           lowcut,
+                                                                                                           n_samples, 
                                                                                                            ylim, 
                                                                                                            r_sphere, 
                                                                                                            x_sphere, 
                                                                                                            y_sphere, 
                                                                                                            z_sphere, 
                                                                                                            dvp, 
-                                                                                                           p_spec_type, 
-                                                                                                           flow_rate_file_name='MCA_10')
+                                                                                                           interface_only, 
+                                                                                                           component,
+                                                                                                           point_id,
+                                                                                                           flow_rate_file_name='MCA_10',
+                                                                                                           sampling_method=sampling_method)
     
-    # Read fixed spectrogram parameters from config file
-    config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),"Spectrogram.config")
-    overlapFrac, window, n_samples, nWindow_per_sec, lowcut, thresh_val, max_plot, amplitude_file_name, flow_rate_file_name = spec.read_spec_config(config_file,dvp)
+
     amplitude_file = os.path.join(visualization_hi_pass_folder,amplitude_file_name)    
     flow_rate_file = os.path.join(case_path, flow_rate_file_name) 
-
     # Create spectrograms
     create_spectrogram_composite(case_name, 
                                  dvp, 
                                  df,
                                  start_t, 
                                  end_t, 
-                                 n_samples, 
                                  nWindow_per_sec, 
                                  overlapFrac, 
                                  window, 
+                                 lowcut,
                                  thresh_val, 
                                  max_plot, 
                                  imageFolder, 
-                                 flow_rate_file=flow_rate_file,
-                                 amplitude_file=amplitude_file,
+                                 flow_rate_file=None,
+                                 amplitude_file=None,
                                  power_scaled=False)
+    if sampling_method=="SinglePoint":
+        sonify_point(case_name, dvp, df, start_t, end_t, overlapFrac, lowcut, imageFolder)

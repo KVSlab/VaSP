@@ -43,52 +43,6 @@ def read_command_line():
 
     return args.case, args.mesh, args.save_deg, args.stride, args.dt, args.start_t, args.end_t, args.dvp, args.bands
 
-def read_command_line_spi():
-    """Read arguments from commandline"""
-    parser = ArgumentParser()
-
-    parser.add_argument('--case', type=str, default="cyl_test", help="Path to simulation results",
-                        metavar="PATH")
-    parser.add_argument('--mesh', type=str, default="artery_coarse_rescaled", help="Mesh File Name",
-                        metavar="PATH")
-    parser.add_argument('--save_deg', type=int, default=2, help="Input save_deg of simulation, i.e whether the intermediate P2 nodes were saved. Entering save_deg = 1 when the simulation was run with save_deg = 2 will result in only the corner nodes being used in postprocessing")
-    parser.add_argument('--stride', type=int, default=1, help="Desired frequency of output data (i.e to output every second step, stride = 2)")    
-    parser.add_argument('--start_t', type=float, default=0.0, help="Start time of simulation (s)")
-    parser.add_argument('--end_t', type=float, default=0.05, help="End time of simulation (s)")
-    parser.add_argument('--dvp', type=str, default="v", help="Quantity to postprocess, input v for velocity, d for displacement, p for pressure, or wss for wall shear stress")
-    parser.add_argument('--bands', default="25,100000", help="input lower then upper frequency threshold for SPI, in a list of pairs. for example: --bands '100 150 175 200' gives you SPI between 100 and 150Hz, and another visualization for SPI between 175 and 200Hz")
-
-    args = parser.parse_args()
-
-    return args.case, args.mesh, args.save_deg, args.stride, args.start_t, args.end_t, args.dvp, args.bands
-
-def read_command_line_spec():
-    """Read arguments from commandline"""
-    parser = ArgumentParser()
-
-    parser.add_argument('--case', type=str, default="cyl_test", help="Path to simulation results",
-                        metavar="PATH")
-    parser.add_argument('--mesh', type=str, default="artery_coarse_rescaled", help="Mesh File Name",
-                        metavar="PATH")
-    parser.add_argument('--save_deg', type=int, default=2, help="Input save_deg of simulation, i.e whether the intermediate P2 nodes were saved. Entering save_deg = 1 when the simulation was run with save_deg = 2 will result in only the corner nodes being used in postprocessing")
-    parser.add_argument('--stride', type=int, default=1, help="Desired frequency of output data (i.e to output every second step, stride = 2)")    
-    parser.add_argument('--start_t', type=float, default=0.0, help="Start time of simulation (s)")
-    parser.add_argument('--end_t', type=float, default=0.05, help="End time of simulation (s)")
-    parser.add_argument('--lowcut', type=float, default=25, help="High pass filter cutoff frequency (Hz)")
-    parser.add_argument('--ylim', type=float, default=800, help="y limit of spectrogram graph")
-    parser.add_argument('--r_sphere', type=float, default=1000000, help="Sphere in which to include points for spectrogram, this is the sphere radius")
-    parser.add_argument('--x_sphere', type=float, default=0.0, help="Sphere in which to include points for spectrogram, this is the x coordinate of the center of the sphere (in m)")
-    parser.add_argument('--y_sphere', type=float, default=0.0, help="Sphere in which to include points for spectrogram, this is the y coordinate of the center of the sphere (in m)")
-    parser.add_argument('--z_sphere', type=float, default=0.0, help="Sphere in which to include points for spectrogram, this is the z coordinate of the center of the sphere (in m)")
-    parser.add_argument('--dvp', type=str, default="v", help="Quantity to postprocess, input v for velocity, d for displacement, p for pressure, or wss for wall shear stress")
-    parser.add_argument('--Re_a', type=float, default=0.0, help="Assuming linearly increasing Reynolds number: Re(t) = Re_a*t + Re_b . if both Re_a and Re_b are 0, don't plot against Re.")
-    parser.add_argument('--Re_b', type=float, default=0.0, help="Assuming linearly increasing Reynolds number: Re(t) = Re_a*t + Re_b . if both Re_a and Re_b are 0, don't plot against Re.")
-    parser.add_argument('--p_spec_type', type=str, default="wall", help="For pressure spectrogram, 'wall gives you only pressure spectrogram for the wall, 'volumetric' gives you the spectrogram for all fluid in the sac")
-
-    args = parser.parse_args()
-
-    return args.case, args.mesh, args.save_deg, args.stride, args.start_t, args.end_t, args.lowcut, args.ylim, args.r_sphere, args.x_sphere, args.y_sphere, args.z_sphere, args.dvp, args.Re_a, args.Re_b, args.p_spec_type
-
 
 def get_visualization_path(case_path):
 
