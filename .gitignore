@@ -16,3 +16,13 @@
 
 # OS specific files
 .DS_Store
+
+# Mesh files
+*.vtp
+*_probe_point
+*.xml
+*.xml.gz
+
+#Others
+*.sh
+*.json
