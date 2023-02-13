@@ -1,40 +1,43 @@
+import argparse
+from pathlib import Path
 from dolfin import *
 
+def commandLine():
+    """
+    args:
+        None
+    return:
+        None
+    """
+    parser = argparse.ArgumentParser(description='Switch inlet in the mesh file')
+    parser.add_argument('-folder_path', type=Path, help='Path to the folder containing the mesh file')
+    parser.add_argument('-mesh_name', type=str, help='name of the mesh file (without extension)')
+    parser.add_argument('-inlet_id_actual', type=int, help='id of the inlet in the mesh file')
+    args = parser.parse_args()
+    return args
 
-#mesh_name = 'case8_el042'
-#inlet_id_actual = 4
-mesh_name = 'stenosis'
-inlet_id_actual = 3
-#mesh_name = 'case16_el06'
-#inlet_id_actual = 4
-#mesh_name = 'case16_el06_1Layer'
-#inlet_id_actual = 4
-#mesh_name = 'case16_el05'
-#inlet_id_actual = 3
-#mesh_names = ['case3','case11','case12']
-mesh_names = ['stenosis']
-
-#mesh_names = ['case8_el042','case9_el047','case16_el06']
-#inlet_ids = [3,2,4]
-
-inlet_ids = [2]
-for idx in range(len(mesh_names)):
-
-    mesh_name = mesh_names[idx]
-    inlet_id_actual = inlet_ids[idx]
-    mesh_file = Mesh("meshes/"+mesh_name+"_fsi.xml")
-    
+def switchInlet(folder_path, mesh_name, inlet_id_actual):
+    """
+    args:
+        folder_path: Path to the folder containing the mesh file
+        mesh_name: name of the mesh file (without extension)
+        inlet_id_actual: id of the inlet in the mesh file
+    return:
+        None (save the new mesh file)
+    """
+    mesh_name_xml = mesh_name+".xml"
+    mesh = Mesh(str(folder_path / mesh_name_xml))
     # Rescale the mesh coordinated from [mm] to [m]
-    x = mesh_file.coordinates()
+    x = mesh.coordinates()
     scaling_factor = 0.001  # from mm to m
     x[:, :] *= scaling_factor
-    mesh_file.bounding_box_tree().build(mesh_file)
+    mesh.bounding_box_tree().build(mesh)
     
     # Convert subdomains to mesh function
-    boundaries = MeshFunction("size_t", mesh_file, 2, mesh_file.domains())
+    boundaries = MeshFunction("size_t", mesh, 2, mesh.domains())
     
     boundaries.set_values(boundaries.array()+1)  # FIX ME, THIS IS NOT NORMAL!
-    #print(boundaries.array())
+    
     for i in range(0,len(boundaries.array())):
         if boundaries.array()[i]==1:
             boundaries.array()[i] = 0
@@ -44,20 +47,25 @@ for idx in range(len(mesh_names)):
             boundaries.array()[i] = 2 # we want the inlet to be 2s
     
     # ---------------------
-    ff = File("meshes/"+mesh_name+"_boundaries.pvd")
+    boundary_file = mesh_name+"_boundaries.pvd"
+    ff = File(str(folder_path / boundary_file))
     ff << boundaries
-
-    domains = MeshFunction("size_t", mesh_file, 3, mesh_file.domains())
+    domain_file = mesh_name+"_domains.pvd"
+    domains = MeshFunction("size_t", mesh, 3, mesh.domains())
     domains.set_values(domains.array()+1)  # in order to have fluid==1 and solid==2
 
-    ff = File("meshes/"+mesh_name+"_domains.pvd")
+    ff = File(str(folder_path / domain_file))
     ff << domains   
-
-    hdf = HDF5File(mesh_file.mpi_comm(), "meshes/file_"+mesh_name+".h5", "w")
-    hdf.write(mesh_file, "/mesh")
+    hd5_file = mesh_name+".h5"
+    hdf = HDF5File(mesh.mpi_comm(), str(folder_path / hd5_file), "w")
+    hdf.write(mesh, "/mesh")
     hdf.write(boundaries, "/boundaries")
     hdf.write(domains, "/domains")
     
-    print("PASSED SERIAL MESH TREATMENT, SAVED TO:")
-    print("../meshes/file_"+mesh_name+".h5")
+    print("PASSED SERIAL MESH TREATMENT")
     
+    return None
+
+if __name__ == "__main__":
+    args = commandLine()
+    switchInlet(args.folder_path, args.mesh_name, args.inlet_id_actual)
