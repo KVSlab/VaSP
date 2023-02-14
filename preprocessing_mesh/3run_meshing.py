@@ -14,23 +14,23 @@ import numpy as np
 #################
 # USER INPUTS
 # ################################################################################
-file_name = "stenosis"
-ifile_surface = "surfaces/"+file_name+".vtp"
-#ifile_surface = "surfaces/"+file_name+"_clipped.stl"
-# FIXME: meshes/ does not exit and we need to create a folder before running this script
-ofile_mesh = "meshes/"+file_name
-TargetEdgeLength_f = 1.8  # more or less minimum edge length of the fluid mesh (These vary for each case, of course)
-TargetEdgeLength_s = 1.950  # more or less minimum edge length of the solid mesh
-Thick_solid = 0.3  # constant tickness of the solid wall
-nb_boundarylayers = 2  # number of sub-boundary layers is the solid and fluid mesh
-BoundaryLayerThicknessFactor = Thick_solid / TargetEdgeLength_f  # Wall Thickness == TargetEdgeLength*BoundaryLayerThicknessFactor
-# Refinement parameters
-seedX = (0.0, 0.0, 0.0)  # location of the seed to refine from (distance based)
-factor_scale = 5  # multiplier for max element size (orig 2)
-factor_shape = 1.0  # 1==linear scale based on distance (orig 0.1)
-rem_it = 50
-iterations = 50
-clip_surface=True
+# file_name = "stenosis"
+# ifile_surface = "surfaces/"+file_name+".vtp"
+# #ifile_surface = "surfaces/"+file_name+"_clipped.stl"
+# # FIXME: meshes/ does not exit and we need to create a folder before running this script
+# ofile_mesh = "meshes/"+file_name
+# TargetEdgeLength_f = 1.8  # more or less minimum edge length of the fluid mesh (These vary for each case, of course)
+# TargetEdgeLength_s = 1.950  # more or less minimum edge length of the solid mesh
+# Thick_solid = 0.3  # constant tickness of the solid wall
+# nb_boundarylayers = 2  # number of sub-boundary layers is the solid and fluid mesh
+# BoundaryLayerThicknessFactor = Thick_solid / TargetEdgeLength_f  # Wall Thickness == TargetEdgeLength*BoundaryLayerThicknessFactor
+# # Refinement parameters
+# seedX = (0.0, 0.0, 0.0)  # location of the seed to refine from (distance based)
+# factor_scale = 5  # multiplier for max element size (orig 2)
+# factor_shape = 1.0  # 1==linear scale based on distance (orig 0.1)
+# rem_it = 50
+# iterations = 50
+clip_surface=False
 
 #factor_scale = 2  # multiplier for max element size (orig 2)
 #factor_shape = 1.0  # 1==linear scale based on distance (orig 0.1)
@@ -44,20 +44,20 @@ clip_surface=True
 ##################
 ## USER INPUTS
 ## ################################################################################
-#file_name = "case9_el047"
-#ifile_surface = "surfaces/"+file_name+"_nocap.stl"
-#ofile_mesh = "meshes/"+file_name
-#TargetEdgeLength_f = 0.400  # more or less minimum edge length of the fluid mesh .410 is good too
-#TargetEdgeLength_s = 0.420  # more or less minimum edge length of the solid mesh .430 is good too
-#Thick_solid = 0.25  # constant tickness of the solid wall
-#nb_boundarylayers = 2  # number of sub-boundary layers is the solid and fluid mesh
-#BoundaryLayerThicknessFactor = Thick_solid / TargetEdgeLength_f  # Wall Thickness == TargetEdgeLength*BoundaryLayerThicknessFactor
-## Refinement parameters
-#seedX = (123.099, 134.62, 64.087)  # location of the seed to refine from (distance based)
-#factor_scale = 5  # multiplier for max element size (orig 2)
-#factor_shape = 1.0  # 1==linear scale based on distance (orig 0.1)
-#rem_it = 100
-#iterations = 200
+file_name = "dab_mesh" 
+ifile_surface = "surfaces/"+file_name+".stl"
+ofile_mesh = "meshes/"+file_name
+TargetEdgeLength_f = 0.340  # more or less minimum edge length of the fluid mesh .410 is good too
+TargetEdgeLength_s = 0.360 # more or less minimum edge length of the solid mesh .430 is good too
+Thick_solid = 0.25  # constant tickness of the solid wall
+nb_boundarylayers = 2  # number of sub-boundary layers is the solid and fluid mesh
+BoundaryLayerThicknessFactor = Thick_solid / TargetEdgeLength_f  # Wall Thickness == TargetEdgeLength*BoundaryLayerThicknessFactor
+# Refinement parameters
+seedX = (123.099, 134.62, 64.087)  # location of the seed to refine from (distance based)
+factor_scale = 5  # multiplier for max element size (orig 2)
+factor_shape = 1.0  # 1==linear scale based on distance (orig 0.1)
+rem_it = 200
+iterations = 200
 
 
 # Read vtp surface file (vtp) ##################################################
@@ -128,13 +128,13 @@ meshGenerator.Surface = surface
 #meshGenerator.SkipRemeshing = 1
 meshGenerator.ElementSizeMode = 'edgelength'
 meshGenerator.TargetEdgeLength = TargetEdgeLength_f
-#meshGenerator.MaxEdgeLength = 20*meshGenerator.TargetEdgeLength
-#meshGenerator.MinEdgeLength = 0.4*meshGenerator.TargetEdgeLength
+meshGenerator.MaxEdgeLength = 20*meshGenerator.TargetEdgeLength
+meshGenerator.MinEdgeLength = 0.4*meshGenerator.TargetEdgeLength
 # for boundary layer (used for both fluid boundary layer and solid domain)
 meshGenerator.BoundaryLayer = 1
 meshGenerator.NumberOfSubLayers = nb_boundarylayers
 meshGenerator.BoundaryLayerOnCaps = 0
-meshGenerator.SubLayerRatio = 1
+meshGenerator.SubLayerRatio = 0.75
 meshGenerator.BoundaryLayerThicknessFactor = BoundaryLayerThicknessFactor
 # mesh
 meshGenerator.Tetrahedralize = 1
