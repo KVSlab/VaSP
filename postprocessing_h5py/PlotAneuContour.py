@@ -5,7 +5,7 @@ import vtk
 import postprocessing_common_pv
 import sys
 import os
-
+pv.rcParams['transparent_background'] = True
 pv.set_plot_theme("document")
 
 CameraPosition = np.array(list(map(float, sys.argv[3].strip('[]').split(','))))
@@ -35,7 +35,8 @@ cpos = [CameraPosition,
         CameraViewUp]
 
 # Define necessary folders
-visualization_path = postprocessing_common_pv.get_visualization_path(case_path)
+# visualization_path = postprocessing_common_pv.get_visualization_path(case_path)
+visualization_path = case_path + "/Visualization/"
 visualization_separate_domain_folder = os.path.join(visualization_path,"../Visualization_separate_domain")
 visualization_hi_pass_folder = os.path.join(visualization_path,"../visualization_hi_pass")
 visualization_sd1_folder = os.path.join(visualization_path,"../Visualization_sd1")
@@ -100,7 +101,7 @@ if contour.n_points > 0:
                     ambient=0.5, 
                     name='contour')
 
-plotter.set_background('white')
+# plotter.set_background('transparent')
 
 plotter.show(auto_close=False)  
 
