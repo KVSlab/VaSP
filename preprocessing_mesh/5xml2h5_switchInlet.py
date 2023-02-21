@@ -1,6 +1,6 @@
 import argparse
 from pathlib import Path
-from dolfin import *
+from dolfin import Mesh, MeshFunction, File, HDF5File
 
 def commandLine():
     """
@@ -27,12 +27,6 @@ def switchInlet(folder_path, mesh_name, inlet_id_actual):
     """
     mesh_name_xml = mesh_name+".xml"
     mesh = Mesh(str(folder_path / mesh_name_xml))
-    # Rescale the mesh coordinated from [mm] to [m]
-    x = mesh.coordinates()
-    scaling_factor = 0.001  # from mm to m
-    x[:, :] *= scaling_factor
-    mesh.bounding_box_tree().build(mesh)
-    
     # Convert subdomains to mesh function
     boundaries = MeshFunction("size_t", mesh, 2, mesh.domains())
     
@@ -46,7 +40,6 @@ def switchInlet(folder_path, mesh_name, inlet_id_actual):
         elif boundaries.array()[i]==inlet_id_actual:
             boundaries.array()[i] = 2 # we want the inlet to be 2s
     
-    # ---------------------
     boundary_file = mesh_name+"_boundaries.pvd"
     ff = File(str(folder_path / boundary_file))
     ff << boundaries
