@@ -5,7 +5,9 @@ from vmtkmeshgeneratorfsi import *
 from vmtkthreshold import *
 from vmtkentityrenumber import *
 
-from os import path 
+from os import path, listdir, remove
+from pathlib import Path
+import time
 import vmtk #import vmtkscripts
 import vtk
 import numpy as np
@@ -36,9 +38,9 @@ def main():
     clip_surface=False
     file_name = mesh
     folder_name = case
+    
     ifile_surface = "surfaces/"+ folder_name + file_name+".stl"
     ofile_mesh = "surfaces/" + folder_name +file_name
-    from IPython import embed; embed(); exit(1)
     # TargetEdgeLength_f = 0.280  # more or less minimum edge length of the fluid mesh .410 is good too
     # TargetEdgeLength_s = 0.300 # more or less minimum edge length of the solid mesh .430 is good too
     # Thick_solid = 0.25  # constant tickness of the solid wall
@@ -204,4 +206,32 @@ def main():
     #viewer.Execute()
 
 if __name__ == '__main__':
-    main()
+    #TODO: auto restart does not work 
+    max_retries = 5
+    retry_delay = 5  # Time delay in seconds between retries
+    args = arg_parser()
+    file_to_keep = f"{args.mesh}.stl"
+    dir_path = Path.cwd() / "surfaces"
+
+    for i in range(max_retries):
+        try:
+            main()
+            break  # Break out of the loop if the execution is successful
+        except Exception as e:
+            error_msg = str(e)
+            if "TetGen quit with an exception" in error_msg:
+                print("An error occurred in TetGen.")
+                # Handle the TetGen error here
+            else:
+                print(f"An error occurred during execution: {error_msg}")
+            if i < max_retries - 1:
+                print(f"Retrying ({i + 1}/{max_retries}) after {retry_delay} seconds...")
+                for filename in listdir(dir_path):
+                    file_path = path.join(dir_path, filename)
+                    if path.isfile(file_path) and filename != file_to_keep:
+                        remove(file_path)
+
+                time.sleep(retry_delay)
+            else:
+                print("Max retries reached. Exiting...")
+                raise  # Reraise the exception to exit the script
