@@ -25,8 +25,13 @@ def switchInlet(folder_path, mesh_name, inlet_id_actual):
     return:
         None (save the new mesh file)
     """
-    mesh_name_xml = mesh_name+".xml"
+    mesh_name_xml = mesh_name+"_fsi.xml"
     mesh = Mesh(str(folder_path / mesh_name_xml))
+    # Rescale the mesh coordinated from [mm] to [m]
+    x = mesh.coordinates()
+    scaling_factor = 0.001  # from mm to m
+    x[:, :] *= scaling_factor
+    mesh.bounding_box_tree().build(mesh)
     # Convert subdomains to mesh function
     boundaries = MeshFunction("size_t", mesh, 2, mesh.domains())
     
