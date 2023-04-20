@@ -34,17 +34,17 @@ def main():
     Thick_solid = args.thick_solid
     nb_boundarylayers = args.nb_boundarylayers
     seedX = args.seedX
-
     clip_surface=False
-    file_name = mesh
-    folder_name = case
     
-    ifile_surface = "surfaces/"+ folder_name + file_name+".stl"
-    ofile_mesh = "surfaces/" + folder_name +file_name
-    # TargetEdgeLength_f = 0.280  # more or less minimum edge length of the fluid mesh .410 is good too
-    # TargetEdgeLength_s = 0.300 # more or less minimum edge length of the solid mesh .430 is good too
-    # Thick_solid = 0.25  # constant tickness of the solid wall
-    # nb_boundarylayers = 2  # number of sub-boundary layers is the solid and fluid mesh
+    ifile_surface = "surfaces/" + case + mesh+".stl"
+    ofile_mesh = "surfaces/" + case + mesh
+    # check if output file already exists and delete it if it does
+    output_files = [ofile_mesh+"_fsi.vtu", ofile_mesh+"_fsi.xml", ofile_mesh+"_cfd.vtu", ofile_mesh+"_cfd.xml"]
+    for file in output_files:
+        if path.exists(file):
+            remove(file)
+
+    # Parameters ###################################################################
     BoundaryLayerThicknessFactor = Thick_solid / TargetEdgeLength_f  # Wall Thickness == TargetEdgeLength*BoundaryLayerThicknessFactor
     # Refinement parameters
     seedX = (123.099, 134.62, 64.087)  # location of the seed to refine from (distance based)
@@ -210,28 +210,4 @@ if __name__ == '__main__':
     max_retries = 5
     retry_delay = 5  # Time delay in seconds between retries
     args = arg_parser()
-    file_to_keep = f"{args.mesh}.stl"
-    dir_path = Path.cwd() / "surfaces"
-
-    for i in range(max_retries):
-        try:
-            main()
-            break  # Break out of the loop if the execution is successful
-        except Exception as e:
-            error_msg = str(e)
-            if "TetGen quit with an exception" in error_msg:
-                print("An error occurred in TetGen.")
-                # Handle the TetGen error here
-            else:
-                print(f"An error occurred during execution: {error_msg}")
-            if i < max_retries - 1:
-                print(f"Retrying ({i + 1}/{max_retries}) after {retry_delay} seconds...")
-                for filename in listdir(dir_path):
-                    file_path = path.join(dir_path, filename)
-                    if path.isfile(file_path) and filename != file_to_keep:
-                        remove(file_path)
-
-                time.sleep(retry_delay)
-            else:
-                print("Max retries reached. Exiting...")
-                raise  # Reraise the exception to exit the script
+    main()

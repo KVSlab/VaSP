@@ -49,8 +49,8 @@ folder_name = "case9_300k/"
 ifile_surface = "surfaces/"+ folder_name + file_name+".stl"
 ofile_mesh = "surfaces/" + folder_name +file_name
 
-TargetEdgeLength_f = 0.280  # more or less minimum edge length of the fluid mesh .410 is good too
-TargetEdgeLength_s = 0.300 # more or less minimum edge length of the solid mesh .430 is good too
+TargetEdgeLength_f = 0.260  # more or less minimum edge length of the fluid mesh .410 is good too
+TargetEdgeLength_s = 0.280 # more or less minimum edge length of the solid mesh .430 is good too
 Thick_solid = 0.25  # constant tickness of the solid wall
 nb_boundarylayers = 2  # number of sub-boundary layers is the solid and fluid mesh
 BoundaryLayerThicknessFactor = Thick_solid / TargetEdgeLength_f  # Wall Thickness == TargetEdgeLength*BoundaryLayerThicknessFactor

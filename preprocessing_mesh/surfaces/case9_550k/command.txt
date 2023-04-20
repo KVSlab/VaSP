@@ -1,0 +1,2 @@
+python 3run_meshing_new.py --case case9_600k/ -ef 0.24 -es 0.23
+

@@ -10,9 +10,9 @@ def commandLine():
         None
     """
     parser = argparse.ArgumentParser(description='Switch inlet in the mesh file')
-    parser.add_argument('-folder_path', type=Path, help='Path to the folder containing the mesh file')
-    parser.add_argument('-mesh_name', type=str, help='name of the mesh file (without extension)')
-    parser.add_argument('-inlet_id_actual', type=int, help='id of the inlet in the mesh file')
+    parser.add_argument('-fpath' "--folder_path", type=Path, dest="folder_path", help='Path to the folder containing the mesh file')
+    parser.add_argument('-mname', "--mesh_name", type=str, dest="mesh_name", help='name of the mesh file (without extension)')
+    parser.add_argument('-id', type=int, dest="inlet_id_actual", help='id of the inlet in the mesh file')
     args = parser.parse_args()
     return args
 
