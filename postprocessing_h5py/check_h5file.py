@@ -62,10 +62,13 @@ def main(folder, correct, wrong):
     map_index = []
     
     # create a list of the index for swapping the wrong node numbering with the correct node numbering
-    for values in index_dict.values():
-        for i in range(len(wrongNumberNodes)):
-            if (values == wrongNumberNodes[i]).all():
-                map_index.append(i)
+    
+    for i, values in enumerate(index_dict.values()):
+        if i % 1000 == 0:
+            print(f"Creating map_index: Going through {i} nodes out of {len(index_dict)} nodes")
+        for j in range(len(wrongNumberNodes)):
+            if (values == wrongNumberNodes[j]).all():
+                map_index.append(j)
 
     # fix the node numbering in the wrong visualization file and overwrite the wrong h5 file
     fixed_nodes = wrongNumberNodes[map_index]
@@ -76,6 +79,8 @@ def main(folder, correct, wrong):
 
     # based on the index, we can now fix the node numbering in the h5 file
     for i in range(len(wrongNumberViz["VisualisationVector"].keys())):
+        if i % 1000 == 0:
+            print(f"Fixing vectors: Going through {i} time steps out of {len(wrongNumberViz['VisualisationVector'].keys())} steps")
         wrongNumberViz["VisualisationVector"][str(i)][...] = np.array(wrongNumberViz["VisualisationVector"][str(i)])[map_index]
 
     # close the files
