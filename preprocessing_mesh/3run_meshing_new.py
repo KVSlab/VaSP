@@ -36,7 +36,7 @@ def main():
     seedX = args.seedX
     clip_surface=False
     
-    ifile_surface = "surfaces/" + case + mesh+".stl"
+    ifile_surface = "surfaces/" + case + mesh+ ".stl"
     ofile_mesh = "surfaces/" + case + mesh
     # check if output file already exists and delete it if it does
     output_files = [ofile_mesh+"_fsi.vtu", ofile_mesh+"_fsi.xml", ofile_mesh+"_cfd.vtu", ofile_mesh+"_cfd.xml"]
