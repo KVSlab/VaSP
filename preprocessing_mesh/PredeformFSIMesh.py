@@ -14,8 +14,8 @@ disp_filepath = folder +"/"+ mesh_name +'/1/Visualization/displacement.h5'
 mesh_path = folder + '/mesh/' + mesh_name +".h5"
 # -----------------------------------------
 
-dt = 0.000679286
-t = 0.59
+dt = 0.00033964285714285700
+t = 0.28
 
 index_t = int(np.round(t/dt))
 print(disp_filepath)
@@ -24,7 +24,7 @@ vectorData = h5py.File(disp_filepath, "r")
 ArrayName = 'VisualisationVector/' + str(index_t)	
 deformation = vectorData[ArrayName][:,:] # Important not to take slices of this array, slows code considerably... 
 
-predeformed_mesh_path=mesh_path.replace(".h5", "_"+str(scaleFactor)+'.h5')
+predeformed_mesh_path=mesh_path.replace(".h5", "_predeformed.h5")
 copyfile(mesh_path, predeformed_mesh_path)
 
 #f = HDF5File(mpi_comm_world(),'meshes/'+mesh_name, 'r')
