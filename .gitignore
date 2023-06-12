@@ -2,3 +2,11 @@
 *.pyc
 plotting_functions/
 preprocessing_mesh/Flatten_Outlet_Cyl.py
+postprocessing_BSL/
+postprocessing_paraview/
+postprocessing_video/
+postprocessing_vmtk/
+Scripts_Nia/
+Scripts_DB/
+outlog_post/
+point_to_cases*
