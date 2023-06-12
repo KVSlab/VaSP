@@ -190,9 +190,9 @@ def create_spectrogram_composite(case_name, dvp, df, start_t, end_t,
     fig2, ax2_1 = plt.subplots()
     fig2.set_size_inches(7.5, 5) #fig1.set_size_inches(10, 7)
     title = "Pxx max = {:.2e}, Pxx min = {:.2e}, threshold Pxx = {}".format(max_val, min_val, lower_thresh)
-    spec.plot_spectrogram(fig2,ax2_1,bins,freqs,Pxx,ylim,title=title,x_label="Time (s)",color_range=[thresh_val,max_plot])
     fullname = dvp+"_"+case_name + '_'+str(nWindow)+'_windows_'+'_'+"thresh"+str(thresh_val)+"_spectrogram"
     path_to_fig = os.path.join(imageFolder, fullname + '.png')
+    spec.plot_spectrogram(fig2,ax2_1,bins,freqs,Pxx,ylim,title=title,path=path_to_fig,x_label="Time (s)",color_range=[thresh_val,max_plot])
     fig2.savefig(path_to_fig)
 
 

@@ -36,29 +36,21 @@ def create_visualizations(case_path, mesh_name, save_deg, stride, ts, start_t, e
 
     case_name = os.path.basename(os.path.normpath(case_path)) # obtains only last folder in case_path
     visualization_path = postprocessing_common_h5py.get_visualization_path(case_path)
-    multiband=False
     
     bands_list = bands.split(",")
     num_bands = int(len(bands_list)/2)
     lower_freq = np.zeros(num_bands)
     higher_freq = np.zeros(num_bands)
-    pass_stop_list = []  # for multi-band filter, specifies which bands to band-pass and which to band-stop. Default is to let the main high frequency band pass
-    # and remove the narrow bands from "rocking modes" 
     for i in range(num_bands):
         lower_freq[i] = float(bands_list[2*i])
         higher_freq[i] = float(bands_list[2*i+1])
-        if higher_freq[i] - lower_freq[i] > 1000: 
-            pass_stop_list.append("pass")  # let all high frequencies pass initially for multiband
-        else:
-            pass_stop_list.append("stop")  # stop the specified narrowbands
 
-    
     point_list = points.split(",")
     try:
         point_ids = [eval(i) for i in point_list]
     except:
         point_ids=[]
-    
+
     # Get Mesh
     if save_deg == 1:
         mesh_path = case_path + "/mesh/" + mesh_name +".h5" # Mesh path. Points to the corner-node input mesh
@@ -84,44 +76,31 @@ def create_visualizations(case_path, mesh_name, save_deg, stride, ts, start_t, e
     formatted_data_path = formatted_data_folder+"/"+output_file_name
     
     # If the output file exists, don't re-make it
-    #if os.path.exists(formatted_data_path):
-    #    print('path found!')
-    if dvp == "wss":
-        time_between_input_files = postprocessing_common_h5py.create_transformed_matrix(visualization_separate_domain_folder, formatted_data_folder, mesh_path_fluid_sd1, case_name, start_t,end_t,dvp,stride)
-    elif dvp == "mps" or dvp == "strain":
-        time_between_input_files = postprocessing_common_h5py.create_transformed_matrix(visualization_separate_domain_folder, formatted_data_folder, mesh_path_solid_sd1, case_name, start_t,end_t,dvp,stride)
-    else: 
-        # Make the output h5 files with dvp magnitudes
-        print("Start time: {}, end time: {}".format(start_t,end_t))
-        time_between_input_files = postprocessing_common_h5py.create_transformed_matrix(visualization_path, formatted_data_folder, mesh_path, case_name, start_t,end_t,dvp,stride)
+    if os.path.exists(formatted_data_path):
+        print('path found!')
+        if dvp == "wss":
+            time_between_input_files = get_time_between_files.get_time_between_files(visualization_separate_domain_folder, formatted_data_folder, mesh_path_fluid_sd1, case_name, dvp,stride)
+        elif dvp == "mps" or dvp == "strain":
+            time_between_input_files = postprocessing_common_h5py.get_time_between_files(visualization_separate_domain_folder, formatted_data_folder, mesh_path_solid_sd1, case_name, dvp,stride)
+        else: 
+            time_between_input_files = postprocessing_common_h5py.get_time_between_files(visualization_path, formatted_data_folder, mesh_path, case_name,dvp,stride)
+
+    else:
+        if dvp == "wss":
+            time_between_input_files = postprocessing_common_h5py.create_transformed_matrix(visualization_separate_domain_folder, formatted_data_folder, mesh_path_fluid_sd1, case_name, start_t,end_t,dvp,stride)
+        elif dvp == "mps" or dvp == "strain":
+            time_between_input_files = postprocessing_common_h5py.create_transformed_matrix(visualization_separate_domain_folder, formatted_data_folder, mesh_path_solid_sd1, case_name, start_t,end_t,dvp,stride)
+        else: 
+            # Make the output h5 files with dvp magnitudes
+            print("Start time: {}, end time: {}".format(start_t,end_t))
+            time_between_input_files = postprocessing_common_h5py.create_transformed_matrix(visualization_path, formatted_data_folder, mesh_path, case_name, start_t,end_t,dvp,stride)
     
+
     # Get the desired time between output files (reduce output frequency by "stride")
     time_between_output_files = time_between_input_files*stride 
     if dvp != "wss" and dvp != "mps" and dvp != "strain":
-        postprocessing_common_h5py.create_domain_specific_viz(formatted_data_folder, visualization_separate_domain_folder, mesh_path,save_deg, time_between_output_files,start_t,dvp)
-    
-        if save_deg == 1:
-            postprocessing_common_h5py.reduce_save_deg_viz(formatted_data_folder, visualization_sd1_folder, mesh_path_sd1,1, time_between_output_files,start_t,dvp)
-            try:
-                postprocessing_common_h5py.create_point_trace(formatted_data_folder, visualization_separate_domain_folder, point_ids ,save_deg, time_between_output_files,start_t,dvp)
-            except: 
-                print("Failed to create point trace... check input points")
-            for i in range(len(lower_freq)):
-                postprocessing_common_h5py.create_hi_pass_viz(formatted_data_folder, visualization_hi_pass_folder, mesh_path,time_between_output_files,start_t,dvp,lower_freq[i],higher_freq[i])
-                postprocessing_common_h5py.create_hi_pass_viz(formatted_data_folder, visualization_hi_pass_folder, mesh_path,time_between_output_files,start_t,dvp,lower_freq[i],higher_freq[i],amplitude=True)
-            
-            # multiband filter
-            if multiband:
-                postprocessing_common_h5py.create_hi_pass_viz(formatted_data_folder, visualization_hi_pass_folder, mesh_path,time_between_output_files,start_t,dvp,lower_freq,higher_freq,filter_type='multiband',pass_stop_list=pass_stop_list)
-                postprocessing_common_h5py.create_hi_pass_viz(formatted_data_folder, visualization_hi_pass_folder, mesh_path,time_between_output_files,start_t,dvp,lower_freq,higher_freq,amplitude=True,filter_type='multiband',pass_stop_list=pass_stop_list)
-       
-    
-    elif dvp == "strain":
-        for i in range(len(lower_freq)):
-            postprocessing_common_h5py.create_hi_pass_viz(formatted_data_folder, visualization_hi_pass_folder, mesh_path_solid_sd1,time_between_output_files,start_t,dvp,lower_freq[i],higher_freq[i])
-            postprocessing_common_h5py.create_hi_pass_viz(formatted_data_folder, visualization_hi_pass_folder, mesh_path_solid_sd1,time_between_output_files,start_t,dvp,lower_freq[i],higher_freq[i],amplitude=True)
-        
-        
+        postprocessing_common_h5py.create_point_trace(formatted_data_folder, visualization_separate_domain_folder, point_ids ,save_deg, time_between_output_files,start_t,dvp)
+
 
 if __name__ == '__main__':
     # Get Command Line Arguments and Input File Paths

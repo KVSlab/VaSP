@@ -38,10 +38,11 @@ def read_command_line():
     parser.add_argument('--end_t', type=float, default=0.05, help="End time of simulation (s)")
     parser.add_argument('--dvp', type=str, default="v", help="Quantity to postprocess, input v for velocity, d for sisplacement, p for pressure, or wss for wall shear stress")
     parser.add_argument('--bands', default="25,100000", help="input lower then upper band for Band-pass filtered displacement, in a list of pairs. for example: --bands '100 150 175 200' gives you band-pass filtered visualization for the band between 100 and 150, and another visualization for the band between 175 and 200")
+    parser.add_argument('--points', default="0,1", help="input list of points")
 
     args = parser.parse_args()
 
-    return args.case, args.mesh, args.save_deg, args.stride, args.dt, args.start_t, args.end_t, args.dvp, args.bands
+    return args.case, args.mesh, args.save_deg, args.stride, args.dt, args.start_t, args.end_t, args.dvp, args.bands, args.points
 
 
 def get_visualization_path(case_path):
@@ -256,6 +257,87 @@ def calculate_spi(case_name, df, output_folder, meshFile,start_t,end_t,low_cut,h
         else:
             outfile.write('\n%d %d %d %d'%(c[0]+1,c[1]+1,c[2]+1,c[3]+1)) # Need to add 1 because tecplot starts node numbering at 1
     outfile.close()   
+
+def create_point_trace(formatted_data_folder, output_folder, point_ids,save_deg,time_between_files,start_t,dvp):
+
+    # Get input data
+    components_data = []
+    component_names = ["mag","x","y","z"]
+    for i in range(len(component_names)):
+        if dvp == "p" and i>0:
+            break
+        file_str = dvp+"_"+component_names[i]+".npz"
+        print(file_str)
+        component_file = [file for file in os.listdir(formatted_data_folder) if file_str in file]
+        component_data = np.load(formatted_data_folder+"/"+component_file[0])['component']
+        components_data.append(component_data)
+
+
+    # Create name for output file, define output path
+
+    if dvp == "v":
+        viz_type = 'velocity'
+    elif dvp == "d":
+        viz_type = 'displacement'
+    elif dvp == "p":
+        viz_type = 'pressure'
+    else:
+        print("Input d, v or p for dvp")
+
+    num_ts = components_data[0].shape[1]   
+    time_plot = np.arange(0.0, num_ts*time_between_files, time_between_files) 
+
+
+    # Create output directory
+    if os.path.exists(output_folder):
+        print('Path exists!')
+    if not os.path.exists(output_folder):
+        print("creating output folder")
+        os.makedirs(output_folder)
+
+
+    for point_id in point_ids:
+
+        output_string = viz_type+"_point_id_"+str(point_id) # Base filename
+        if dvp != "p":
+            output_data = np.zeros((num_ts, 5))
+        else:
+            output_data = np.zeros((num_ts, 2))
+
+        output_data[:,0] = time_plot
+        output_data[:,1] = components_data[0][point_id,:]
+        if dvp != "p":
+            output_data[:,2] = components_data[1][point_id,:]
+            output_data[:,3] = components_data[2][point_id,:]
+            output_data[:,4] = components_data[3][point_id,:]
+
+        point_trace_file = output_folder+'/'+output_string+'.csv' # file name for point trace
+        point_trace_graph_file = output_folder+'/'+output_string+'.png' 
+
+        if dvp != "p":
+            np.savetxt(point_trace_file, output_data, delimiter=",", header="time (s), Magnitude, X Component, Y Component, Z Component")
+        else:
+            np.savetxt(point_trace_file, output_data, delimiter=",", header="time (s), Magnitude")
+
+        # Plot and Save
+        plt.plot(output_data[:,0],output_data[:,1],label="Mag")
+        if dvp != "p":
+            plt.plot(output_data[:,0],output_data[:,2],label="X")
+            plt.plot(output_data[:,0],output_data[:,3],label="Y")
+            plt.plot(output_data[:,0],output_data[:,4],label="Z")
+        plt.title('Point # '+ str(point_id))
+        if dvp == "p":
+            plt.ylabel("Pressure (Pa) Not including 80-120 perfusion pressure")
+        elif dvp == "v":
+            plt.ylabel("Velocity (m/s)")
+        elif dvp == "d":
+            plt.ylabel("Displacement (m)")
+
+        plt.xlabel('Simulation Time (s)')
+        plt.legend()
+        plt.savefig(point_trace_graph_file)  
+        plt.close()
+
 
 def create_domain_specific_viz(formatted_data_folder, output_folder, meshFile,save_deg,time_between_files,start_t,dvp):
 
@@ -475,7 +557,7 @@ def reduce_save_deg_viz(formatted_data_folder, output_folder, meshFile,save_deg,
 
 
 
-def create_hi_pass_viz(formatted_data_folder, output_folder, meshFile,time_between_files,start_t,dvp,lowcut=0,highcut=100000,amplitude=False):
+def create_hi_pass_viz(formatted_data_folder, output_folder, meshFile,time_between_files,start_t,dvp,lowcut=0,highcut=100000,amplitude=False,filter_type="bandpass",pass_stop_list=[]):
 
     # Get input data
     components_data = []
@@ -514,7 +596,13 @@ def create_hi_pass_viz(formatted_data_folder, output_folder, meshFile,time_betwe
 
     if amplitude==True:
         viz_type=viz_type+"_amplitude"
-    viz_type = viz_type+"_"+str(int(np.rint(lowcut)))+"_to_"+str(int(np.rint(highcut)))
+
+    if filter_type=="multiband":
+        for lowfreq, highfreq, pass_stop in zip(lowcut,highcut,pass_stop_list):
+            viz_type = viz_type+"_"+pass_stop+"_"+str(int(np.rint(lowfreq)))+"_to_"+str(int(np.rint(highfreq)))
+
+    else:
+        viz_type = viz_type+"_"+str(int(np.rint(lowcut)))+"_to_"+str(int(np.rint(highcut)))
     output_file_name = viz_type+'.h5'  
     output_path = os.path.join(output_folder, output_file_name)  
 
@@ -564,23 +652,27 @@ def create_hi_pass_viz(formatted_data_folder, output_folder, meshFile,time_betwe
     topoArray = vectorData.create_dataset("Mesh/0/mesh/topology", (nElementsFSI,4), dtype='i')
     topoArray[...] = topoArrayFSI
 
-    # if lowcut exists, use a hi-pass filter on the results.
     print("Filtering data...")
     for idy in range(nNodesFSI):
         if idy%1000 == 0:
-            print("... band pass filtering")
+            print("... {} filtering".format(filter_type))
         
-        f_crit = int(1/time_between_files)/2 - 1
-        if highcut >=f_crit:
-            highcut = f_crit
-        for ic in range(len(component_names)):
+        if filter_type=="multiband":  # loop through the bands and either bandpass or bandstop filter them
+            for lowfreq, highfreq, pass_stop in zip(lowcut,highcut,pass_stop_list):   
+                for ic in range(len(component_names)):
+                    components_data[ic][idy,:] = spec.butter_bandpass_filter(components_data[ic][idy,:], lowcut=lowfreq, highcut=highfreq, fs=int(1/time_between_files)-1,btype=pass_stop)
+
+        else:
+            f_crit = int(1/time_between_files)/2 - 1
+            if highcut >=f_crit:
+                highcut = f_crit
             if lowcut < 0.1:
                 btype="lowpass"
             else:
-                btype="band"
-            components_data[ic][idy,:] = spec.butter_bandpass_filter(components_data[ic][idy,:], lowcut=lowcut, highcut=highcut, fs=int(1/time_between_files)-1,btype=btype)
-            if idy%1000 == 0:
-                print(btype + str(lowcut) + str(highcut))
+                btype="bandpass"
+            for ic in range(len(component_names)):
+                components_data[ic][idy,:] = spec.butter_bandpass_filter(components_data[ic][idy,:], lowcut=lowcut, highcut=highcut, fs=int(1/time_between_files)-1,btype=btype)
+
     # if amplitude is selected, calculate moving RMS amplitude for the results                
     if amplitude==True:
         RMS_Magnitude = np.zeros((nNodesFSI,num_ts))
@@ -651,9 +743,8 @@ def create_hi_pass_viz(formatted_data_folder, output_folder, meshFile,time_betwe
     # if amplitude is selected, save the percentiles of magnitude of RMS amplitude to file              
     if amplitude==True:
         # 3 save average amplitude, 95th percentile amplitude, max amplitude
-        output_amplitudes = np.zeros((num_ts, 12))
+        output_amplitudes = np.zeros((num_ts, 13))
         for idx in range(num_ts):
-#
             output_amplitudes[idx,0] = idx*time_between_files
             output_amplitudes[idx,1] = np.percentile(RMS_Magnitude[:,idx],95)
             output_amplitudes[idx,2] = np.percentile(RMS_Magnitude[:,idx],5)
@@ -666,11 +757,12 @@ def create_hi_pass_viz(formatted_data_folder, output_folder, meshFile,time_betwe
             output_amplitudes[idx,9] = np.percentile(RMS_Magnitude[:,idx],2.5)
             output_amplitudes[idx,10] = np.percentile(RMS_Magnitude[:,idx],99)
             output_amplitudes[idx,11] = np.percentile(RMS_Magnitude[:,idx],1)
-#
+            output_amplitudes[idx,12] = np.argmax(RMS_Magnitude[:,idx])
+
         amp_file = output_folder+'/'+viz_type+'.csv' # file name for amplitudes
         amp_graph_file = output_folder+'/'+viz_type+'.png' # file name for amplitudes
 #
-        np.savetxt(amp_file, output_amplitudes, delimiter=",", header="time (s), 95th percentile amplitude, 5th percentile amplitude, maximum amplitude, minimum amplitude, average amplitude, 90th percentile amplitude, 10th percentile amplitude, 97.5th percentile amplitude, 2.5th percentile amplitude, 99th percentile amplitude, 1st percentile amplitude")
+        np.savetxt(amp_file, output_amplitudes, delimiter=",", header="time (s), 95th percentile amplitude, 5th percentile amplitude, maximum amplitude, minimum amplitude, average amplitude, 90th percentile amplitude, 10th percentile amplitude, 97.5th percentile amplitude, 2.5th percentile amplitude, 99th percentile amplitude, 1st percentile amplitude, ID of node with max amplitude")
         # Plot and Save
         plt.plot(output_amplitudes[:,0],output_amplitudes[:,3],label="Maximum amplitude")
         plt.plot(output_amplitudes[:,0],output_amplitudes[:,1],label="95th percentile amplitude")
@@ -1041,6 +1133,72 @@ def create_transformed_matrix(input_path, output_folder,meshFile, case_name, sta
             np.savez_compressed(output_path, component=dvp_magnitude)
 
     return time_between_files
+
+def get_time_between_files(input_path, output_folder,meshFile, case_name, dvp,stride=1):
+    # Create name for case, define output path
+    print('Creating matrix for case {}...'.format(case_name))
+    output_folder = output_folder
+
+    # Create output directory
+    if os.path.exists(output_folder):
+        print('Path exists')
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+
+    # Get node ids from input mesh. If save_deg = 2, you can supply the original mesh to get the data for the 
+    # corner nodes, or supply a refined mesh to get the data for all nodes (very computationally intensive)
+    if dvp == "d" or dvp == "v" or dvp == "p":
+        fluidIDs, wallIDs, allIDs = get_domain_ids(meshFile)
+        ids = allIDs
+
+    # Get name of xdmf file
+    if dvp == 'd':
+        xdmf_file = input_path + '/displacement.xdmf' # Change
+    elif dvp == 'v':
+        xdmf_file = input_path + '/velocity.xdmf' # Change
+    elif dvp == 'p':
+        xdmf_file = input_path + '/pressure.xdmf' # Change
+    elif dvp == 'wss':
+        xdmf_file = input_path + '/WSS_ts.xdmf' # Change
+    elif dvp == 'mps':
+        xdmf_file = input_path + '/MaxPrincipalStrain.xdmf' # Change
+    elif dvp == 'strain':
+        xdmf_file = input_path + '/InfinitesimalStrain.xdmf' # Change
+    else:
+        print('input d, v, p, mps, strain or wss for dvp')
+
+    # If the simulation has been restarted, the output is stored in multiple files and may not have even temporal spacing
+    # This loop determines the file names from the xdmf output file
+    file1 = open(xdmf_file, 'r') 
+    Lines = file1.readlines() 
+    h5_ts=[]
+    time_ts=[]
+    index_ts=[]
+    
+    # This loop goes through the xdmf output file and gets the time value (time_ts), associated 
+    # .h5 file (h5_ts) and index of each timestep inthe corresponding h5 file (index_ts)
+    for line in Lines: 
+        if '<Time Value' in line:
+            time_pattern = '<Time Value="(.+?)"'
+            time_str = re.findall(time_pattern, line)
+            time = float(time_str[0])
+            time_ts.append(time)
+
+        elif 'VisualisationVector' in line:
+            #print(line)
+            h5_pattern = '"HDF">(.+?):/'
+            h5_str = re.findall(h5_pattern, line)
+            h5_ts.append(h5_str[0])
+
+            index_pattern = "VisualisationVector/(.+?)</DataItem>"
+            index_str = re.findall(index_pattern, line)
+            index = int(index_str[0])
+            index_ts.append(index)
+    time_between_files = time_ts[2] - time_ts[1] # Calculate the time between files from xdmf file
+
+    return time_between_files
+
+
 
 def get_eig(T):
 ########################################################################
