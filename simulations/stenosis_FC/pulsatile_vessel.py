@@ -58,7 +58,7 @@ def set_problem_parameters(default_variables, **namespace):
         mesh_file=mesh_path,#"file_case9_el047",
         FC_file="FC_MCA_10", # This is the location of CFD results used to prescribe the inlet velocity profile
         Q_mean=Q_mean,#1.9275E-06, # Problem specific
-        P_FC_file="FC_Pressure", # This is the location of CFD results used to prescribe the inlet velocity profile
+        P_FC_File="FC_Pressure", # This is the location of CFD results used to prescribe the inlet velocity profile
         P_mean=11200,#1.9275E-06, # Problem specific
         T_Cycle=0.951,# Used to define length of flow waveform
         theta=0.50+dt, # Theta scheme (implicit/explicit time stepping)
