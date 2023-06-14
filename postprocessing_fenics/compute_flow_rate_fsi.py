@@ -191,5 +191,5 @@ def compute_flow_rate(case_path,mesh_name, dt, stride, save_deg):
     flow_rate_file.close()
 
 if __name__ == '__main__':
-    folder, mesh, nu, dt, stride, save_deg = read_command_line()
+    folder, mesh, nu,_,_, dt, stride, save_deg,_,_ = read_command_line()
     compute_flow_rate(folder, mesh, dt, stride, save_deg)

@@ -4,7 +4,7 @@ import numpy as np
 import h5py
 from dolfin import *
 import os
-from postprocessing_common import read_command_line_stress, get_time_between_files
+from postprocessing_common import read_command_line, get_time_between_files
 import stress_strain
 from pathlib import Path
 import matplotlib.pyplot as plt
@@ -250,5 +250,5 @@ def format_output_data(case_path, mesh_name, dt, stride, save_deg):
     np.savetxt(csvPath, np.transpose([t_list[:-1],norm_d_l2_list_normalized[:-1]]), delimiter=",")
 
 if __name__ == '__main__':
-    folder, mesh, E_s, nu_s, dt, stride, save_deg = read_command_line_stress()
+    folder, mesh, _, E_s, nu_s, dt, stride, save_deg,_,_ = read_command_line()
     format_output_data(folder,mesh, dt, stride, save_deg)
