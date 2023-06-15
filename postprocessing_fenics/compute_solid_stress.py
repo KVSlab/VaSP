@@ -4,7 +4,7 @@ import numpy as np
 import h5py
 from dolfin import *
 import os
-from postprocessing_common import read_command_line_stress
+from postprocessing_common import read_command_line
 import stress_strain
 
 # set compiler arguments
@@ -200,5 +200,5 @@ def compute_stress(case_path, mesh_name, E_s, nu_s, dt, stride, save_deg):
 
 
 if __name__ == '__main__':
-    folder, mesh, E_s, nu_s, dt, stride, save_deg = read_command_line_stress()
+    folder, mesh, _, E_s, nu_s, dt, stride, save_deg, _, _ = read_command_line()
     compute_stress(folder,mesh, E_s, nu_s, dt, stride, save_deg)

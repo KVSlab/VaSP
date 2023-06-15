@@ -263,6 +263,6 @@ def compute_wss(case_path,mesh_name, nu, dt, stride, save_deg):
     twssg.write(TWSSG)
 
 if __name__ == '__main__':
-    folder, mesh, nu, dt, stride, save_deg = read_command_line()
+    folder, mesh, nu,_,_, dt, stride, save_deg,_,_ = read_command_line()
     compute_wss(folder, mesh, nu, dt, stride, save_deg)
 
