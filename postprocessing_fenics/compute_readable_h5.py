@@ -202,10 +202,11 @@ def format_output_data(case_path, mesh_name, dt, stride, save_deg, start_t, end_
 
 def get_domain_topology(meshFile):
     # This function obtains the topology for the fluid, solid, and all elements of the input mesh
+    # Importantly, it is ASSUMED that the fluid domain is labeled 1 and the solid domain is labeled 2 (and above, if multiple solid regions) 
     vectorData = h5py.File(meshFile,"r")
     domainsLoc = 'domains/values'
     domains = vectorData[domainsLoc][:] # Open domain array
-    id_wall = (domains>1).nonzero() # domain = 2 is the solid
+    id_wall = (domains>1).nonzero() # domain = 2 and above is the solid
     id_fluid = (domains==1).nonzero() # domain = 1 is the fluid
 
     topologyLoc = 'domains/topology'
