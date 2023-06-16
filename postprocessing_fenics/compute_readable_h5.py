@@ -48,7 +48,7 @@ def format_output_data(case_path, mesh_name, dt, stride, save_deg, start_t, end_
 
     d_path_in = str(os.path.join(visualization_separate_domain_path,"d.h5")) 
     v_path_in = str(os.path.join(visualization_separate_domain_path,"v.h5")) 
-
+    displacement_domains = "all"
 
     # get fluid+solid (FSI) mesh
     mesh_name = mesh_name + ".h5"
@@ -63,21 +63,35 @@ def format_output_data(case_path, mesh_name, dt, stride, save_deg, start_t, end_
     # if save_deg = 1, make the refined mesh path the same (Call this mesh_viz)
     if save_deg == 1:
         print("Warning, stress results are compromised by using save_deg = 1, especially using a coarse mesh. Recommend using save_deg = 2 instead for computing stress")
-        mesh_path_viz_solid = mesh_path_solid
+        if displacement_domains == "all": # for d.h5, we can choose between using the entire domain and just the solid domain
+            mesh_path_viz_solid = mesh_path
+        else:
+            mesh_path_viz_solid = mesh_path_solid
+
         mesh_path_viz_fluid = mesh_path_fluid
 
     else:
-        mesh_path_viz_solid = mesh_path_solid.replace("_solid_only.h5","_refined_solid_only.h5")
-        mesh_path_viz_fluid = mesh_path_fluid.replace("_fluid_only.h5","_refined_fluid_only.h5")
         mesh_path = mesh_path.replace(".h5","_refined.h5")
-
-
+        if displacement_domains == "all": # for d.h5, we can choose between using the entire domain and just the solid domain
+            mesh_path_viz_solid = mesh_path
+        else:
+            mesh_path_viz_solid = mesh_path_solid.replace("_solid_only.h5","_refined_solid_only.h5")
+        mesh_path_viz_fluid = mesh_path_fluid.replace("_fluid_only.h5","_refined_fluid_only.h5")
+ 
+    print(mesh_path_viz_solid)
     # Get data from input mesh, .h5 and .xdmf files
     fluidIDs, solidIDs, allIDs = get_domain_ids(mesh_path) # Get list of all nodes in fluid, solid domains
     xdmf_file_v = os.path.join(visualization_path, 'velocity.xdmf') # Use velocity xdmf to determine which h5 file contains each timestep
     xdmf_file_d = os.path.join(visualization_path, 'displacement.xdmf') # Use displacement xdmf to determine which h5 file contains each timestep
     h5_ts, time_ts, index_ts = output_file_lists(xdmf_file_v) # Get list of h5 files containing each timestep, and corresponding indices for each timestep
     h5_ts_d, time_ts_d, index_ts_d = output_file_lists(xdmf_file_d)
+
+
+    v_ids = fluidIDs # for v.h5, we only want the fluid ids, so we can use CFD postprocessing code
+    if displacement_domains == "all": # for d.h5, we can choose between using the entire domain and just the solid domain
+        d_ids = allIDs # Fluid and solid domain
+    else:
+        d_ids = solidIDs # Solid domain only
 
     # Read refined mesh saved as HDF5 format
     mesh_path_viz_fluid = Path(mesh_path_viz_fluid)
@@ -119,11 +133,11 @@ def format_output_data(case_path, mesh_name, dt, stride, save_deg, start_t, end_
     # Open up the first velocity.h5 file to get the number of timesteps and nodes for the output data
     file = visualization_path + '/'+  h5_ts[0]
     vectorData = h5py.File(file) 
-    vectorArray = vectorData['VisualisationVector/0'][fluidIDs,:] 
+    vectorArray = vectorData['VisualisationVector/0'][v_ids,:] 
     # Open up the first displacement.h5 file to get the number of timesteps and nodes for the output data
     file_d = visualization_path + '/'+  h5_ts_d[0]
     vectorData_d = h5py.File(file_d) 
-    vectorArray_d = vectorData['VisualisationVector/0'][solidIDs,:] 
+    vectorArray_d = vectorData['VisualisationVector/0'][d_ids,:] 
 
     while True:
 
@@ -157,11 +171,11 @@ def format_output_data(case_path, mesh_name, dt, stride, save_deg, start_t, end_
                 ArrayName = 'VisualisationVector/' + str((index_ts[file_counter]))    
                 vectorArrayFull = vectorData[ArrayName][:,:] # Important not to take slices of this array, slows code considerably... 
                 ArrayName_d = 'VisualisationVector/' + str((index_ts_d[file_counter]))    
-                vectorArrayFull_d = vectorData[ArrayName_d][:,:] # Important not to take slices of this array, slows code considerably... 
+                vectorArrayFull_d = vectorData_d[ArrayName_d][:,:] # Important not to take slices of this array, slows code considerably... 
                 # instead make a copy (VectorArrayFull) and slice that.
                 
-                vectorArray = vectorArrayFull[fluidIDs,:]    
-                vectorArray_d = vectorArrayFull_d[solidIDs,:]    
+                vectorArray = vectorArrayFull[v_ids,:]    
+                vectorArray_d = vectorArrayFull_d[d_ids,:]    
                 
                 # Velocity
                 vector_np_flat = vectorArray.flatten('F')
@@ -170,8 +184,8 @@ def format_output_data(case_path, mesh_name, dt, stride, save_deg, start_t, end_
                     print("Saved data in v.h5")
     
                 # Displacement
-                vector_np_flat = vectorArray_d.flatten('F')
-                d_viz.vector().set_local(vector_np_flat)  # Set d vector
+                vector_np_flat_d = vectorArray_d.flatten('F')
+                d_viz.vector().set_local(vector_np_flat_d)  # Set d vector
                 if MPI.rank(MPI.comm_world) == 0:
                     print("Saved data in d.h5")
     

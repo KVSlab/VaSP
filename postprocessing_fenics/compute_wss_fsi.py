@@ -197,7 +197,9 @@ def compute_wss(case_path,mesh_name, nu, dt, stride, save_deg):
             # Update file_counter
             file_counter += stride
 
-        except:
+        except Exception as error:
+            print("An exception occurred:", error) # An exception occurred: division by zero
+
             if MPI.rank(MPI.comm_world) == 0:
                 print("=" * 10, "Finished reading solutions", "=" * 10)
             break   

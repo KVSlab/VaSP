@@ -3,10 +3,11 @@ from pathlib import Path
 import numpy as np
 import h5py
 from dolfin import *
+from turtleFSI.modules import common
 import os
 from postprocessing_common import read_command_line
 import stress_strain
-
+#from simulations.stenosis_FC_sd2.pulsatile_vessel import set_problem_parameters
 # set compiler arguments
 parameters["form_compiler"]["quadrature_degree"] = 6 # Not investigated thorougly. See MSc theses of Gjertsen. Doesnt affect the speed
 parameters["reorder_dofs_serial"] = False
@@ -36,6 +37,7 @@ def compute_stress(case_path, mesh_name, E_s, nu_s, dt, stride, save_deg):
     # Calculate solid Lame parameters
     mu_s = E_s/(2*(1+nu_s))  # 0.345E6
     lambda_s = nu_s*2.*mu_s/(1. - 2.*nu_s)
+    displacement_domains = "all"
 
     # File paths
 
@@ -53,20 +55,29 @@ def compute_stress(case_path, mesh_name, E_s, nu_s, dt, stride, save_deg):
     ep_path = (visualization_separate_domain_path / "InfinitesimalStrain.xdmf").__str__()
     sig_P_path = (visualization_separate_domain_path / "MaxPrincipalStress.xdmf").__str__()
     ep_P_path = (visualization_separate_domain_path / "MaxPrincipalStrain.xdmf").__str__()
+    d_out_path = (visualization_separate_domain_path / "disp_test.xdmf").__str__()
 
-    # get solid-only version of the mesh
     mesh_name = mesh_name + ".h5"
-    mesh_name = mesh_name.replace(".h5","_solid_only.h5")
+
+
     mesh_path = os.path.join(case_path, "mesh", mesh_name)
+    mesh_path_solid = mesh_path.replace(".h5","_solid_only.h5")
 
     # if save_deg = 1, make the refined mesh path the same (Call this mesh_viz)
     if save_deg == 1:
         if MPI.rank(MPI.comm_world) == 0:
             print("Warning, stress results are compromised by using save_deg = 1, especially using a coarse mesh. Recommend using save_deg = 2 instead for computing stress")
-        mesh_path_viz = mesh_path
+        if displacement_domains == "all": # for d.h5, we can choose between using the entire domain and just the solid domain
+            mesh_path_viz = mesh_path
+        else:
+            mesh_path_viz = mesh_path_solid     
     else:
-        mesh_path_viz = mesh_path.replace("_solid_only.h5","_refined_solid_only.h5")
+        if displacement_domains == "all": # for d.h5, we can choose between using the entire domain and just the solid domain
+            mesh_path_viz = mesh_path.replace(".h5","_refined.h5")
+        else:
+            mesh_path_viz = mesh_path_solid.replace("_solid_only.h5","_refined_solid_only.h5")
     
+    print(mesh_path_viz)
     mesh_path = Path(mesh_path)
     mesh_path_viz = Path(mesh_path_viz)
         
@@ -120,11 +131,13 @@ def compute_stress(case_path, mesh_name, E_s, nu_s, dt, stride, save_deg):
     ep_file = XDMFFile(MPI.comm_world, ep_path)
     sig_P_file = XDMFFile(MPI.comm_world, sig_P_path)
     ep_P_file = XDMFFile(MPI.comm_world, ep_P_path)
+    d_out_file = XDMFFile(MPI.comm_world, d_out_path)
 
     sig_file.parameters["rewrite_function_mesh"] = False
     ep_file.parameters["rewrite_function_mesh"] = False
     sig_P_file.parameters["rewrite_function_mesh"] = False
     ep_P_file.parameters["rewrite_function_mesh"] = False
+    d_out_file.parameters["rewrite_function_mesh"] = False
 
     if MPI.rank(MPI.comm_world) == 0:
         print("=" * 10, "Start post processing", "=" * 10)
@@ -148,11 +161,16 @@ def compute_stress(case_path, mesh_name, E_s, nu_s, dt, stride, save_deg):
             if MPI.rank(MPI.comm_world) == 0:
                 print("=" * 10, "Timestep: {}".format(t), "=" * 10)
             f.read(d_viz, vec_name)
-        except:
+        except Exception as error:
+            print("An exception occurred:", error) # An exception occurred
+
             if MPI.rank(MPI.comm_world) == 0:
                 print("=" * 10, "Finished reading solutions", "=" * 10)
             break        
+        
+        d_viz.rename("Displacement_test", "d_viz")
 
+        d_out_file.write(d_viz, t)
         # Calculate d in P2 based on visualization refined P1
         d.vector()[:] = dv_trans*d_viz.vector()
 
