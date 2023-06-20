@@ -102,11 +102,6 @@ def project_solid(tensorForm, fxnSpace, dx_s):#,dx_s_id_list):
     v = TestFunction(fxnSpace) 
     u = TrialFunction(fxnSpace)
     tensorProjected=Function(fxnSpace) # output tensor-valued function
-    #a=0
-    #L=0
-    #for solid_region in range(len(dx_s_id_list)):
-    #    a+=inner(u,v)*dx_s[solid_region] # bilinear form
-    #    L+=inner(tensorForm,v)*dx_s[solid_region] # linear form
     a=inner(u,v)*dx_s # bilinear form
     L=inner(tensorForm,v)*dx_s # linear form     
     # Alternate way that doesnt work on MPI (may be faster on PC)
@@ -172,7 +167,6 @@ def compute_stress(case_path, mesh_name, dt, stride, save_deg):
     solid_properties, fluid_properties = read_material_properties(case_path) # we now read material properties from a logfile or from material_properties.txt
 
     # File paths
-
     for file in os.listdir(case_path):
         file_path = os.path.join(case_path, file)
         if os.path.exists(os.path.join(file_path, "1")):
@@ -190,8 +184,6 @@ def compute_stress(case_path, mesh_name, dt, stride, save_deg):
     d_out_path = (visualization_separate_domain_path / "disp_test.xdmf").__str__()
 
     mesh_name = mesh_name + ".h5"
-
-
     mesh_path = os.path.join(case_path, "mesh", mesh_name)
     mesh_path_solid = mesh_path.replace(".h5","_solid_only.h5")
 
@@ -243,11 +235,8 @@ def compute_stress(case_path, mesh_name, dt, stride, save_deg):
     # Create a transfer matrix between higher degree and lower degree (visualization) function spaces
     dv_trans = PETScDMCollection.create_transfer_matrix(FSdv_viz,FSdv)
 
+    # Set up dx (dx_s for solid, dx_f for fluid) for each domain
     dx = Measure("dx", subdomain_data=domains)
-
-    #dx_s_id = [2,1]
-    #solid_properties = [{'dx_s_id': 2, 'material_model': 'StVenantKirchoff', 'rho_s': 1000.0, 'mu_s': 344827.5862068966, 'lambda_s': 3103448.2758620703},
-    #                    {'dx_s_id': 1, 'material_model': 'StVenantKirchoff', 'rho_s': 1000.0, 'mu_s': 103448200.7586206897, 'lambda_s': 931034400.82758621}]
     dx_s = {}
     dx_s_id_list = []
     for idx, solid_region in enumerate(solid_properties):
@@ -311,7 +300,7 @@ def compute_stress(case_path, mesh_name, dt, stride, save_deg):
             print_MPI("========== Timestep: {} ==========".format(t))
             f.read(d_viz, vec_name)
         except Exception as error:
-            print_MPI("An exception occurred:", error) # An exception occurred
+            print_MPI(error) # An exception occurred
 
             print_MPI("========== Finished reading solutions ==========")
             break        
@@ -322,88 +311,58 @@ def compute_stress(case_path, mesh_name, dt, stride, save_deg):
         # Calculate d in P2 based on visualization refined P1
         d.vector()[:] = dv_trans*d_viz.vector()
 
-
-
-
         # Deformation Gradient and first Piola-Kirchoff stress (PK1)
         deformationF = common.F_(d) # calculate deformation gradient from displacement
         
-        # Cauchy (True) Stress and Infinitesimal Strain (Only accurate for small strains, ask DB for True strain calculation...)
+        # Cauchy (True) Stress and Infinitesimal Strain (Only accurate for small strains, if other strain desired, check)
         epsilon = common.eps(d) # Form for Infinitesimal strain (need polar decomposition if we want to calculate logarithmic/Hencky strain)
-        #ep = project_solid(epsilon,Tens,dx) # Calculate stress tensor (this projection method is 6x faster than the built in version)
-        
-        # ADD THIS BACK?
-        #eigStrain11,eigStrain22,eigStrain33 = common.get_eig(epsilon)
 
 
-        #ep_P = project_solid(eigStrain11,Scal,dx) # Calculate Principal stress tensor, on whole solid domain
-        #ep = project(epsilon,Tens) # Calculate stress tensor
-        
+        # These two loops project the material equations for the fluid and solid domains onto the proper subdomains.
+        # This type of projection requires more lines of code but is faster than the built-in "project()" function. 
+        # All quantities defined below are linear, bilinear forms and trial and test functions for the tensor and scalar quantities computed
         a = 0 
         a_scal = 0
         L_sig = 0
         L_sig_P = 0
         L_ep = 0
         L_ep_P = 0
-
-
         v = TestFunction(Tens) 
         u = TrialFunction(Tens)
         v_scal = TestFunction(Scal) 
         u_scal = TestFunction(Scal) 
+
         for solid_region in range(len(dx_s_id_list)):
 
             PiolaKirchoff2 = common.S(d, solid_properties[solid_region]) # Form for second PK stress (using specified material model)
             sigma = (1/common.J_(d))*deformationF*PiolaKirchoff2*deformationF.T  # Form for Cauchy (true) stress 
-            #eigStress11,eigStress22,eigStress33  = common.get_eig(sigma)  # Calculate principal stress
             a+=inner(u,v)*dx_s[solid_region] # bilinear form
             a_scal+=inner(u_scal,v_scal)*dx_s[solid_region] # bilinear form
-
-            L_sig+=inner(sigma,v)*dx_s[solid_region] 
-            #L_sig_P+=inner(eigStress11,v_scal)*dx_s[solid_region] 
-            L_ep+=inner(epsilon,v)*dx_s[solid_region] 
-            #L_ep_P+=inner(eigStrain11,v_scal)*dx_s[solid_region] 
+            L_sig+=inner(sigma,v)*dx_s[solid_region] # linear form
+            L_ep+=inner(epsilon,v)*dx_s[solid_region]  # linear form
 
         for fluid_region in range(len(dx_f_id_list)):
 
-            nought_value = 1e-10
+            nought_value = 1e-10 # Value for stress components in fluid regions 
             sigma_nought = as_tensor([[nought_value ,nought_value ,nought_value],
                                [nought_value ,nought_value ,nought_value],
                                [nought_value ,nought_value ,nought_value]]) # Add placeholder value to fluid region
             epsilon_nought = as_tensor([[nought_value ,nought_value ,nought_value],
                                [nought_value ,nought_value ,nought_value],
-                               [nought_value ,nought_value ,nought_value]]) # Add placeholder value to fluid region            #eigStress11,eigStress22,eigStress33  = common.get_eig(sigma)  # Calculate principal stress
+                               [nought_value ,nought_value ,nought_value]]) # Add placeholder value to fluid region            
             a+=inner(u,v)*dx_f[fluid_region] # bilinear form
             a_scal+=inner(u_scal,v_scal)*dx_f[fluid_region] # bilinear form
-            L_sig+=inner(sigma_nought,v)*dx_f[fluid_region] 
-            L_ep+=inner(epsilon_nought,v)*dx_f[fluid_region] 
+            L_sig+=inner(sigma_nought,v)*dx_f[fluid_region]  # linear form
+            L_ep+=inner(epsilon_nought,v)*dx_f[fluid_region] # linear form
 
         sig = solve_stress_forms(a,L_sig,Tens) # Calculate stress tensor 
-        #sig_P = solve_stress_forms(a_scal,L_sig_P,Scal) # Calculate stress tensor 
         ep = solve_stress_forms(a,L_ep,Tens) # Calculate stress tensor 
-        #ep_P = solve_stress_forms(a_scal,L_ep_P,Scal) # Calculate stress tensor 
-        eigStrain11,eigStrain22,eigStrain33 = common.get_eig(ep)
+
+        eigStrain11,eigStrain22,eigStrain33 = common.get_eig(ep) # Calculate principal strain
         eigStress11,eigStress22,eigStress33  = common.get_eig(sig)  # Calculate principal stress
-        ep_P=project_solid(eigStrain11,Scal,dx)
-        sig_P=project_solid(eigStress11,Scal,dx)
+        ep_P=project_solid(eigStrain11,Scal,dx) # Project onto whole domain
+        sig_P=project_solid(eigStress11,Scal,dx)  # Project onto whole domain
 
-        #S_ = stress_strain.S(d, lambda_s, mu_s)  # Form for second PK stress (using St. Venant Kirchoff Model)
-        #sigma = (1/stress_strain.J_(d))*deformationF*S_*deformationF.T  # Form for Cauchy (true) stress 
-
-
-        #sig =project(sigma,Tens) # Calculate stress tensor
-
-        # Calculate eigenvalues of the stress tensor (Three eigenvalues for 3x3 tensor)
-        # Eigenvalues are returned as a diagonal tensor, with the Maximum Principal stress as 1-1
-        #eigStress11,eigStress22,eigStress33  = stress_strain.get_eig(sigma) 
-
-        #sig_P = project_solid(eigStress11,Scal,dx) # Calculate Principal stress tensor
-        #sig_P+=project_solid(eigStress11,Scal,dx_s[1]) # Calculate Principal stress tensor
-
-        #sig_P = project(eigStress,Tens) # Calculate Principal stress tensor
-
-        #ep_P = project(eigStrain,Tens) # Calculate Principal stress tensor
-    
         # Name function
         ep.rename("InfinitesimalStrain", "ep")
         sig.rename("TrueStress", "sig")
