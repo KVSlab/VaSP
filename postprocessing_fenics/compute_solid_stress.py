@@ -42,12 +42,12 @@ def read_material_properties(case_path):
         print_MPI("Reading material properties from log file: {}".format(outLog[0]))
         material_properties_file = outLog[0]
 
-    # Open log file
+    # Open material properties file
     outLogPath=os.path.join(case_path,material_properties_file)
     file1 = open(outLogPath, 'r') 
     Lines = file1.readlines() 
 
-    # Open log file get compute time and simulation time from that logfile 
+    # Open log file get material properties from that logfile 
     for line in Lines: 
         if 'dx_s_id' in line:
             material_properties_dict = eval(line)
@@ -56,6 +56,7 @@ def read_material_properties(case_path):
             material_properties_dict = eval(line)
             fluid_properties.append(material_properties_dict)
     
+    # remove duplicate regions if applicable
     fluid_properties = remove_duplicates(fluid_properties)
     solid_properties = remove_duplicates(solid_properties)
 
