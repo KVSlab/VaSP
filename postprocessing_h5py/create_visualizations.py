@@ -98,10 +98,10 @@ def create_visualizations(case_path, mesh_name, save_deg, stride, ts, start_t, e
     # Get the desired time between output files (reduce output frequency by "stride")
     time_between_output_files = time_between_input_files*stride 
     if dvp != "wss" and dvp != "mps" and dvp != "strain":
-        postprocessing_common_h5py.create_domain_specific_viz(formatted_data_folder, visualization_separate_domain_folder, mesh_path,save_deg, time_between_output_files,start_t,dvp)
+        #postprocessing_common_h5py.create_domain_specific_viz(formatted_data_folder, visualization_separate_domain_folder, mesh_path,save_deg, time_between_output_files,start_t,dvp)
     
         if save_deg == 1:
-            postprocessing_common_h5py.reduce_save_deg_viz(formatted_data_folder, visualization_sd1_folder, mesh_path_sd1,1, time_between_output_files,start_t,dvp)
+            #postprocessing_common_h5py.reduce_save_deg_viz(formatted_data_folder, visualization_sd1_folder, mesh_path_sd1,1, time_between_output_files,start_t,dvp)
             try:
                 postprocessing_common_h5py.create_point_trace(formatted_data_folder, visualization_separate_domain_folder, point_ids ,save_deg, time_between_output_files,start_t,dvp)
             except: 

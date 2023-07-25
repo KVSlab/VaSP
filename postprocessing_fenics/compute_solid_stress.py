@@ -8,7 +8,6 @@ import os
 import re
 from postprocessing_common import read_command_line
 
-#from simulations.stenosis_FC_sd2.pulsatile_vessel import set_problem_parameters
 # set compiler arguments
 parameters["form_compiler"]["quadrature_degree"] = 6 # Not investigated thorougly. See MSc theses of Gjertsen. Doesnt affect the speed
 parameters["reorder_dofs_serial"] = False
