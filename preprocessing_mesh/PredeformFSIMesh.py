@@ -15,7 +15,7 @@ mesh_path = folder + '/mesh/' + mesh_name +".h5"
 # -----------------------------------------
 
 dt = 0.00033964285714285700
-t = 0.28
+t = 0.45
 
 index_t = int(np.round(t/dt))
 print(disp_filepath)
