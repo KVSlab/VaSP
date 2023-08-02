@@ -4,7 +4,7 @@ import numpy as np
 import h5py
 from dolfin import *
 import os
-from postprocessing_common import read_command_line_stress, get_time_between_files
+from postprocessing_common import read_command_line, get_time_between_files
 import stress_strain
 from pathlib import Path
 import matplotlib.pyplot as plt
@@ -44,7 +44,9 @@ def format_output_data(case_path, mesh_name, dt, stride, save_deg):
             visualization_separate_domain_path = os.path.join(file_path, "Visualization_separate_domain") 
     
     imageFolder = os.path.join(visualization_separate_domain_path, "../Images") 
-
+    if not os.path.exists(imageFolder):
+        print("creating image folder")
+        os.makedirs(imageFolder)
 
     file_path_d = Path(os.path.join(visualization_separate_domain_path, "displacement_save_deg_"+str(save_deg)+'.h5'))
     file_path_v = Path(os.path.join(visualization_separate_domain_path, "velocity_save_deg_"+str(save_deg)+'.h5')) 
@@ -181,11 +183,11 @@ def format_output_data(case_path, mesh_name, dt, stride, save_deg):
             norm_v_l2 = norm(Difference_v,'l2')
             #norm_v_linf = norm(Difference_v,'linf') # Linf doesnt work in dolfin 2018 it seems
 
-            print("{} is the L2 norm of the difference between step {} and {}".format(norm_v_l2, file_counter, file_counter % files_per_cycle))
+            print("{} is the L2 norm of the difference between step {} and {}".format(norm_v_l2, file_counter, file_counter - files_per_cycle)) #file_counter % files_per_cycle))
             Difference_d.vector()[:] = d_viz.vector() - d_viz_cycle_0.vector()
             norm_d_l2 = norm(Difference_d,'l2')
             #norm_d_linf = norm(Difference_d,'linf')
-            print("{} is the L2 norm of the difference between step {} and {}".format(norm_d_l2, file_counter, file_counter % files_per_cycle))
+            print("{} is the L2 norm of the difference between step {} and {}".format(norm_d_l2, file_counter, file_counter - files_per_cycle)) #file_counter % files_per_cycle))
 
             norm_v_l2_list.append(norm_v_l2)
             #norm_v_linf_list.append(norm_v_linf)
@@ -248,5 +250,5 @@ def format_output_data(case_path, mesh_name, dt, stride, save_deg):
     np.savetxt(csvPath, np.transpose([t_list[:-1],norm_d_l2_list_normalized[:-1]]), delimiter=",")
 
 if __name__ == '__main__':
-    folder, mesh, E_s, nu_s, dt, stride, save_deg = read_command_line_stress()
+    folder, mesh, _, E_s, nu_s, dt, stride, save_deg,_,_ = read_command_line()
     format_output_data(folder,mesh, dt, stride, save_deg)

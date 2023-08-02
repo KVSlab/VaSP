@@ -38,10 +38,11 @@ def read_command_line():
     parser.add_argument('--end_t', type=float, default=0.05, help="End time of simulation (s)")
     parser.add_argument('--dvp', type=str, default="v", help="Quantity to postprocess, input v for velocity, d for sisplacement, p for pressure, or wss for wall shear stress")
     parser.add_argument('--bands', default="25,100000", help="input lower then upper band for Band-pass filtered displacement, in a list of pairs. for example: --bands '100 150 175 200' gives you band-pass filtered visualization for the band between 100 and 150, and another visualization for the band between 175 and 200")
+    parser.add_argument('--points', default="0,1", help="input list of points")
 
     args = parser.parse_args()
 
-    return args.case, args.mesh, args.save_deg, args.stride, args.dt, args.start_t, args.end_t, args.dvp, args.bands
+    return args.case, args.mesh, args.save_deg, args.stride, args.dt, args.start_t, args.end_t, args.dvp, args.bands, args.points
 
 
 def get_visualization_path(case_path):
@@ -257,7 +258,88 @@ def calculate_spi(case_name, df, output_folder, meshFile,start_t,end_t,low_cut,h
             outfile.write('\n%d %d %d %d'%(c[0]+1,c[1]+1,c[2]+1,c[3]+1)) # Need to add 1 because tecplot starts node numbering at 1
     outfile.close()   
 
-def create_domain_specific_viz(formatted_data_folder, output_folder, meshFile,save_deg,time_between_files,start_t,dvp):
+def create_point_trace(formatted_data_folder, output_folder, point_ids,save_deg,time_between_files,start_t,dvp):
+
+    # Get input data
+    components_data = []
+    component_names = ["mag","x","y","z"]
+    for i in range(len(component_names)):
+        if dvp == "p" and i>0:
+            break
+        file_str = dvp+"_"+component_names[i]+".npz"
+        print(file_str)
+        component_file = [file for file in os.listdir(formatted_data_folder) if file_str in file]
+        component_data = np.load(formatted_data_folder+"/"+component_file[0])['component']
+        components_data.append(component_data)
+
+
+    # Create name for output file, define output path
+
+    if dvp == "v":
+        viz_type = 'velocity'
+    elif dvp == "d":
+        viz_type = 'displacement'
+    elif dvp == "p":
+        viz_type = 'pressure'
+    else:
+        print("Input d, v or p for dvp")
+
+    num_ts = components_data[0].shape[1]   
+    time_plot = np.arange(0.0, num_ts*time_between_files, time_between_files) 
+
+
+    # Create output directory
+    if os.path.exists(output_folder):
+        print('Path exists!')
+    if not os.path.exists(output_folder):
+        print("creating output folder")
+        os.makedirs(output_folder)
+
+
+    for point_id in point_ids:
+
+        output_string = viz_type+"_point_id_"+str(point_id) # Base filename
+        if dvp != "p":
+            output_data = np.zeros((num_ts, 5))
+        else:
+            output_data = np.zeros((num_ts, 2))
+
+        output_data[:,0] = time_plot
+        output_data[:,1] = components_data[0][point_id,:]
+        if dvp != "p":
+            output_data[:,2] = components_data[1][point_id,:]
+            output_data[:,3] = components_data[2][point_id,:]
+            output_data[:,4] = components_data[3][point_id,:]
+
+        point_trace_file = output_folder+'/'+output_string+'.csv' # file name for point trace
+        point_trace_graph_file = output_folder+'/'+output_string+'.png' 
+
+        if dvp != "p":
+            np.savetxt(point_trace_file, output_data, delimiter=",", header="time (s), Magnitude, X Component, Y Component, Z Component")
+        else:
+            np.savetxt(point_trace_file, output_data, delimiter=",", header="time (s), Magnitude")
+
+        # Plot and Save
+        plt.plot(output_data[:,0],output_data[:,1],label="Mag")
+        if dvp != "p":
+            plt.plot(output_data[:,0],output_data[:,2],label="X")
+            plt.plot(output_data[:,0],output_data[:,3],label="Y")
+            plt.plot(output_data[:,0],output_data[:,4],label="Z")
+        plt.title('Point # '+ str(point_id))
+        if dvp == "p":
+            plt.ylabel("Pressure (Pa) Not including 80-120 perfusion pressure")
+        elif dvp == "v":
+            plt.ylabel("Velocity (m/s)")
+        elif dvp == "d":
+            plt.ylabel("Displacement (m)")
+
+        plt.xlabel('Simulation Time (s)')
+        plt.legend()
+        plt.savefig(point_trace_graph_file)  
+        plt.close()
+
+
+def create_domain_specific_viz(formatted_data_folder, output_folder, meshFile,save_deg,time_between_files,start_t,dvp,overwrite=False):
 
     # Get input data
     components_data = []
@@ -316,77 +398,82 @@ def create_domain_specific_viz(formatted_data_folder, output_folder, meshFile,sa
     # Get number of timesteps
     num_ts = components_data[0].shape[1]    
 
-    # Remove old file path
-    if os.path.exists(output_path):
-        print('File path exists; rewriting')
-        os.remove(output_path)
-    # Create H5 file
-    vectorData = h5py.File(output_path,'a')
-
-    # Create mesh arrays
-    # 1. update so that the fluid only nodes are used
-    # Easiest way is just inputting the fluid-only mesh
-    # harder way is modifying the topology of the mesh.. if an element contains a node that is in the solid, then don't include it? 
-    # for save_deg = 2, maybe we can use fenics to create refined mesh with the fluid and solid elements noted?
-    # hopefully that approach will yield the same node numbering as turtleFSI
-
-
-    if dvp == "d":
-        geoArray = vectorData.create_dataset("Mesh/0/mesh/geometry", (nNodesSolid,3))
-        geoArray[...] = coordArraySolid
-        topoArray = vectorData.create_dataset("Mesh/0/mesh/topology", (nElementsSolid,4), dtype='i')
-
-        # Fix Wall topology (need to renumber nodes consecutively so that dolfin can read the mesh)
-        for node_id in range(nNodesSolid):
-            wallTopology = np.where(wallTopology == wallIDs[node_id], node_id, wallTopology)
-        topoArray[...] = wallTopology
-        #print(wallTopology)
+    if os.path.exists(output_path) and overwrite == False:
+            print('File path {} exists; not overwriting. set overwrite = True to overwrite this file.'.format(output_path))
 
     else:
-        geoArray = vectorData.create_dataset("Mesh/0/mesh/geometry", (nNodesFluid,3))
-        geoArray[...] = coordArrayFluid
-        topoArray = vectorData.create_dataset("Mesh/0/mesh/topology", (nElementsFluid,4), dtype='i')
+        # Remove old file path
+        if os.path.exists(output_path):
+            print('File path exists; rewriting')
+            os.remove(output_path)
 
-        # Fix Fluid topology
-        for node_id in range(len(fluidIDs)):
-            fluidTopology = np.where(fluidTopology == fluidIDs[node_id], node_id, fluidTopology)
-        topoArray[...] = fluidTopology
+        # Create H5 file
+        vectorData = h5py.File(output_path,'a')
 
-    # 2. loop through elements and load in the df
-    for idx in range(num_ts):
-        ArrayName = 'VisualisationVector/' + str(idx)
-        if dvp == "p":
-            v_array = vectorData.create_dataset(ArrayName, (nNodesFluid,1))
-            v_array[:,0] = components_data[0][fluidIDs,idx]
-            attType = "Scalar"
+        # Create mesh arrays
+        # 1. update so that the fluid only nodes are used
+        # Easiest way is just inputting the fluid-only mesh
+        # harder way is modifying the topology of the mesh.. if an element contains a node that is in the solid, then don't include it? 
+        # for save_deg = 2, maybe we can use fenics to create refined mesh with the fluid and solid elements noted?
+        # hopefully that approach will yield the same node numbering as turtleFSI
 
-        elif dvp == "v":
-            v_array = vectorData.create_dataset(ArrayName, (nNodesFluid,3))
-            v_array[:,0] = components_data[1][fluidIDs,idx]
-            v_array[:,1] = components_data[2][fluidIDs,idx]
-            v_array[:,2] = components_data[3][fluidIDs,idx]
-            attType = "Vector"
 
-        elif dvp == "d":
-            v_array = vectorData.create_dataset(ArrayName, (nNodesSolid,3))
-            v_array[:,0] = components_data[1][wallIDs,idx]
-            v_array[:,1] = components_data[2][wallIDs,idx]
-            v_array[:,2] = components_data[3][wallIDs,idx]
-            attType = "Vector"
+        if dvp == "d":
+            geoArray = vectorData.create_dataset("Mesh/0/mesh/geometry", (nNodesSolid,3))
+            geoArray[...] = coordArraySolid
+            topoArray = vectorData.create_dataset("Mesh/0/mesh/topology", (nElementsSolid,4), dtype='i')
+
+            # Fix Wall topology (need to renumber nodes consecutively so that dolfin can read the mesh)
+            for node_id in range(nNodesSolid):
+                wallTopology = np.where(wallTopology == wallIDs[node_id], node_id, wallTopology)
+            topoArray[...] = wallTopology
+            #print(wallTopology)
 
         else:
-            print("ERROR, input dvp")
+            geoArray = vectorData.create_dataset("Mesh/0/mesh/geometry", (nNodesFluid,3))
+            geoArray[...] = coordArrayFluid
+            topoArray = vectorData.create_dataset("Mesh/0/mesh/topology", (nElementsFluid,4), dtype='i')
 
-    vectorData.close() 
+            # Fix Fluid topology
+            for node_id in range(len(fluidIDs)):
+                fluidTopology = np.where(fluidTopology == fluidIDs[node_id], node_id, fluidTopology)
+            topoArray[...] = fluidTopology
 
-    # 3 create xdmf so that we can visualize
-    if dvp == "d":
-        create_xdmf_file(num_ts,time_between_files,start_t,nElementsSolid,nNodesSolid,attType,viz_type,output_folder)
+        # 2. loop through elements and load in the df
+        for idx in range(num_ts):
+            ArrayName = 'VisualisationVector/' + str(idx)
+            if dvp == "p":
+                v_array = vectorData.create_dataset(ArrayName, (nNodesFluid,1))
+                v_array[:,0] = components_data[0][fluidIDs,idx]
+                attType = "Scalar"
 
-    else:
-        create_xdmf_file(num_ts,time_between_files,start_t,nElementsFluid,nNodesFluid,attType,viz_type,output_folder)
+            elif dvp == "v":
+                v_array = vectorData.create_dataset(ArrayName, (nNodesFluid,3))
+                v_array[:,0] = components_data[1][fluidIDs,idx]
+                v_array[:,1] = components_data[2][fluidIDs,idx]
+                v_array[:,2] = components_data[3][fluidIDs,idx]
+                attType = "Vector"
 
-def reduce_save_deg_viz(formatted_data_folder, output_folder, meshFile,save_deg,time_between_files,start_t,dvp):
+            elif dvp == "d":
+                v_array = vectorData.create_dataset(ArrayName, (nNodesSolid,3))
+                v_array[:,0] = components_data[1][wallIDs,idx]
+                v_array[:,1] = components_data[2][wallIDs,idx]
+                v_array[:,2] = components_data[3][wallIDs,idx]
+                attType = "Vector"
+
+            else:
+                print("ERROR, input dvp")
+
+        vectorData.close() 
+
+        # 3 create xdmf so that we can visualize
+        if dvp == "d":
+            create_xdmf_file(num_ts,time_between_files,start_t,nElementsSolid,nNodesSolid,attType,viz_type,output_folder)
+
+        else:
+            create_xdmf_file(num_ts,time_between_files,start_t,nElementsFluid,nNodesFluid,attType,viz_type,output_folder)
+
+def reduce_save_deg_viz(formatted_data_folder, output_folder, meshFile,save_deg,time_between_files,start_t,dvp,overwrite=False):
 
     # Get input data
     components_data = []
@@ -438,44 +525,48 @@ def reduce_save_deg_viz(formatted_data_folder, output_folder, meshFile,save_deg,
     # Get number of timesteps
     num_ts = components_data[0].shape[1]    
 
-    # Remove old file path
-    if os.path.exists(output_path):
-        print('File path exists; rewriting')
-        os.remove(output_path)
-    # Create H5 file
-    vectorData = h5py.File(output_path,'a')
+    if os.path.exists(output_path) and overwrite == False:
+            print('File path {} exists; not overwriting. set overwrite = True to overwrite this file.'.format(output_path))
 
-    # Create mesh arrays
-    geoArray = vectorData.create_dataset("Mesh/0/mesh/geometry", (nNodesFSI,3))
-    geoArray[...] = coordArrayFSI
-    topoArray = vectorData.create_dataset("Mesh/0/mesh/topology", (nElementsFSI,4), dtype='i')
-    topoArray[...] = topoArrayFSI
+    else:
+        # Remove old file path
+        if os.path.exists(output_path):
+            print('File path exists; rewriting')
+            os.remove(output_path)
+        # Create H5 file
+        vectorData = h5py.File(output_path,'a')
+    
+        # Create mesh arrays
+        geoArray = vectorData.create_dataset("Mesh/0/mesh/geometry", (nNodesFSI,3))
+        geoArray[...] = coordArrayFSI
+        topoArray = vectorData.create_dataset("Mesh/0/mesh/topology", (nElementsFSI,4), dtype='i')
+        topoArray[...] = topoArrayFSI
+    
+    
+        # 2. loop through elements and load in the df
+        for idx in range(num_ts):
+            ArrayName = 'VisualisationVector/' + str(idx)
+            if dvp == "p":
+                v_array = vectorData.create_dataset(ArrayName, (nNodesFSI,1))
+                v_array[:,0] = components_data[0][allIDs,idx]
+                attType = "Scalar"
+    
+            else:
+                v_array = vectorData.create_dataset(ArrayName, (nNodesFSI,3))
+                v_array[:,0] = components_data[1][allIDs,idx]
+                v_array[:,1] = components_data[2][allIDs,idx]
+                v_array[:,2] = components_data[3][allIDs,idx]
+                attType = "Vector"
+    
+    
+        vectorData.close() 
+    
+        # 3 create xdmf so that we can visualize
+        create_xdmf_file(num_ts,time_between_files,start_t,nElementsFSI,nNodesFSI,attType,viz_type,output_folder)
 
 
-    # 2. loop through elements and load in the df
-    for idx in range(num_ts):
-        ArrayName = 'VisualisationVector/' + str(idx)
-        if dvp == "p":
-            v_array = vectorData.create_dataset(ArrayName, (nNodesFSI,1))
-            v_array[:,0] = components_data[0][allIDs,idx]
-            attType = "Scalar"
 
-        else:
-            v_array = vectorData.create_dataset(ArrayName, (nNodesFSI,3))
-            v_array[:,0] = components_data[1][allIDs,idx]
-            v_array[:,1] = components_data[2][allIDs,idx]
-            v_array[:,2] = components_data[3][allIDs,idx]
-            attType = "Vector"
-
-
-    vectorData.close() 
-
-    # 3 create xdmf so that we can visualize
-    create_xdmf_file(num_ts,time_between_files,start_t,nElementsFSI,nNodesFSI,attType,viz_type,output_folder)
-
-
-
-def create_hi_pass_viz(formatted_data_folder, output_folder, meshFile,time_between_files,start_t,dvp,lowcut=0,highcut=100000,amplitude=False):
+def create_hi_pass_viz(formatted_data_folder, output_folder, meshFile,time_between_files,start_t,dvp,lowcut=0,highcut=100000,amplitude=False,filter_type="bandpass",pass_stop_list=[],overwrite=False):
 
     # Get input data
     components_data = []
@@ -514,7 +605,13 @@ def create_hi_pass_viz(formatted_data_folder, output_folder, meshFile,time_betwe
 
     if amplitude==True:
         viz_type=viz_type+"_amplitude"
-    viz_type = viz_type+"_"+str(int(np.rint(lowcut)))+"_to_"+str(int(np.rint(highcut)))
+
+    if filter_type=="multiband":
+        for lowfreq, highfreq, pass_stop in zip(lowcut,highcut,pass_stop_list):
+            viz_type = viz_type+"_"+pass_stop+"_"+str(int(np.rint(lowfreq)))+"_to_"+str(int(np.rint(highfreq)))
+
+    else:
+        viz_type = viz_type+"_"+str(int(np.rint(lowcut)))+"_to_"+str(int(np.rint(highcut)))
     output_file_name = viz_type+'.h5'  
     output_path = os.path.join(output_folder, output_file_name)  
 
@@ -545,173 +642,182 @@ def create_hi_pass_viz(formatted_data_folder, output_folder, meshFile,time_betwe
     # Get number of timesteps
     num_ts = components_data[0].shape[1]    
 
-    # Remove old file path
-    if os.path.exists(output_path):
-        print('File path exists; rewriting')
-        os.remove(output_path)
-    # Create H5 file
-    vectorData = h5py.File(output_path,'a')
+    if os.path.exists(output_path) and overwrite == False:
+            print('File path {} exists; not overwriting. set overwrite = True to overwrite this file.'.format(output_path))
 
-    # Create mesh arrays
-    # 1. update so that the fluid only nodes are used
-    # Easiest way is just inputting the fluid-only mesh
-    # harder way is modifying the topology of the mesh.. if an element contains a node that is in the solid, then don't include it? 
-    # for save_deg = 2, maybe we can use fenics to create refined mesh with the fluid and solid elements noted?
-    # hopefully that approach will yield the same node numbering as turtleFSI
+    else:
+        # Remove old file path
+        if os.path.exists(output_path):
+            print('File path exists; rewriting')
+            os.remove(output_path)
 
-    geoArray = vectorData.create_dataset("Mesh/0/mesh/geometry", (nNodesFSI,3))
-    geoArray[...] = coordArrayFSI
-    topoArray = vectorData.create_dataset("Mesh/0/mesh/topology", (nElementsFSI,4), dtype='i')
-    topoArray[...] = topoArrayFSI
-
-    # if lowcut exists, use a hi-pass filter on the results.
-    print("Filtering data...")
-    for idy in range(nNodesFSI):
-        if idy%1000 == 0:
-            print("... band pass filtering")
-        
-        f_crit = int(1/time_between_files)/2 - 1
-        if highcut >=f_crit:
-            highcut = f_crit
-        for ic in range(len(component_names)):
-            if lowcut < 0.1:
-                btype="lowpass"
-            else:
-                btype="band"
-            components_data[ic][idy,:] = spec.butter_bandpass_filter(components_data[ic][idy,:], lowcut=lowcut, highcut=highcut, fs=int(1/time_between_files)-1,btype=btype)
-            if idy%1000 == 0:
-                print(btype + str(lowcut) + str(highcut))
-    # if amplitude is selected, calculate moving RMS amplitude for the results                
-    if amplitude==True:
-        RMS_Magnitude = np.zeros((nNodesFSI,num_ts))
-        #window_size = int((1/lowcut)/time_between_files + 1) # this is the initial guess
-        window_size = 250 # this is ~1/4 the value used in the spectrograms (992) ...     
+        # Create H5 file
+        vectorData = h5py.File(output_path,'a')
+    
+        # Create mesh arrays
+        # 1. update so that the fluid only nodes are used
+        # Easiest way is just inputting the fluid-only mesh
+        # harder way is modifying the topology of the mesh.. if an element contains a node that is in the solid, then don't include it? 
+        # for save_deg = 2, maybe we can use fenics to create refined mesh with the fluid and solid elements noted?
+        # hopefully that approach will yield the same node numbering as turtleFSI
+    
+        geoArray = vectorData.create_dataset("Mesh/0/mesh/geometry", (nNodesFSI,3))
+        geoArray[...] = coordArrayFSI
+        topoArray = vectorData.create_dataset("Mesh/0/mesh/topology", (nElementsFSI,4), dtype='i')
+        topoArray[...] = topoArrayFSI
+    
+        print("Filtering data...")
         for idy in range(nNodesFSI):
             if idy%1000 == 0:
-                print("... calculating amplitude")
-            for ic in range(len(component_names)):
-                components_data[ic][idy,:] = window_rms(components_data[ic][idy,:],window_size) # For pressure
-
-
-    # 2. loop through elements and load in the df
-    for idx in range(num_ts):
-        ArrayName = 'VisualisationVector/' + str(idx)
-        if dvp == "p" or dvp =="wss" or dvp =="mps":
-            v_array = vectorData.create_dataset(ArrayName, (nNodesFSI,1))
-            v_array[:,0] = components_data[0][:,idx]
-            attType = "Scalar"
-            if amplitude==True:
-                RMS_Magnitude[:,idx] = components_data[0][:,idx] # Pressure is a scalar
-
-        elif dvp == "strain":
-            v_array = vectorData.create_dataset(ArrayName, (nNodesFSI,9))
-            v_array[:,0] = components_data[0][:,idx] # 11
-            v_array[:,1] = components_data[1][:,idx] # 12
-            v_array[:,2] = components_data[5][:,idx] # 31
-            v_array[:,3] = components_data[1][:,idx] # 12
-            v_array[:,4] = components_data[2][:,idx] # 22
-            v_array[:,5] = components_data[3][:,idx] # 23
-            v_array[:,6] = components_data[5][:,idx] # 31
-            v_array[:,7] = components_data[3][:,idx] # 23
-            v_array[:,8] = components_data[4][:,idx] # 33
-            attType = "Tensor"
-            if amplitude==True:
-                # Just print out dummy number for now.
-                #RMS_Magnitude[:,idx] = components_data[0][:,idx] 
-
-                print("calculating eigenvalues for ts #" + str(idx))
-                for iel in range(nNodesFSI):
-                    #print("Before creating Strain Tensor: " + str(time.perf_counter()))
-                    Strain_Tensor = np.array([[components_data[0][iel,idx],components_data[1][iel,idx],components_data[5][iel,idx]], [components_data[1][iel,idx],components_data[2][iel,idx],components_data[3][iel,idx]] ,[components_data[5][iel,idx],components_data[3][iel,idx],components_data[4][iel,idx]]])
-                    #print("After creating Strain Tensor: " + str(time.perf_counter()))
-                    if (np.abs(Strain_Tensor) < 1e-8).all():  # This is a shortcut to avoid taking eignevalues if the Strain tensor is all zeroes (outside the FSI region)
-                        MPS = 0.0
-                    else:
-                        #print(Strain_Tensor)
-                        MPS = get_eig(Strain_Tensor) # Instead of Magnitude, we take Maximum Principal Strain
-                    #print(MPS)
-                    #print("After calculating eigenvalues: " + str(time.perf_counter()))
-                    RMS_Magnitude[iel,idx] = MPS  
-                    #print("After assigning MPS: " + str(time.perf_counter()))
-
-        else:
-            v_array = vectorData.create_dataset(ArrayName, (nNodesFSI,3))
-            v_array[:,0] = components_data[1][:,idx]
-            v_array[:,1] = components_data[2][:,idx]
-            v_array[:,2] = components_data[3][:,idx]
-            attType = "Vector"
-            if amplitude==True:
-                RMS_Magnitude[:,idx] = LA.norm(v_array, axis=1)  # Take magnitude of RMS Amplitude, this way you don't lose any directional changes
-
-    vectorData.close() 
-
-    # 3 create xdmf so that we can visualize
-    create_xdmf_file(num_ts,time_between_files,start_t,nElementsFSI,nNodesFSI,attType,viz_type,output_folder)
-
-    # if amplitude is selected, save the percentiles of magnitude of RMS amplitude to file              
-    if amplitude==True:
-        # 3 save average amplitude, 95th percentile amplitude, max amplitude
-        output_amplitudes = np.zeros((num_ts, 12))
-        for idx in range(num_ts):
-#
-            output_amplitudes[idx,0] = idx*time_between_files
-            output_amplitudes[idx,1] = np.percentile(RMS_Magnitude[:,idx],95)
-            output_amplitudes[idx,2] = np.percentile(RMS_Magnitude[:,idx],5)
-            output_amplitudes[idx,3] = np.percentile(RMS_Magnitude[:,idx],100)
-            output_amplitudes[idx,4] = np.percentile(RMS_Magnitude[:,idx],0)
-            output_amplitudes[idx,5] = np.percentile(RMS_Magnitude[:,idx],50)
-            output_amplitudes[idx,6] = np.percentile(RMS_Magnitude[:,idx],90)
-            output_amplitudes[idx,7] = np.percentile(RMS_Magnitude[:,idx],10)
-            output_amplitudes[idx,8] = np.percentile(RMS_Magnitude[:,idx],97.5)
-            output_amplitudes[idx,9] = np.percentile(RMS_Magnitude[:,idx],2.5)
-            output_amplitudes[idx,10] = np.percentile(RMS_Magnitude[:,idx],99)
-            output_amplitudes[idx,11] = np.percentile(RMS_Magnitude[:,idx],1)
-#
-        amp_file = output_folder+'/'+viz_type+'.csv' # file name for amplitudes
-        amp_graph_file = output_folder+'/'+viz_type+'.png' # file name for amplitudes
-#
-        np.savetxt(amp_file, output_amplitudes, delimiter=",", header="time (s), 95th percentile amplitude, 5th percentile amplitude, maximum amplitude, minimum amplitude, average amplitude, 90th percentile amplitude, 10th percentile amplitude, 97.5th percentile amplitude, 2.5th percentile amplitude, 99th percentile amplitude, 1st percentile amplitude")
-        # Plot and Save
-        plt.plot(output_amplitudes[:,0],output_amplitudes[:,3],label="Maximum amplitude")
-        plt.plot(output_amplitudes[:,0],output_amplitudes[:,1],label="95th percentile amplitude")
-        plt.plot(output_amplitudes[:,0],output_amplitudes[:,5],label="50th percentile amplitude")
-        plt.title('Amplitude Percentiles')
-        plt.ylabel('Amplitude (units depend on d, v or p)')
-        plt.xlabel('Simulation Time (s)')
-        plt.legend()
-        plt.savefig(amp_graph_file)  
-        plt.close()
-
- 
-        if attType == "Tensor":
-
-            # Save MPS amplitude to file
-            # Remove old file path
-            viz_type = viz_type.replace("InfinitesimalStrain","MaxPrincipalHiPassStrain")
-            output_file_name = viz_type+'.h5'  
-            output_path = os.path.join(output_folder, output_file_name) 
-            if os.path.exists(output_path):
-                print('File path exists; rewriting')
-                os.remove(output_path)
-
-            # Create H5 file
-            vectorData = h5py.File(output_path,'a')
-            geoArray = vectorData.create_dataset("Mesh/0/mesh/geometry", (nNodesFSI,3))
-            geoArray[...] = coordArrayFSI
-            topoArray = vectorData.create_dataset("Mesh/0/mesh/topology", (nElementsFSI,4), dtype='i')
-            topoArray[...] = topoArrayFSI
-
-            # 2. loop through elements and load in the df
-            for idx in range(num_ts):
-                ArrayName = 'VisualisationVector/' + str(idx)
-                v_array = vectorData.create_dataset(ArrayName, (nNodesFSI,1))
-                v_array[:,0] = RMS_Magnitude[:,idx]
-                attType = "Scalar"
-                
-            vectorData.close() 
+                print("... {} filtering".format(filter_type))
             
-            # 3 create xdmf so that we can visualize
-            create_xdmf_file(num_ts,time_between_files,start_t,nElementsFSI,nNodesFSI,attType,viz_type,output_folder)
+            if filter_type=="multiband":  # loop through the bands and either bandpass or bandstop filter them
+                for lowfreq, highfreq, pass_stop in zip(lowcut,highcut,pass_stop_list):   
+                    for ic in range(len(component_names)):
+                        components_data[ic][idy,:] = spec.butter_bandpass_filter(components_data[ic][idy,:], lowcut=lowfreq, highcut=highfreq, fs=int(1/time_between_files)-1,btype=pass_stop)
+    
+            else:
+                f_crit = int(1/time_between_files)/2 - 1
+                if highcut >=f_crit:
+                    highcut = f_crit
+                if lowcut < 0.1:
+                    btype="lowpass"
+                else:
+                    btype="bandpass"
+                for ic in range(len(component_names)):
+                    components_data[ic][idy,:] = spec.butter_bandpass_filter(components_data[ic][idy,:], lowcut=lowcut, highcut=highcut, fs=int(1/time_between_files)-1,btype=btype)
+    
+        # if amplitude is selected, calculate moving RMS amplitude for the results                
+        if amplitude==True:
+            RMS_Magnitude = np.zeros((nNodesFSI,num_ts))
+            #window_size = int((1/lowcut)/time_between_files + 1) # this is the initial guess
+            window_size = 250 # this is ~1/4 the value used in the spectrograms (992) ...     
+            for idy in range(nNodesFSI):
+                if idy%1000 == 0:
+                    print("... calculating amplitude")
+                for ic in range(len(component_names)):
+                    components_data[ic][idy,:] = window_rms(components_data[ic][idy,:],window_size) # For pressure
+    
+    
+        # 2. loop through elements and load in the df
+        for idx in range(num_ts):
+            ArrayName = 'VisualisationVector/' + str(idx)
+            if dvp == "p" or dvp =="wss" or dvp =="mps":
+                v_array = vectorData.create_dataset(ArrayName, (nNodesFSI,1))
+                v_array[:,0] = components_data[0][:,idx]
+                attType = "Scalar"
+                if amplitude==True:
+                    RMS_Magnitude[:,idx] = components_data[0][:,idx] # Pressure is a scalar
+    
+            elif dvp == "strain":
+                v_array = vectorData.create_dataset(ArrayName, (nNodesFSI,9))
+                v_array[:,0] = components_data[0][:,idx] # 11
+                v_array[:,1] = components_data[1][:,idx] # 12
+                v_array[:,2] = components_data[5][:,idx] # 31
+                v_array[:,3] = components_data[1][:,idx] # 12
+                v_array[:,4] = components_data[2][:,idx] # 22
+                v_array[:,5] = components_data[3][:,idx] # 23
+                v_array[:,6] = components_data[5][:,idx] # 31
+                v_array[:,7] = components_data[3][:,idx] # 23
+                v_array[:,8] = components_data[4][:,idx] # 33
+                attType = "Tensor"
+                if amplitude==True:
+                    # Just print out dummy number for now.
+                    #RMS_Magnitude[:,idx] = components_data[0][:,idx] 
+    
+                    print("calculating eigenvalues for ts #" + str(idx))
+                    for iel in range(nNodesFSI):
+                        #print("Before creating Strain Tensor: " + str(time.perf_counter()))
+                        Strain_Tensor = np.array([[components_data[0][iel,idx],components_data[1][iel,idx],components_data[5][iel,idx]], [components_data[1][iel,idx],components_data[2][iel,idx],components_data[3][iel,idx]] ,[components_data[5][iel,idx],components_data[3][iel,idx],components_data[4][iel,idx]]])
+                        #print("After creating Strain Tensor: " + str(time.perf_counter()))
+                        if (np.abs(Strain_Tensor) < 1e-8).all():  # This is a shortcut to avoid taking eignevalues if the Strain tensor is all zeroes (outside the FSI region)
+                            MPS = 0.0
+                        else:
+                            #print(Strain_Tensor)
+                            MPS = get_eig(Strain_Tensor) # Instead of Magnitude, we take Maximum Principal Strain
+                        #print(MPS)
+                        #print("After calculating eigenvalues: " + str(time.perf_counter()))
+                        RMS_Magnitude[iel,idx] = MPS  
+                        #print("After assigning MPS: " + str(time.perf_counter()))
+    
+            else:
+                v_array = vectorData.create_dataset(ArrayName, (nNodesFSI,3))
+                v_array[:,0] = components_data[1][:,idx]
+                v_array[:,1] = components_data[2][:,idx]
+                v_array[:,2] = components_data[3][:,idx]
+                attType = "Vector"
+                if amplitude==True:
+                    RMS_Magnitude[:,idx] = LA.norm(v_array, axis=1)  # Take magnitude of RMS Amplitude, this way you don't lose any directional changes
+    
+        vectorData.close() 
+    
+        # 3 create xdmf so that we can visualize
+        create_xdmf_file(num_ts,time_between_files,start_t,nElementsFSI,nNodesFSI,attType,viz_type,output_folder)
+
+        # if amplitude is selected, save the percentiles of magnitude of RMS amplitude to file              
+        if amplitude==True:
+            # 3 save average amplitude, 95th percentile amplitude, max amplitude
+            output_amplitudes = np.zeros((num_ts, 13))
+            for idx in range(num_ts):
+                output_amplitudes[idx,0] = idx*time_between_files
+                output_amplitudes[idx,1] = np.percentile(RMS_Magnitude[:,idx],95)
+                output_amplitudes[idx,2] = np.percentile(RMS_Magnitude[:,idx],5)
+                output_amplitudes[idx,3] = np.percentile(RMS_Magnitude[:,idx],100)
+                output_amplitudes[idx,4] = np.percentile(RMS_Magnitude[:,idx],0)
+                output_amplitudes[idx,5] = np.percentile(RMS_Magnitude[:,idx],50)
+                output_amplitudes[idx,6] = np.percentile(RMS_Magnitude[:,idx],90)
+                output_amplitudes[idx,7] = np.percentile(RMS_Magnitude[:,idx],10)
+                output_amplitudes[idx,8] = np.percentile(RMS_Magnitude[:,idx],97.5)
+                output_amplitudes[idx,9] = np.percentile(RMS_Magnitude[:,idx],2.5)
+                output_amplitudes[idx,10] = np.percentile(RMS_Magnitude[:,idx],99)
+                output_amplitudes[idx,11] = np.percentile(RMS_Magnitude[:,idx],1)
+                output_amplitudes[idx,12] = np.argmax(RMS_Magnitude[:,idx])
+    
+            amp_file = output_folder+'/'+viz_type+'.csv' # file name for amplitudes
+            amp_graph_file = output_folder+'/'+viz_type+'.png' # file name for amplitudes
+  
+            np.savetxt(amp_file, output_amplitudes, delimiter=",", header="time (s), 95th percentile amplitude, 5th percentile amplitude, maximum amplitude, minimum amplitude, average amplitude, 90th percentile amplitude, 10th percentile amplitude, 97.5th percentile amplitude, 2.5th percentile amplitude, 99th percentile amplitude, 1st percentile amplitude, ID of node with max amplitude")
+            # Plot and Save
+            plt.plot(output_amplitudes[:,0],output_amplitudes[:,3],label="Maximum amplitude")
+            plt.plot(output_amplitudes[:,0],output_amplitudes[:,1],label="95th percentile amplitude")
+            plt.plot(output_amplitudes[:,0],output_amplitudes[:,5],label="50th percentile amplitude")
+            plt.title('Amplitude Percentiles')
+            plt.ylabel('Amplitude (units depend on d, v or p)')
+            plt.xlabel('Simulation Time (s)')
+            plt.legend()
+            plt.savefig(amp_graph_file)  
+            plt.close()
+    
+     
+            if attType == "Tensor":
+    
+                # Save MPS amplitude to file
+                # Remove old file path
+                viz_type = viz_type.replace("InfinitesimalStrain","MaxPrincipalHiPassStrain")
+                output_file_name = viz_type+'.h5'  
+                output_path = os.path.join(output_folder, output_file_name) 
+                if os.path.exists(output_path):
+                    print('File path exists; rewriting')
+                    os.remove(output_path)
+    
+                # Create H5 file
+                vectorData = h5py.File(output_path,'a')
+                geoArray = vectorData.create_dataset("Mesh/0/mesh/geometry", (nNodesFSI,3))
+                geoArray[...] = coordArrayFSI
+                topoArray = vectorData.create_dataset("Mesh/0/mesh/topology", (nElementsFSI,4), dtype='i')
+                topoArray[...] = topoArrayFSI
+    
+                # 2. loop through elements and load in the df
+                for idx in range(num_ts):
+                    ArrayName = 'VisualisationVector/' + str(idx)
+                    v_array = vectorData.create_dataset(ArrayName, (nNodesFSI,1))
+                    v_array[:,0] = RMS_Magnitude[:,idx]
+                    attType = "Scalar"
+                    
+                vectorData.close() 
+                
+                # 3 create xdmf so that we can visualize
+                create_xdmf_file(num_ts,time_between_files,start_t,nElementsFSI,nNodesFSI,attType,viz_type,output_folder)
 
 
 
@@ -1041,6 +1147,72 @@ def create_transformed_matrix(input_path, output_folder,meshFile, case_name, sta
             np.savez_compressed(output_path, component=dvp_magnitude)
 
     return time_between_files
+
+def get_time_between_files(input_path, output_folder,meshFile, case_name, dvp,stride=1):
+    # Create name for case, define output path
+    print('Creating matrix for case {}...'.format(case_name))
+    output_folder = output_folder
+
+    # Create output directory
+    if os.path.exists(output_folder):
+        print('Path exists')
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+
+    # Get node ids from input mesh. If save_deg = 2, you can supply the original mesh to get the data for the 
+    # corner nodes, or supply a refined mesh to get the data for all nodes (very computationally intensive)
+    if dvp == "d" or dvp == "v" or dvp == "p":
+        fluidIDs, wallIDs, allIDs = get_domain_ids(meshFile)
+        ids = allIDs
+
+    # Get name of xdmf file
+    if dvp == 'd':
+        xdmf_file = input_path + '/displacement.xdmf' # Change
+    elif dvp == 'v':
+        xdmf_file = input_path + '/velocity.xdmf' # Change
+    elif dvp == 'p':
+        xdmf_file = input_path + '/pressure.xdmf' # Change
+    elif dvp == 'wss':
+        xdmf_file = input_path + '/WSS_ts.xdmf' # Change
+    elif dvp == 'mps':
+        xdmf_file = input_path + '/MaxPrincipalStrain.xdmf' # Change
+    elif dvp == 'strain':
+        xdmf_file = input_path + '/InfinitesimalStrain.xdmf' # Change
+    else:
+        print('input d, v, p, mps, strain or wss for dvp')
+
+    # If the simulation has been restarted, the output is stored in multiple files and may not have even temporal spacing
+    # This loop determines the file names from the xdmf output file
+    file1 = open(xdmf_file, 'r') 
+    Lines = file1.readlines() 
+    h5_ts=[]
+    time_ts=[]
+    index_ts=[]
+    
+    # This loop goes through the xdmf output file and gets the time value (time_ts), associated 
+    # .h5 file (h5_ts) and index of each timestep inthe corresponding h5 file (index_ts)
+    for line in Lines: 
+        if '<Time Value' in line:
+            time_pattern = '<Time Value="(.+?)"'
+            time_str = re.findall(time_pattern, line)
+            time = float(time_str[0])
+            time_ts.append(time)
+
+        elif 'VisualisationVector' in line:
+            #print(line)
+            h5_pattern = '"HDF">(.+?):/'
+            h5_str = re.findall(h5_pattern, line)
+            h5_ts.append(h5_str[0])
+
+            index_pattern = "VisualisationVector/(.+?)</DataItem>"
+            index_str = re.findall(index_pattern, line)
+            index = int(index_str[0])
+            index_ts.append(index)
+    time_between_files = time_ts[2] - time_ts[1] # Calculate the time between files from xdmf file
+
+    return time_between_files
+
+
 
 def get_eig(T):
 ########################################################################

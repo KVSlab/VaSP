@@ -36,7 +36,7 @@ def create_visualizations(case_path, mesh_name, save_deg, stride, ts, start_t, e
 
     case_name = os.path.basename(os.path.normpath(case_path)) # obtains only last folder in case_path
     visualization_path = postprocessing_common_h5py.get_visualization_path(case_path)
-    multiband=False
+    multiband=True
     
     bands_list = bands.split(",")
     num_bands = int(len(bands_list)/2)
@@ -98,14 +98,8 @@ def create_visualizations(case_path, mesh_name, save_deg, stride, ts, start_t, e
     # Get the desired time between output files (reduce output frequency by "stride")
     time_between_output_files = time_between_input_files*stride 
     if dvp != "wss" and dvp != "mps" and dvp != "strain":
-        #postprocessing_common_h5py.create_domain_specific_viz(formatted_data_folder, visualization_separate_domain_folder, mesh_path,save_deg, time_between_output_files,start_t,dvp)
     
         if save_deg == 1:
-            #postprocessing_common_h5py.reduce_save_deg_viz(formatted_data_folder, visualization_sd1_folder, mesh_path_sd1,1, time_between_output_files,start_t,dvp)
-            try:
-                postprocessing_common_h5py.create_point_trace(formatted_data_folder, visualization_separate_domain_folder, point_ids ,save_deg, time_between_output_files,start_t,dvp)
-            except: 
-                print("Failed to create point trace... check input points")
             for i in range(len(lower_freq)):
                 postprocessing_common_h5py.create_hi_pass_viz(formatted_data_folder, visualization_hi_pass_folder, mesh_path,time_between_output_files,start_t,dvp,lower_freq[i],higher_freq[i])
                 postprocessing_common_h5py.create_hi_pass_viz(formatted_data_folder, visualization_hi_pass_folder, mesh_path,time_between_output_files,start_t,dvp,lower_freq[i],higher_freq[i],amplitude=True)
@@ -115,13 +109,7 @@ def create_visualizations(case_path, mesh_name, save_deg, stride, ts, start_t, e
                 postprocessing_common_h5py.create_hi_pass_viz(formatted_data_folder, visualization_hi_pass_folder, mesh_path,time_between_output_files,start_t,dvp,lower_freq,higher_freq,filter_type='multiband',pass_stop_list=pass_stop_list)
                 postprocessing_common_h5py.create_hi_pass_viz(formatted_data_folder, visualization_hi_pass_folder, mesh_path,time_between_output_files,start_t,dvp,lower_freq,higher_freq,amplitude=True,filter_type='multiband',pass_stop_list=pass_stop_list)
        
-    
-    elif dvp == "strain":
-        for i in range(len(lower_freq)):
-            postprocessing_common_h5py.create_hi_pass_viz(formatted_data_folder, visualization_hi_pass_folder, mesh_path_solid_sd1,time_between_output_files,start_t,dvp,lower_freq[i],higher_freq[i])
-            postprocessing_common_h5py.create_hi_pass_viz(formatted_data_folder, visualization_hi_pass_folder, mesh_path_solid_sd1,time_between_output_files,start_t,dvp,lower_freq[i],higher_freq[i],amplitude=True)
-        
-        
+  
 
 if __name__ == '__main__':
     # Get Command Line Arguments and Input File Paths
