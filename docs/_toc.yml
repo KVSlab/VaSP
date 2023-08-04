@@ -17,15 +17,13 @@ parts:
     - file: preprocess
     - file: simulation
     - file: postprocess
-    - file: quantities
     - file: cluster
     - file: features
 
   - caption: Tutorials
     chapters:
     - file: tutorials
-    - file: cylinder
-    - file: offset stenosis
+    - file: stenosis
     - file: aneurysm
     - file: avf
 
