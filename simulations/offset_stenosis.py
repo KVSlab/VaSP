@@ -1,12 +1,15 @@
-from dolfin import *
-import os, math
-from turtleFSI.problems import *
-from utils.Womersley import make_womersley_bcs, compute_boundary_geometry_acrn
+"""
+Problem file for offset stenosis FSI simulation
+"""
+import os
 import numpy as np
-from numpy import genfromtxt
-from os import path, makedirs, getcwd
-from pprint import pprint
 import configparser
+
+from Womersley import make_womersley_bcs_from_coefficients, compute_boundary_geometry_acrn
+
+from turtleFSI.problems import *
+from dolfin import *
+
 # set compiler arguments
 parameters["form_compiler"]["quadrature_degree"] = 6
 parameters["form_compiler"]["optimize"] = True
@@ -45,19 +48,22 @@ def set_problem_parameters(default_variables, **namespace):
     default_variables.update(dict(
         T=T, # Simulation end time
         dt=dt,#0.00033964286, # Timne step size
-        atol=1e-6, # Absolute tolerance in the Newton solver
-        rtol=1e-6,# Relative tolerance in the Newton solver
+        atol=1e-10, # Absolute tolerance in the Newton solver
+        rtol=1e-9,# Relative tolerance in the Newton solver
         inlet_id=2,  # inlet
         inlet_outlet_s_id=11,  # also the "rigid wall" id for the stucture problem
-        recompute=30, # Recompute the Jacobian matix within time steps                                                                                    
-        recompute_tstep=10, # Recompute the Jacobian matix over time steps (dangerous!)  
+        recompute=20, # Recompute the Jacobian matix within time steps                                                                                    
+        recompute_tstep=20, # Recompute the Jacobian matix over time steps (dangerous!)  
         fsi_id=22,  # fsi surface
         rigid_id=11,  # "rigid wall" id for the fluid and mesh problem
         outer_id=33,  # outer surface
         folder=mesh_path,#"file_case9_el047",
         mesh_file=mesh_path,#"file_case9_el047",
-        Q_file="MCA_10", # This is the location of CFD results used to prescribe the inlet velocity profile
+        FC_file="FC_MCA_10", # This is the location of CFD results used to prescribe the inlet velocity profile
         Q_mean=Q_mean,#1.9275E-06, # Problem specific
+        P_FC_File="FC_Pressure", # This is the location of CFD results used to prescribe the inlet velocity profile
+        P_mean=11200,#1.9275E-06, # Problem specific
+        T_Cycle=0.951,# Used to define length of flow waveform
         theta=0.50+dt, # Theta scheme (implicit/explicit time stepping)
         rho_f=[1.000E3,1.000E3],    # Fluid density [kg/m3]
         mu_f=[3.5E-3,7.0E-2],       # Fluid dynamic viscosity [Pa.s]
@@ -79,6 +85,12 @@ def set_problem_parameters(default_variables, **namespace):
     ))
 
     return default_variables
+
+#def initiate(**namespace):
+#
+#    T=1.902
+#
+#    return dict(T=T)
 
 def get_mesh_domain_and_boundaries(mesh_file,fsi_region, dx_f_id, fsi_id, rigid_id, outer_id, folder, **namespace):
     # Read mesh
@@ -128,11 +140,13 @@ def get_mesh_domain_and_boundaries(mesh_file,fsi_region, dx_f_id, fsi_id, rigid_
 
 
 class InnerP(UserExpression):
-    def __init__(self, t, t_ramp, t_p, p_PA, **kwargs):
+    def __init__(self, t, t_ramp, An, Bn, period,P_mean, **kwargs):
         self.t = t
         self.t_ramp = t_ramp
-        self.t_p = t_p
-        self.p_PA = p_PA    
+        self.An = An
+        self.Bn = Bn
+        self.omega = (2.0 * np.pi / period)
+        self.P_mean=P_mean
         self.p_0 = 0.0 # Initial pressure
         self.P = self.p_0 # Apply initial pressure to inner pressure variable
         super().__init__(**kwargs)
@@ -146,8 +160,15 @@ class InnerP(UserExpression):
             ramp_factor = 1.0
         if MPI.rank(MPI.comm_world) == 0:
             print("ramp_factor = {} m^3/s".format(ramp_factor))
-        # Caclulate P as resistance boundary condition multiplied by ramp factor
-        self.P = ramp_factor * (np.interp(self.t, self.t_p, self.p_PA))
+
+        # Caclulate Pn (normalized pressure)from Fourier Coefficients
+        Pn = 0 + 0j
+        for i in range (len(self.An)):
+            Pn = Pn + (self.An[i]-self.Bn[i]*1j)*np.exp(1j*i*self.omega*self.t)
+        Pn = abs(Pn)
+
+        # Multiply by mean pressure and ramp factor 
+        self.P = ramp_factor * Pn * self.P_mean
         if MPI.rank(MPI.comm_world) == 0:
             print("P = {} Pa".format(self.P))
 
@@ -160,7 +181,8 @@ class InnerP(UserExpression):
 
 def create_bcs(t, v_, DVP, mesh, boundaries, domains, mu_f,
                fsi_id, inlet_id, inlet_outlet_s_id,
-               rigid_id, psi, F_solid_linear, p_deg, Q_file, Q_mean, **namespace):
+               rigid_id, psi, F_solid_linear, p_deg, FC_file,
+               Q_mean, P_FC_File, P_mean, T_Cycle, **namespace):
 
     # Fluid velocity BCs
     dsi = ds(inlet_id, domain=mesh, subdomain_data=boundaries)
@@ -170,13 +192,15 @@ def create_bcs(t, v_, DVP, mesh, boundaries, domains, mu_f,
     n_len = np.sqrt(sum([ni[i]**2 for i in range(ndim)]))  # Should always be 1!?
     normal = ni/n_len
 
-    # Load normalized time and flow rate values
-    t_values, Q_ = np.loadtxt(path.join(path.dirname(path.abspath(__file__)), Q_file)).T
-    Q_values = Q_mean * Q_  # Specific flow rate = Normalized flow wave form * Prescribed flow rate
+    # Load fourier coefficients and scale by flow rate
+    An, Bn = np.loadtxt(os.path.join(os.path.dirname(os.path.abspath(__file__)), FC_file)).T
+    # Convert to complex fourier coefficients
+    Cn = (An - Bn*1j)*Q_mean
+
     tmp_area, tmp_center, tmp_radius, tmp_normal = compute_boundary_geometry_acrn(mesh, inlet_id, boundaries)
 
     # Create Womersley boundary condition at inlet
-    inlet = make_womersley_bcs(t_values, Q_values, mesh, mu_f[0], tmp_area, tmp_center, tmp_radius, tmp_normal, DVP.sub(1).sub(0).ufl_element())
+    inlet = make_womersley_bcs_from_coefficients(Cn, T_Cycle, mesh, mu_f[0], tmp_area, tmp_center, tmp_radius, tmp_normal, DVP.sub(1).sub(0).ufl_element())
 
     # Initialize inlet expressions with initial time
     for uc in inlet:
@@ -196,11 +220,14 @@ def create_bcs(t, v_, DVP, mesh, boundaries, domains, mu_f,
 
     # Define the pressure condition (apply to inner surface, numerical instability results from applying to outlet)
     #dso = ds(outlet_id1, domain=mesh, subdomain_data=boundaries) # Outlet surface # Maybe try applying to all outlets???
+
+
+
+    # Load fourier coefficients and scale by flow rate
+    An_P, Bn_P = np.loadtxt(os.path.join(os.path.dirname(os.path.abspath(__file__)), P_FC_File)).T
+
     dSS = Measure("dS", domain=mesh, subdomain_data=boundaries)
-    p_t_file = genfromtxt('p_t.csv', delimiter=',')
-    t_pressure=p_t_file[1:,0]
-    pressure_PA=p_t_file[1:,1]
-    p_out_bc_val = InnerP(t=0.0, t_p=t_pressure, t_ramp=0.2, p_PA=pressure_PA, degree=p_deg)
+    p_out_bc_val = InnerP(t=0.0, t_ramp=0.2, An=An_P, Bn=Bn_P, period=T_Cycle, P_mean=P_mean, degree=p_deg)
     F_solid_linear += p_out_bc_val * inner(n('+'), psi('+'))*dSS(fsi_id)  # defined on the reference domain
 
     return dict(bcs=bcs, inlet=inlet, p_out_bc_val=p_out_bc_val, F_solid_linear=F_solid_linear)
@@ -217,13 +244,20 @@ def pre_solve(t, v_, DVP, inlet, p_out_bc_val, **namespace):
         else:
             uc.scale_value = 1.0
 
+
     # Update pressure condition
     p_out_bc_val.update(t)
 
     return dict(inlet=inlet, p_out_bc_val=p_out_bc_val)
 
+def post_solve(mesh,boundaries,inlet_id, v_, **namespace):
+
+    # Calc flow rate
+    dsi = ds(inlet_id, domain=mesh, subdomain_data=boundaries)
+    n = FacetNormal(mesh)
+    flow_rate_inlet = assemble(inner(v_["n"], n)*dsi)
+    if MPI.rank(MPI.comm_world) == 0:
+        print("Inlet flow rate is: {:e} m^3/s\n".format(flow_rate_inlet))
+
 def finished(**namespace):
     with open("finished", mode='a'): pass
-
-
-
