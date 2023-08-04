@@ -1,0 +1,51 @@
+[build-system] # Require setuptool version due to https://github.com/pypa/setuptools/issues/2938
+requires = ["setuptools>=61.0.0", "wheel"]
+
+[project]
+name = "fsipy"
+version = "0.1.0"
+description = "Vascular Fluid Structure Interaction Pipline"
+authors = [{name = "John Smith", email = "johnsmith@example.org"}]
+license = { file = "LICENSE" }
+readme = "README.md"
+dependencies = [
+    'numpy',
+    'matplotlib',
+    'vampy',
+]
+
+[project.scripts]
+fsipy-mesh = "fsipy.automatedPreprocessing.automated_preprocessing:main_meshing"
+
+[project.optional-dependencies]
+test = [
+    "flake8",
+    'mypy',
+    "pytest",
+    "pytest-cov"
+]
+
+[tool.pytest.ini_options]
+addopts = [
+    "--import-mode=importlib",
+    "--cov=./",
+    "--cov-report=xml",
+    "--cov-report=term-missing",
+    "-v"
+]
+testpaths = [
+    "tests"
+]
+
+[tool.mypy]
+ignore_missing_imports = true
+# Folders to exclude
+exclude = [
+    "docs/",
+    "build/",
+]
+# Folder to check with mypy
+files = [
+    "src",
+    "tests"
+]
