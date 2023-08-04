@@ -1,0 +1,19 @@
+name: fsipy
+
+channels:
+  - conda-forge
+
+dependencies:
+  - vtk=*=qt*
+  - fenics
+  - morphman
+  - paramiko
+  - vmtk
+  - pip
+  - python >=3.8
+  - git
+  - pip:
+      - cppimport
+      - git+https://github.com/mikaem/Oasis
+      - git+https://github.com/KVSlab/VaMPy.git
+      - git+https://github.com/KVSlab/turtleFSI.git
