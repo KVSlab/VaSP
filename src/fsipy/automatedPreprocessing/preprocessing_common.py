@@ -1,6 +1,8 @@
-from vmtkmeshgeneratorfsi import vmtkMeshGeneratorFsi
+from fsipy.automatedPreprocessing.vmtkmeshgeneratorfsi import vmtkMeshGeneratorFsi
 from vmtk import vmtkdistancetospheres
 from morphman import vmtkscripts, write_polydata, get_point_data_array, create_vtk_array
+from dolfin import Mesh, MeshFunction, File, HDF5File
+from pathlib import Path
 
 # Global array names
 distanceToSpheresArrayName = "DistanceToSpheres"
@@ -160,3 +162,47 @@ def generate_mesh(surface, add_boundary_layer, meshing_method, solid_thickness, 
     mesh = meshGenerator.Mesh
 
     return mesh, remeshSurface
+
+def convert_xml_mesh_to_hdf5(file_name_xml_mesh, scaling_factor=0.001):
+    """Converts an XML mesh to an HDF5 mesh.
+
+    Args:
+        file_name_xml_mesh (str): The name of the XML mesh file.
+        scaling_factor (float, optional): A scaling factor to apply to the mesh coordinates. The default value is 0.001, which converts from millimeters to meters.
+
+    Returns:
+        None
+
+    Raises:
+        FileNotFoundError: If the XML mesh file does not exist.
+    """
+
+    # Check if the XML mesh file exists
+    if not Path(file_name_xml_mesh).is_file():
+        raise FileNotFoundError(f"The file '{file_name_xml_mesh}' does not exist.")
+
+    mesh = Mesh(file_name_xml_mesh)
+
+    # Rescale the mesh coordinates
+    x = mesh.coordinates()
+    x[:, :] *= scaling_factor
+    mesh.bounding_box_tree().build(mesh)
+
+    # Convert subdomains to mesh function
+    boundaries = MeshFunction("size_t", mesh, 2, mesh.domains())
+    boundaries.set_values(boundaries.array() + 1)  # FIXME: Explain why this is necessary
+
+    boundary_file = File(str(Path(file_name_xml_mesh).with_suffix('').with_suffix('')) + '_boundaries.pvd')
+    boundary_file << boundaries
+
+    domains = MeshFunction("size_t", mesh, 3, mesh.domains())
+    domains.set_values(domains.array() + 1)  # in order to have fluid==1 and solid==2
+
+    domain_file = File(str(Path(file_name_xml_mesh).with_suffix('').with_suffix('')) + '_domains.pvd')
+    domain_file << domains
+
+    file_name_h5_mesh = str(Path(file_name_xml_mesh).with_suffix('').with_suffix('.h5'))
+    hdf = HDF5File(mesh.mpi_comm(), file_name_h5_mesh, "w")
+    hdf.write(mesh, "/mesh")
+    hdf.write(boundaries, "/boundaries")
+    hdf.write(domains, "/domains")
