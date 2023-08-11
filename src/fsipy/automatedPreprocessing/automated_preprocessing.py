@@ -19,19 +19,15 @@ from vampy.automatedPreprocessing.preprocessing_common import read_polydata, get
 from vampy.automatedPreprocessing.simulate import run_simulation
 from vampy.automatedPreprocessing.visualize import visualize_model
 
-
-import sys
-from os.path import dirname
-sys.path.append(dirname(__file__))
-
-from preprocessing_common import generate_mesh, distance_to_spheres_solid_thickness, dist_sphere_spheres
+from fsipy.automatedPreprocessing.preprocessing_common import generate_mesh, distance_to_spheres_solid_thickness, \
+     dist_sphere_spheres, convert_xml_mesh_to_hdf5
 
 
 def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_factor, smoothing_iterations,
                        meshing_method, refine_region, is_atrium, add_flow_extensions, visualize, config_path,
                        coarsening_factor, inlet_flow_extension_length, outlet_flow_extension_length, edge_length,
                        region_points, compress_mesh, add_boundary_layer, scale_factor, resampling_step,
-                       remove_all, solid_thickness, solid_thickness_parameters):
+                       meshing_parameters, remove_all, solid_thickness, solid_thickness_parameters):
     """
     Automatically generate mesh of surface model in .vtu and .xml format, including prescribed
     flow rates at inlet and outlet based on flow network model.
@@ -362,8 +358,13 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
             distance_to_sphere = read_polydata(file_name_distance_to_sphere_diam)
     elif meshing_method == "distancetospheres":
         if not path.isfile(file_name_distance_to_sphere_spheres):
-            distance_to_sphere = dist_sphere_spheres(surface_extended, centerlines, region_center, misr_max,
-                                                     file_name_distance_to_sphere_spheres, coarsening_factor)
+            if len(meshing_parameters) == 4:
+                distance_to_sphere = dist_sphere_spheres(surface_extended, file_name_distance_to_sphere_spheres,
+                                                         *meshing_parameters)
+            else:
+                print("ERROR: Invalid parameters for meshing method 'distancetospheres'. This should be " +
+                      "given as four parameters: 'offset', 'scale', 'min' and 'max.")
+                sys.exit(-1)
         else:
             distance_to_sphere = read_polydata(file_name_distance_to_sphere_spheres)
 
@@ -380,39 +381,44 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
                 distance_to_sphere = distance_to_spheres_solid_thickness(distance_to_sphere,
                                                                          file_name_distance_to_sphere_solid_thickness)
             else:
-                print("ERROR: Invalid parameters for variable solid thickness. This should be "+
+                print("ERROR: Invalid parameters for variable solid thickness. This should be " +
                       "given as four parameters: 'offset', 'scale', 'min' and 'max.")
                 sys.exit(-1)
         else:
             distance_to_sphere = read_polydata(file_name_distance_to_sphere_solid_thickness)
-                
     else:
-        pass  # FIXME: how to set constant thickness
+        if len(solid_thickness_parameters) != 1 or solid_thickness_parameters[0] <= 0:
+            print("ERROR: Invalid parameter for constant solid thickness. This should be a " +
+                  "single number greater than zero.")
+            sys.exit(-1)
             
     # Compute mesh
     if not path.isfile(file_name_vtu_mesh):
         print("--- Computing mesh\n")
         try:
-            mesh, remeshed_surface = generate_mesh(distance_to_sphere, add_boundary_layer, meshing_method,
-                                                   solid_thickness, solid_thickness_parameters)
+            mesh, remeshed_surface = generate_mesh(distance_to_sphere, solid_thickness, solid_thickness_parameters)
         except Exception:
             distance_to_sphere = mesh_alternative(distance_to_sphere)
-            mesh, remeshed_surface = generate_mesh(distance_to_sphere, add_boundary_layer, meshing_method,
-                                                   solid_thickness, solid_thickness_parameters)
+            mesh, remeshed_surface = generate_mesh(distance_to_sphere, solid_thickness, solid_thickness_parameters)
 
         assert mesh.GetNumberOfPoints() > 0, "No points in mesh, try to remesh."
         assert remeshed_surface.GetNumberOfPoints() > 0, "No points in surface mesh, try to remesh."
 
         if mesh.GetNumberOfPoints() < remeshed_surface.GetNumberOfPoints():
             print("--- An error occurred during meshing. Will attempt to re-mesh \n")
-            mesh, remeshed_surface = generate_mesh(distance_to_sphere, add_boundary_layer, meshing_method,
-                                                   solid_thickness, solid_thickness_parameters)
+            mesh, remeshed_surface = generate_mesh(distance_to_sphere, solid_thickness, solid_thickness_parameters)
 
         write_mesh(compress_mesh, file_name_surface_name, file_name_vtu_mesh, file_name_xml_mesh,
                    mesh, remeshed_surface)
 
+        # Add .gz to XML mesh file if compressed
+        if compress_mesh:
+            file_name_xml_mesh = file_name_xml_mesh + ".gz"
     else:
         mesh = read_polydata(file_name_vtu_mesh)
+
+    print(f"--- Converting XML mesh to HDF5")
+    convert_xml_mesh_to_hdf5(file_name_xml_mesh)
 
     network, probe_points = setup_model_network(centerlines, file_name_probe_points, region_center, verbose_print)
 
@@ -520,7 +526,8 @@ def read_command_line(input_path=None):
                              "centerline to the surface, respectively. The 'distancetospheres' method allows to " +
                              "place spheres where the surface is pointing by pressing 'space'. By pressing 'd', the " +
                              "surface is coloured by the distance to the spheres. By pressing 'a', a scaling function " +
-                             "can be specified by four parameters: 'offset', 'scale', 'min' and 'max'.")
+                             "can be specified by four parameters: 'offset', 'scale', 'min' and 'max'. These parameters " +
+                             "for the scaling function can also be controlled by the -mp argument.")
 
     parser.add_argument('-el', '--edge-length',
                         default=None,
@@ -591,6 +598,14 @@ def read_command_line(input_path=None):
                         type=float,
                         help="Resampling step used to resample centerline in [m].")
 
+    parser.add_argument('-mp', '--meshing-parameters',
+                        type=float,
+                        nargs="+",
+                        default=[0, 0.1, 0.4, 0.6],
+                        help="Parameters for meshing method 'distancetospheres'. This should be given as " +
+                             "four numbers for the distancetosphere scaling function: 'offset', 'scale', 'min' " +
+                             "and 'max'. For example --meshing-parameters 0 0.1 0.3 0.4")
+
     remove_all = parser.add_mutually_exclusive_group(required=False)
     remove_all.add_argument('-ra', '--remove-all',
                             action="store_true",
@@ -610,7 +625,7 @@ def read_command_line(input_path=None):
                         nargs="+",
                         default=[0.3],
                         help="Parameters for solid thickness. For constant solid thickness, this should be " +
-                             "given as a single float. For 'variable' solid thickness, this should be given " +
+                             "given as a single float. For 'variable' solid thickness, this should be given as " +
                              "four floats for the distancetosphere scaling function: 'offset', 'scale', 'min' " +
                              "and 'max'. For example --solid-thickness-parameters 0 0.1 0.25 0.3")
 
@@ -648,7 +663,8 @@ def read_command_line(input_path=None):
                 coarsening_factor=args.coarsening_factor, inlet_flow_extension_length=args.inlet_flowextension,
                 visualize=args.visualize, region_points=args.region_points, compress_mesh=args.compress_mesh,
                 outlet_flow_extension_length=args.outlet_flowextension, add_boundary_layer=args.add_boundary_layer,
-                scale_factor=args.scale_factor, resampling_step=args.resampling_step, remove_all=args.remove_all,
+                scale_factor=args.scale_factor, resampling_step=args.resampling_step,
+                meshing_parameters=args.meshing_parameters, remove_all=args.remove_all,
                 solid_thickness=args.solid_thickness, solid_thickness_parameters=args.solid_thickness_parameters)
 
 

@@ -16,6 +16,7 @@ def distance_to_spheres_solid_thickness(surface, save_path, distance_offset=0, d
 
     Args:
         surface (vtkPolyData): Input surface model
+        save_path (str): Location to store processed surface
         distance_offset (float): Offset added to the distances
         distance_scale (float): Scale applied to the distances
         min_distance (float): Minimum value for the distances
@@ -40,8 +41,7 @@ def distance_to_spheres_solid_thickness(surface, save_path, distance_offset=0, d
     return distance_to_sphere
 
 
-def dist_sphere_spheres(surface, centerlines, region_center, misr_max, save_path, factor,
-                        distance_offset=0.0, distance_scale=0.2, min_distance=0.4, max_distance=0.7):
+def dist_sphere_spheres(surface, save_path, distance_offset, distance_scale, min_distance, max_distance):
     """
     Determines the target edge length for each cell on the surface, including
     potential refinement or coarsening of certain user specified areas.
@@ -49,11 +49,7 @@ def dist_sphere_spheres(surface, centerlines, region_center, misr_max, save_path
 
     Args:
         surface (vtkPolyData): Input surface model
-        centerlines (vtkPolyData): Centerlines of input model
-        region_center (list): Point representing region to refine
-        misr_max (list): Maximum inscribed sphere radius in region of refinement
         save_path (str): Location to store processed surface
-        factor (float): Coarsening factor, determining the level of refinement (<1) or coarsening (>1)
         distance_offset (float): Offset added to the distances
         distance_scale (float): Scale applied to the distances
         min_distance (float): Minimum value for the distances
@@ -90,20 +86,13 @@ def dist_sphere_spheres(surface, centerlines, region_center, misr_max, save_path
     surfaceArrayOperation.Operation = "multiply"
     surfaceArrayOperation.Execute()
     distance_to_sphere = surfaceArrayOperation.Surface
-    
-    remeshing = vmtkscripts.vmtkSurfaceRemeshing()
-    remeshing.Surface = distance_to_sphere
-    remeshing.ElementSizeMode = "edgelengtharray"
-    remeshing.TargetEdgeLengthArrayName = "Size"
-    remeshing.Execute()
-    distance_to_sphere = remeshing.Surface
 
     write_polydata(distance_to_sphere, save_path)
 
     return distance_to_sphere
 
 
-def generate_mesh(surface, add_boundary_layer, meshing_method, solid_thickness, solid_thickness_parameters):
+def generate_mesh(surface, solid_thickness, solid_thickness_parameters):
     """
     Generates a mesh suitable for FSI from a input surface model.
 
@@ -114,34 +103,26 @@ def generate_mesh(surface, add_boundary_layer, meshing_method, solid_thickness, 
         mesh (vtkUnstructuredGrid): Output mesh
         remeshedsurface (vtkPolyData): Remeshed version of the input model
     """
-
     print("--- Creating FSI mesh")
     meshGenerator = vmtkMeshGeneratorFsi()
     meshGenerator.Surface = surface
-    # for remeshing
-    meshGenerator.SkipRemeshing = 1
-    if meshing_method == 'distancetospheres':
-        meshGenerator.ElementSizeMode = 'edgelength'
-        meshGenerator.TargetEdgeLength = 0.5
-    else:
-        meshGenerator.ElementSizeMode = "edgelengtharray"  # Variable size mesh
-        meshGenerator.TargetEdgeLengthArrayName = "Size"  # Variable size mesh
+    meshGenerator.ElementSizeMode = "edgelengtharray"  # Variable size mesh
+    meshGenerator.TargetEdgeLengthArrayName = "Size"  # Variable size mesh
     meshGenerator.LogOn = 1
-    # for boundary layer (used for both fluid boundary layer and solid domain)
+    # For boundary layer (used for both fluid boundary layer and solid domain)
     meshGenerator.BoundaryLayer = 1
     meshGenerator.NumberOfSubLayersSolid = 2
     meshGenerator.NumberOfSubLayersFluid = 2
     meshGenerator.BoundaryLayerOnCaps = 0
     meshGenerator.SubLayerRatioFluid = 0.75
     meshGenerator.SubLayerRatioSolid = 0.75
-    meshGenerator.BoundaryLayerThicknessFactorFluid = 0.85
-    meshGenerator.BoundaryLayerThicknessFactorSolid = 1
+    meshGenerator.BoundaryLayerThicknessFactor = 0.5
     if solid_thickness == 'variable':
         meshGenerator.ElementSizeModeSolid = "edgelengtharray"
         meshGenerator.TargetEdgeLengthArrayNameSolid = distanceToSpheresArrayNameSolid
     else:
         meshGenerator.ElementSizeModeSolid = "edgelength"
-    # mesh
+        meshGenerator.SolidThickness = solid_thickness_parameters[0]
     meshGenerator.Tetrahedralize = 1
     meshGenerator.VolumeElementScaleFactor = 0.8
     meshGenerator.EndcapsEdgeLengthFactor = 1.0
