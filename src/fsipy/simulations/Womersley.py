@@ -167,10 +167,10 @@ class WomersleyComponent(UserExpression):
         self.ns = np.arange(1, self.N)
 
         # Allocate for 0...N-1
-        alpha = np.zeros(self.N, dtype=np.complex)
-        self.beta = np.zeros(self.N, dtype=np.complex)
-        self.jn0_betas = np.zeros(self.N, dtype=np.complex)
-        self.jn1_betas = np.zeros(self.N, dtype=np.complex)
+        alpha = np.zeros(self.N, dtype=np.complex128)
+        self.beta = np.zeros(self.N, dtype=np.complex128)
+        self.jn0_betas = np.zeros(self.N, dtype=np.complex128)
+        self.jn1_betas = np.zeros(self.N, dtype=np.complex128)
 
         # Compute vectorized for 1...N-1 (keeping element 0 in arrays to make indexing work out later)
         alpha[1:] = self.radius * np.sqrt(self.ns * (self.omega / self.nu))
@@ -181,7 +181,7 @@ class WomersleyComponent(UserExpression):
     def _precompute_r_dependent_coeffs(self, y):
         pir2 = np.pi * self.radius**2
         # Compute intermediate terms for womersley function
-        r_dependent_coeffs = np.zeros(self.N, dtype=np.complex)
+        r_dependent_coeffs = np.zeros(self.N, dtype=np.complex128)
         if hasattr(self, 'Vn'):
             #r_dependent_coeffs[0] = (self.Vn[0]/2.0) * (1 - y**2)
             r_dependent_coeffs[0] = self.Vn[0] * (1 - y**2)
@@ -228,7 +228,7 @@ class WomersleyComponent(UserExpression):
 
 def make_womersley_bcs(t, Q, mesh, nu, area, center, radius, normal,
                        element, scale_to=None, coeffstype="Q",
-                       N=1001, num_fourier_coefficients=20, **NS_namespace):
+                       N=1001, num_fourier_coefficients=20, Cn=None, **NS_namespace):
     """Generate a list of expressions for the components of a Womersley profile."""
     # Compute transient profile as interpolation of given coefficients
     period = max(t)
@@ -238,7 +238,7 @@ def make_womersley_bcs(t, Q, mesh, nu, area, center, radius, normal,
     timedisc = np.linspace(0, period, N)
 
     Cn = fourier_coefficients(timedisc, transient_profile, period, num_fourier_coefficients)
-
+    
     # Create Expressions for each direction
     expressions = []
     for ncomp in normal:
@@ -252,9 +252,50 @@ def make_womersley_bcs(t, Q, mesh, nu, area, center, radius, normal,
                                               element, Q=Q, V=V))
     return expressions
 
+
 def make_womersley_bcs_from_coefficients(Cn, period, mesh, nu, area, center, radius, normal,
                        element, coeffstype="Q", **NS_namespace):
     """Generate a list of expressions for the components of a Womersley profile."""
+
+    # Create Expressions for each direction
+    expressions = []
+    for ncomp in normal:
+        if coeffstype == "Q":
+            Q = Cn
+            V = None
+        elif coeffstype == "V":
+            V = Cn
+            Q = None
+        expressions.append(WomersleyComponent(radius, center, normal, ncomp, period, nu,
+                                              element, Q=Q, V=V))
+
+    return expressions
+
+
+def make_womersley_bcs_new(t, Q, nu, center, radius, normal, element, coeffstype="Q", 
+                       N=1001, num_fourier_coefficients=20, Cn=None, **NS_namespace):
+    """
+    Generate a list of expressions for the components of a Womersley profile.
+    Users can specify either the flow rate or fourier coefficients of the flow rate 
+    depending on if Cn is None or not.
+    """
+    # period is usually the lenght of a cardiac cycle (0.951 s)
+    # If t is a list or numpy array, then period is the maximum value of t
+    # If not, simply assign t as period
+    try :
+        period = max(t)
+    except TypeError:
+        period = t
+
+    # Compute fourier coefficients of transient profile if Cn is None
+    if Cn is None:    
+        # Compute transient profile as interpolation of given coefficients
+        transient_profile = UnivariateSpline(t, Q, s=0, k=1)
+
+        # Compute fourier coefficients of transient profile
+        timedisc = np.linspace(0, period, N)
+
+        Cn = fourier_coefficients(timedisc, transient_profile, period, num_fourier_coefficients)
 
     # Create Expressions for each direction
     expressions = []

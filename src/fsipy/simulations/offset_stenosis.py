@@ -3,12 +3,13 @@ Problem file for offset stenosis FSI simulation
 """
 import os
 import numpy as np
-import configparser
 
+# from vampy.simulation.Womersley import make_womersley_bcs, compute_boundary_geometry_acrn
 from Womersley import make_womersley_bcs_from_coefficients, compute_boundary_geometry_acrn
 
 from turtleFSI.problems import *
-from dolfin import *
+from dolfin import HDF5File, Mesh, MeshFunction, facets, cells, assemble, UserExpression, sqrt, \
+                    FacetNormal, ds, DirichletBC, Measure, inner
 
 # set compiler arguments
 parameters["form_compiler"]["quadrature_degree"] = 6
@@ -22,23 +23,6 @@ _compiler_parameters = dict(parameters["form_compiler"])
 
 def set_problem_parameters(default_variables, **namespace):
 
-    # Find and open config file in current directory. Should only have 1 config file in directory
-    config_file = [_ for _ in os.listdir(os.getcwd()) if _.endswith(".config")][0]
-    config = configparser.ConfigParser()
-    with open(config_file) as stream:
-        config.read_string("[Case_Specific_Variables]\n" + stream.read()) 
-
-    # Read problem-specific variables from config file
-    x_sphere = float(config.get("Case_Specific_Variables", "x_sphere"))
-    y_sphere = float(config.get("Case_Specific_Variables", "y_sphere"))
-    z_sphere = float(config.get("Case_Specific_Variables", "z_sphere"))
-    r_sphere = float(config.get("Case_Specific_Variables", "r_sphere"))
-    dt = float(config.get("Case_Specific_Variables", "dt"))
-    mesh_path = config.get("Case_Specific_Variables", "mesh_path").strip("\"").strip("\'")
-    save_deg_sim = int(config.get("Case_Specific_Variables", "save_deg_sim"))
-    Q_mean = float(config.get("Case_Specific_Variables", "Q_mean"))
-    T = float(config.get("Case_Specific_Variables", "T"))
-
     # Overwrite default values
     E_s_val = 1E6
     nu_s_val = 0.45
@@ -46,8 +30,8 @@ def set_problem_parameters(default_variables, **namespace):
     lambda_s_val = nu_s_val*2.*mu_s_val/(1. - 2.*nu_s_val)
 
     default_variables.update(dict(
-        T=T, # Simulation end time
-        dt=dt,#0.00033964286, # Timne step size
+        T=0.951, # Simulation end time
+        dt=0.001,#0.00033964286, # Timne step size
         atol=1e-10, # Absolute tolerance in the Newton solver
         rtol=1e-9,# Relative tolerance in the Newton solver
         inlet_id=2,  # inlet
@@ -57,14 +41,14 @@ def set_problem_parameters(default_variables, **namespace):
         fsi_id=22,  # fsi surface
         rigid_id=11,  # "rigid wall" id for the fluid and mesh problem
         outer_id=33,  # outer surface
-        folder=mesh_path,#"file_case9_el047",
-        mesh_file=mesh_path,#"file_case9_el047",
+        folder="stenosis",#"file_case9_el047",
+        mesh_file="file_stenosis",
         FC_file="FC_MCA_10", # This is the location of CFD results used to prescribe the inlet velocity profile
-        Q_mean=Q_mean,#1.9275E-06, # Problem specific
+        Q_mean=2.5E-06,#1.9275E-06, # Problem specific
         P_FC_File="FC_Pressure", # This is the location of CFD results used to prescribe the inlet velocity profile
         P_mean=11200,#1.9275E-06, # Problem specific
         T_Cycle=0.951,# Used to define length of flow waveform
-        theta=0.50+dt, # Theta scheme (implicit/explicit time stepping)
+        theta=0.501, # Theta scheme (implicit/explicit time stepping)
         rho_f=[1.000E3,1.000E3],    # Fluid density [kg/m3]
         mu_f=[3.5E-3,7.0E-2],       # Fluid dynamic viscosity [Pa.s]
         rho_s=1.0E3,    # Solid density [kg/m3]
@@ -77,20 +61,14 @@ def set_problem_parameters(default_variables, **namespace):
         extrapolation_sub_type="constant",  # ["constant", "small_constant", "volume", "volume_change", "bc1", "bc2"]
         compiler_parameters=_compiler_parameters,  # Update the defaul values of the compiler arguments (FEniCS)
         linear_solver="mumps",  # use list_linear_solvers() to check alternatives
-        checkpoint_step=50, # CHANGE
+        checkpoint_step=50,
         save_step=1, # Save frequency of files for visualisation
-        save_deg=save_deg_sim,          # Degree of the functions saved for visualisation '1' '2' '3' etc... (high value can slow down simulation significantly!)
-        fsi_region=[x_sphere,y_sphere,z_sphere,r_sphere], # X, Y, and Z coordinate of FSI region center, radius of spherical deformable region (outside this region the walls are rigid)
-        killtime=80000 # 40 mins # CHANGE 23:25 in seconds, after this time start dumping checkpoints every timestep
+        save_deg=2,          # Degree of the functions saved for visualisation '1' '2' '3' etc... (high value can slow down simulation significantly!)
+        fsi_region=[0.003, 0, 0, 0.01], # X, Y, and Z coordinate of FSI region center, radius of spherical deformable region (outside this region the walls are rigid)
     ))
 
     return default_variables
 
-#def initiate(**namespace):
-#
-#    T=1.902
-#
-#    return dict(T=T)
 
 def get_mesh_domain_and_boundaries(mesh_file,fsi_region, dx_f_id, fsi_id, rigid_id, outer_id, folder, **namespace):
     # Read mesh
@@ -119,7 +97,6 @@ def get_mesh_domain_and_boundaries(mesh_file,fsi_region, dx_f_id, fsi_id, rigid_
                 boundaries.array()[i] = rigid_id  # changed "fsi" idx to "rigid wall" idx
         i += 1
 
-    # # Checking boundaries and domains
     # In this region, make fluid more viscous
     x_min = 0.023
     i = 0
@@ -132,11 +109,12 @@ def get_mesh_domain_and_boundaries(mesh_file,fsi_region, dx_f_id, fsi_id, rigid_
         i += 1
 
     # Checking boundaries and domains
-    f = File('mesh/domains.pvd')
-    f << domains
-
+    # f = File('mesh/domains.pvd')
+    # f << domains
+    # f = File('mesh/boundaries.pvd')
+    # f << boundaries
+    # exit(1)
     return mesh, domains, boundaries
-
 
 
 class InnerP(UserExpression):
@@ -196,12 +174,11 @@ def create_bcs(t, v_, DVP, mesh, boundaries, domains, mu_f,
     An, Bn = np.loadtxt(os.path.join(os.path.dirname(os.path.abspath(__file__)), FC_file)).T
     # Convert to complex fourier coefficients
     Cn = (An - Bn*1j)*Q_mean
-
-    tmp_area, tmp_center, tmp_radius, tmp_normal = compute_boundary_geometry_acrn(mesh, inlet_id, boundaries)
+    _, tmp_center, tmp_radius, tmp_normal = compute_boundary_geometry_acrn(mesh, inlet_id, boundaries)
 
     # Create Womersley boundary condition at inlet
-    inlet = make_womersley_bcs_from_coefficients(Cn, T_Cycle, mesh, mu_f[0], tmp_area, tmp_center, tmp_radius, tmp_normal, DVP.sub(1).sub(0).ufl_element())
-
+    inlet = make_womersley_bcs_from_coefficients(Cn, T_Cycle, mesh, mu_f[0], None, tmp_center, tmp_radius, tmp_normal, DVP.sub(1).sub(0).ufl_element())
+    # inlet = make_womersley_bcs(T_Cycle, None, mu_f[0], tmp_center, tmp_radius, tmp_normal, DVP.sub(1).sub(0).ufl_element(), Cn=Cn)
     # Initialize inlet expressions with initial time
     for uc in inlet:
         uc.set_t(t)
@@ -258,6 +235,3 @@ def post_solve(mesh,boundaries,inlet_id, v_, **namespace):
     flow_rate_inlet = assemble(inner(v_["n"], n)*dsi)
     if MPI.rank(MPI.comm_world) == 0:
         print("Inlet flow rate is: {:e} m^3/s\n".format(flow_rate_inlet))
-
-def finished(**namespace):
-    with open("finished", mode='a'): pass
