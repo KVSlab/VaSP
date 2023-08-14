@@ -376,53 +376,6 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
             if tetgen.Mesh.GetNumberOfCells() == 0 and surfaceToMesh.Mesh.GetNumberOfCells() > 0:
                 self.PrintLog('An error occurred during tetrahedralization. Will only output surface mesh and boundary layer.')
 
-            # ADDING CELL IDs
-
-            #array = vtk.vtkDoubleArray()
-            # array.SetNumberOfTuples(tetgen.Mesh.GetNumberOfCells())
-            # array.SetNumberOfComponents(1)
-            #array.FillComponent(0, 1.0)
-            # array.SetName('RegionIDs')
-            # tetgen.Mesh.GetCellData().AddArray(array)
-
-            #array = vtk.vtkDoubleArray()
-            # array.SetNumberOfTuples(boundaryLayer.Mesh.GetNumberOfCells())
-            # array.SetNumberOfComponents(1)
-            #array.FillComponent(0, 1.0)
-            # array.SetName('RegionIDs')
-            # boundaryLayer.Mesh.GetCellData().AddArray(array)
-
-            #array = vtk.vtkDoubleArray()
-            # array.SetNumberOfTuples(boundaryLayer2.Mesh.GetNumberOfCells())
-            # array.SetNumberOfComponents(1)
-            #array.FillComponent(0, 2.0)
-            # array.SetName('RegionIDs')
-            # boundaryLayer2.Mesh.GetCellData().AddArray(array)
-
-            #####
-
-            # w1 = vtk.vtkXMLUnstructuredGridWriter()
-            # w1.SetInputData(boundaryLayer2.Mesh)
-            # w1.SetFileName('BoundaryLayer2.vtu')
-            # w1.Write()
-            #
-            # w2 = vtk.vtkXMLUnstructuredGridWriter()
-            # w2.SetInputData(tetgen.Mesh)
-            # w2.SetFileName('Tetgen.vtu')
-            # w2.Write()
-            #
-            # w3 = vtk.vtkXMLUnstructuredGridWriter()
-            # w3.SetInputData(boundaryLayer.Mesh)
-            # w3.SetFileName('BoundaryLayer.vtu')
-            # w3.Write()
-            #
-            # w4 = vtk.vtkXMLUnstructuredGridWriter()
-            # w4.SetInputData(boundaryLayer.InnerSurfaceMesh)
-            # w4.SetFileName('InnerLayer.vtu')
-            # w4.Write()
-
-            #from IPython import embed; embed()
-
             self.PrintLog("Assembling fluid mesh")
             appendFilter = vtkvmtk.vtkvmtkAppendFilter()
             appendFilter.AddInputData(boundaryLayer.Mesh)
