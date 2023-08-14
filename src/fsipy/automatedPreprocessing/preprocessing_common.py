@@ -159,10 +159,11 @@ def convert_xml_mesh_to_hdf5(file_name_xml_mesh, scaling_factor=0.001):
     """
 
     # Check if the XML mesh file exists
-    if not Path(file_name_xml_mesh).is_file():
-        raise FileNotFoundError(f"The file '{file_name_xml_mesh}' does not exist.")
+    file_name_xml_mesh = Path(file_name_xml_mesh)
+    if not file_name_xml_mesh.is_file():
+        raise FileNotFoundError(f"The file '{str(file_name_xml_mesh)}' does not exist.")
 
-    mesh = Mesh(file_name_xml_mesh)
+    mesh = Mesh(str(file_name_xml_mesh))
 
     # Rescale the mesh coordinates
     x = mesh.coordinates()
@@ -173,16 +174,19 @@ def convert_xml_mesh_to_hdf5(file_name_xml_mesh, scaling_factor=0.001):
     boundaries = MeshFunction("size_t", mesh, 2, mesh.domains())
     boundaries.set_values(boundaries.array() + 1)  # FIXME: Explain why this is necessary
 
-    boundary_file = File(str(Path(file_name_xml_mesh).with_suffix('').with_suffix('')) + '_boundaries.pvd')
+    base, first_dot, rest = file_name_xml_mesh.name.partition('.')
+    file_name_boundaries = str(file_name_xml_mesh.with_name(base + "_boundaries.pvd"))
+    boundary_file = File(file_name_boundaries)
     boundary_file << boundaries
 
     domains = MeshFunction("size_t", mesh, 3, mesh.domains())
     domains.set_values(domains.array() + 1)  # in order to have fluid==1 and solid==2
 
-    domain_file = File(str(Path(file_name_xml_mesh).with_suffix('').with_suffix('')) + '_domains.pvd')
+    file_name_domains = str(file_name_xml_mesh.with_name(base + "_domains.pvd"))
+    domain_file = File(file_name_domains)
     domain_file << domains
 
-    file_name_h5_mesh = str(Path(file_name_xml_mesh).with_suffix('').with_suffix('.h5'))
+    file_name_h5_mesh = str(file_name_xml_mesh.with_name(base + '.h5'))
     hdf = HDF5File(mesh.mpi_comm(), file_name_h5_mesh, "w")
     hdf.write(mesh, "/mesh")
     hdf.write(boundaries, "/boundaries")
