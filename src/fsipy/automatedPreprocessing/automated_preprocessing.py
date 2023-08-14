@@ -417,7 +417,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
     else:
         mesh = read_polydata(file_name_vtu_mesh)
 
-    print(f"--- Converting XML mesh to HDF5")
+    print(f"--- Converting XML mesh to HDF5\n")
     convert_xml_mesh_to_hdf5(file_name_xml_mesh)
 
     network, probe_points = setup_model_network(centerlines, file_name_probe_points, region_center, verbose_print)
