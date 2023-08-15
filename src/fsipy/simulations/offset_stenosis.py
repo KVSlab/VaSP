@@ -32,7 +32,7 @@ def set_problem_parameters(default_variables, **namespace):
         # Temporal parameters
         T=0.951,  # Simulation end time
         dt=0.001,  # Timne step size
-        theta=0.501,  # Theta scheme (implicit/explicit time stepping)
+        theta=0.501,  # Theta scheme parameter
         save_step=1,  # Save frequency of files for visualisation
         checkpoint_step=50,  # Save frequency of checkpoint files
         # Linear solver parameters
@@ -64,12 +64,10 @@ def set_problem_parameters(default_variables, **namespace):
         lambda_s=lambda_s_val,  # Solid Young's modulus [Pa]
         dx_s_id=2,  # ID of marker in the solid domain
         # FSI parameters
-        # X, Y, and Z coordinate of FSI region center,
-        # and radius of spherical deformable region
-        fsi_region=[0.003, 0, 0, 0.01],
+        fsi_region=[0.003, 0, 0, 0.01],  # x, y, and z coordinate of FSI region center, and radius of FSI region sphere
         # Simulation parameters
-        folder="stenosis",  # Folder name generated for the simulation
-        mesh_file="file_stenosis",
+        folder="offset_stenosis_results",  # Folder name generated for the simulation
+        mesh_path="mesh/file_stenosis.h5",
         FC_file="FC_MCA_10",  # File name containing the fourier coefficients for the flow waveform
         P_FC_File="FC_Pressure",  # File name containing the fourier coefficients for the pressure waveform
         compiler_parameters=_compiler_parameters,  # Update the defaul values of the compiler arguments (FEniCS)
@@ -79,11 +77,11 @@ def set_problem_parameters(default_variables, **namespace):
     return default_variables
 
 
-def get_mesh_domain_and_boundaries(mesh_file, fsi_region, dx_f_id, fsi_id, rigid_id, outer_id, **namespace):
+def get_mesh_domain_and_boundaries(mesh_path, fsi_region, dx_f_id, fsi_id, rigid_id, outer_id, **namespace):
 
     # Read mesh
     mesh = Mesh()
-    hdf = HDF5File(mesh.mpi_comm(), "mesh/" + mesh_file + ".h5", "r")
+    hdf = HDF5File(mesh.mpi_comm(), mesh_path, "r")
     hdf.read(mesh, "/mesh", False)
     boundaries = MeshFunction("size_t", mesh, 2)
     hdf.read(boundaries, "/boundaries")
@@ -117,12 +115,6 @@ def get_mesh_domain_and_boundaries(mesh_file, fsi_region, dx_f_id, fsi_id, rigid
                 domains.array()[i] = dx_f_id[1]  # assign this region lowest E
         i += 1
 
-    # Checking boundaries and domains
-    # f = File('mesh/domains.pvd')
-    # f << domains
-    # f = File('mesh/boundaries.pvd')
-    # f << boundaries
-    # exit(1)
     return mesh, domains, boundaries
 
 
@@ -166,12 +158,12 @@ class InnerP(UserExpression):
         return ()
 
 
-def create_bcs(t, v_, DVP, mesh, boundaries, domains, mu_f,
+def create_bcs(t, DVP, mesh, boundaries, mu_f,
                fsi_id, inlet_id, inlet_outlet_s_id,
                rigid_id, psi, F_solid_linear, p_deg, FC_file,
                Q_mean, P_FC_File, P_mean, T_Cycle, **namespace):
 
-    # Load fourier coefficients and scale by flow rate
+    # Load fourier coefficients for the velocity and scale by flow rate
     An, Bn = np.loadtxt(os.path.join(os.path.dirname(os.path.abspath(__file__)), FC_file)).T
     # Convert to complex fourier coefficients
     Cn = (An - Bn * 1j) * Q_mean
@@ -196,18 +188,21 @@ def create_bcs(t, v_, DVP, mesh, boundaries, domains, mu_f,
     # Assemble boundary conditions
     bcs = u_inlet + [d_inlet, u_inlet_s, d_inlet_s, d_rigid]
 
-    # Load fourier coefficients and scale by flow rate
+    # Load fourier coefficients for the pressure and scale by flow rate
     An_P, Bn_P = np.loadtxt(os.path.join(os.path.dirname(os.path.abspath(__file__)), P_FC_File)).T
 
+    # Apply pulsatile pressure at the fsi interface by modifying the variational form
     n = FacetNormal(mesh)
     dSS = Measure("dS", domain=mesh, subdomain_data=boundaries)
     p_out_bc_val = InnerP(t=0.0, t_ramp=0.2, An=An_P, Bn=Bn_P, period=T_Cycle, P_mean=P_mean, degree=p_deg)
     F_solid_linear += p_out_bc_val * inner(n('+'), psi('+')) * dSS(fsi_id)
 
-    return dict(bcs=bcs, inlet=inlet, p_out_bc_val=p_out_bc_val, F_solid_linear=F_solid_linear)
+    # Create inlet subdomain for computing the flow rate inside post_solve
+    dsi = ds(inlet_id, domain=mesh, subdomain_data=boundaries)
+    return dict(bcs=bcs, inlet=inlet, p_out_bc_val=p_out_bc_val, F_solid_linear=F_solid_linear, n=n, dsi=dsi)
 
 
-def pre_solve(t, v_, DVP, inlet, p_out_bc_val, **namespace):
+def pre_solve(t, inlet, p_out_bc_val, **namespace):
     for uc in inlet:
         # Update the time variable used for the inlet boundary condition
         uc.set_t(t)
@@ -224,11 +219,8 @@ def pre_solve(t, v_, DVP, inlet, p_out_bc_val, **namespace):
     return dict(inlet=inlet, p_out_bc_val=p_out_bc_val)
 
 
-def post_solve(mesh, boundaries, inlet_id, v_, **namespace):
-
-    # Calc flow rate
-    dsi = ds(inlet_id, domain=mesh, subdomain_data=boundaries)
-    n = FacetNormal(mesh)
-    flow_rate_inlet = assemble(inner(v_["n"], n) * dsi)
+def post_solve(n, dsi, v_, **namespace):
+    # Compute flow rate at inlet
+    flow_rate_inlet = abs(assemble(inner(v_["n"], n) * dsi))
     if MPI.rank(MPI.comm_world) == 0:
-        print("Inlet flow rate is: {:e} m^3/s\n".format(flow_rate_inlet))
+        print(f"Inlet flow rate is: {flow_rate_inlet} m^3/s\n")
