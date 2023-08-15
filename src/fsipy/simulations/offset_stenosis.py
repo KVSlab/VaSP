@@ -4,9 +4,7 @@ Problem file for offset stenosis FSI simulation
 import os
 import numpy as np
 
-# from vampy.simulation.Womersley import make_womersley_bcs, compute_boundary_geometry_acrn
-from Womersley import make_womersley_bcs_from_coefficients, compute_boundary_geometry_acrn
-
+from vampy.simulation.Womersley import make_womersley_bcs, compute_boundary_geometry_acrn
 from turtleFSI.problems import *
 from dolfin import HDF5File, Mesh, MeshFunction, facets, cells, assemble, UserExpression, sqrt, \
                     FacetNormal, ds, DirichletBC, Measure, inner
@@ -177,8 +175,7 @@ def create_bcs(t, v_, DVP, mesh, boundaries, domains, mu_f,
     _, tmp_center, tmp_radius, tmp_normal = compute_boundary_geometry_acrn(mesh, inlet_id, boundaries)
 
     # Create Womersley boundary condition at inlet
-    inlet = make_womersley_bcs_from_coefficients(Cn, T_Cycle, mesh, mu_f[0], None, tmp_center, tmp_radius, tmp_normal, DVP.sub(1).sub(0).ufl_element())
-    # inlet = make_womersley_bcs(T_Cycle, None, mu_f[0], tmp_center, tmp_radius, tmp_normal, DVP.sub(1).sub(0).ufl_element(), Cn=Cn)
+    inlet = make_womersley_bcs(T_Cycle, None, mu_f[0], tmp_center, tmp_radius, tmp_normal, DVP.sub(1).sub(0).ufl_element(), Cn=Cn)
     # Initialize inlet expressions with initial time
     for uc in inlet:
         uc.set_t(t)
@@ -194,11 +191,6 @@ def create_bcs(t, v_, DVP, mesh, boundaries, domains, mu_f,
 
     # Assemble boundary conditions
     bcs = u_inlet + [d_inlet, u_inlet_s, d_inlet_s, d_rigid]
-
-    # Define the pressure condition (apply to inner surface, numerical instability results from applying to outlet)
-    #dso = ds(outlet_id1, domain=mesh, subdomain_data=boundaries) # Outlet surface # Maybe try applying to all outlets???
-
-
 
     # Load fourier coefficients and scale by flow rate
     An_P, Bn_P = np.loadtxt(os.path.join(os.path.dirname(os.path.abspath(__file__)), P_FC_File)).T
@@ -221,11 +213,11 @@ def pre_solve(t, v_, DVP, inlet, p_out_bc_val, **namespace):
         else:
             uc.scale_value = 1.0
 
-
     # Update pressure condition
     p_out_bc_val.update(t)
 
     return dict(inlet=inlet, p_out_bc_val=p_out_bc_val)
+
 
 def post_solve(mesh,boundaries,inlet_id, v_, **namespace):
 
