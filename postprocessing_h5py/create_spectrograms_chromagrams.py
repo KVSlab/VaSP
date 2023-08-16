@@ -105,7 +105,7 @@ def create_spectrogram_composite(case_name, dvp, df, start_t, end_t,
                                                                                         thresh_method="old")
     bins = bins+start_t # Need to shift bins so that spectrogram timing is correct
     spec.plot_spectrogram(fig1,ax2,bins,freqs,Pxx,ylim,color_range=[thresh_val,max_plot])
-    
+
     
     # Chromagram ------------------------------------------------------------
     n_fft = spec.shift_bit_length(int(df.shape[1]/nWindow))*2 
@@ -190,11 +190,37 @@ def create_spectrogram_composite(case_name, dvp, df, start_t, end_t,
     fig2, ax2_1 = plt.subplots()
     fig2.set_size_inches(7.5, 5) #fig1.set_size_inches(10, 7)
     title = "Pxx max = {:.2e}, Pxx min = {:.2e}, threshold Pxx = {}".format(max_val, min_val, lower_thresh)
-    fullname = dvp+"_"+case_name + '_'+str(nWindow)+'_windows_'+'_'+"thresh"+str(thresh_val)+"_spectrogram"
-    path_to_fig = os.path.join(imageFolder, fullname + '.png')
-    spec.plot_spectrogram(fig2,ax2_1,bins,freqs,Pxx,ylim,title=title,path=path_to_fig,x_label="Time (s)",color_range=[thresh_val,max_plot])
-    fig2.savefig(path_to_fig)
+    spec.plot_spectrogram(fig2,ax2_1,bins,freqs,Pxx,ylim,title=title,x_label="Time (s)",color_range=[thresh_val,max_plot])
+    # Save data to files (spectrogram, chromagram, SBI)
 
+    fullname = dvp+"_"+case_name + '_'+str(nWindow)+'_windows_'+'_'+"thresh"+str(thresh_val)+"_spectrogram"
+    path_to_spec = os.path.join(imageFolder, fullname + '.png')
+    fig2.savefig(path_to_spec)
+    path_csv = path_to_spec.replace(".png",".csv")
+    #freqs_txt = np.array2string(freqs, precision=2, separator=',',)
+    data_csv = np.append(freqs[np.newaxis].T,Pxx, axis=1)
+    bins_txt =  np.array2string(bins, max_line_width=10000, precision=2, separator=',',).replace("[","").replace("]","")
+    np.savetxt(path_csv, data_csv,header=bins_txt, delimiter=",")
+
+    # Save data to files (spectrogram, chromagram, SBI)
+    fullname = dvp+"_"+case_name + '_'+str(nWindow)+'_windows_'+'_chromagram'
+    path_to_chroma = os.path.join(imageFolder, fullname + '.png')
+    path_csv = path_to_chroma.replace(".png",".csv")
+    chroma_y = np.linspace(0,1,chroma.shape[0])
+    #freqs_txt = np.array2string(freqs, precision=2, separator=',',)
+    data_csv = np.append(chroma_y[np.newaxis].T,chroma, axis=1)
+    bins_txt =  np.array2string(bins_raw, max_line_width=10000, precision=2, separator=',',).replace("[","").replace("]","")
+    np.savetxt(path_csv, data_csv,header=bins_txt, delimiter=",")
+
+    fullname = dvp+"_"+case_name + '_'+str(nWindow)+'_windows_'+'_SBI'
+    path_to_SBI = os.path.join(imageFolder, fullname + '.png')
+    path_csv = path_to_SBI.replace(".png",".csv")
+    #freqs_txt = np.array2string(freqs, precision=2, separator=',',)
+    print(bins)
+    print(chroma_entropy)
+    data_csv = np.array([bins,chroma_entropy]).T
+    np.savetxt(path_csv, data_csv,header="t (s), SBI", delimiter=",")
+    #bins_raw,chroma
 
 def sonify_point(case_name, dvp, df, start_t, end_t, overlapFrac, lowcut, imageFolder):
 

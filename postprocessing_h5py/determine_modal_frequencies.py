@@ -33,8 +33,10 @@ Args:
 
 def determine_modal_frequencies(case_path, dvp, n_samples, thresh_val, max_plot):
     
-    idy_time=12 # time index for determining peak freqs
-    thresh_peak=-40 # Power threshold in db for determining peaks
+
+
+    #idy_time=12 # time index for determining peak freqs
+    thresh_peak=-41 # Power threshold in db for determining peaks
     peak_idx_min_gap=4 # minimum spacing between peaks, in terms of frequency index (4 for surgical cases)
     # Get viz path
     visualization_path = postprocessing_common_h5py.get_visualization_path(case_path)    
@@ -45,6 +47,7 @@ def determine_modal_frequencies(case_path, dvp, n_samples, thresh_val, max_plot)
 
     # create spec name
     fullname=os.path.basename(x_csv_files[0]).replace("d_combined_","d_overlayLines_").replace(".csv",".png")
+    fullname=os.path.basename(x_csv_files[0]).replace("d_combined_","d_overlayLines_").replace(".csv",'')
 
     # get bins from x csv file header
     bins_file = open(x_csv_files[0], "r")
@@ -61,45 +64,55 @@ def determine_modal_frequencies(case_path, dvp, n_samples, thresh_val, max_plot)
 
     # Frequencies are the first column of the data
     freqs=csv_x_data[:,0]
+    Pxx = csv_x_data[:,1:]    
+    n_ts = len(Pxx[0,:])
 
-    # Average the component10
-    Pxx = csv_x_data[:,1:]
-    peaks_indices = find_peaks_cwt(Pxx[:,idy_time], np.arange(3,6) ,noise_perc=40) # gap_thresh=10
-    print(peaks_indices)
-    #print(Pxx[peaks_indices,idy_time])
-    #print(peaks_indices)
-    peak_idx_prev = 0
-    peak_idx_filtered = []
-    for peak_idx in peaks_indices:
-        if Pxx[peak_idx,idy_time] > thresh_peak:
-            if (peak_idx - peak_idx_prev >= peak_idx_min_gap):
-                peak_idx_filtered.append(peak_idx)
-            else:
-                if Pxx[peak_idx,idy_time] >  Pxx[peak_idx_prev,idy_time]:
-                    del peak_idx_filtered[-1]
+    print(n_ts)
+    for idy_time in range(n_ts):
+        # Average the component10
+        peaks_indices = find_peaks_cwt(Pxx[:,idy_time], np.arange(3,6) ,noise_perc=40) # gap_thresh=10
+        #print(peaks_indices)
+        #print(Pxx[peaks_indices,idy_time])
+        #print(peaks_indices)
+        peak_idx_prev = 0
+        peak_idx_filtered = []
+        for peak_idx in peaks_indices:
+            if Pxx[peak_idx,idy_time] > thresh_peak:
+                if (peak_idx - peak_idx_prev >= peak_idx_min_gap):
                     peak_idx_filtered.append(peak_idx)
-                #else:
-                #    peak_idx_filtered.append(peak_idx_prev)
+                else:
+                    if Pxx[peak_idx,idy_time] >  Pxx[peak_idx_prev,idy_time]:
+                        del peak_idx_filtered[-1]
+                        peak_idx_filtered.append(peak_idx)
+                    #else:
+                    #    peak_idx_filtered.append(peak_idx_prev)
+    
+            peak_idx_prev = peak_idx
+    
+        modal_freqs = freqs[peak_idx_filtered]
+    
+        # create separate spectrogram figure
+        fig2, ax2_1 = plt.subplots()
+        fig2.set_size_inches(7.5, 5) #fig1.set_size_inches(10, 7)
+        title = "threshold Pxx = {}".format(thresh_val)
+        file_name_ts = fullname + "_" + str(idy_time) + ".png"
+        path_to_fig = os.path.join(imageFolder, file_name_ts)
+        
+        
+        spec.plot_spectrogram(fig2,ax2_1,bins,freqs,Pxx,ylim,title=title,x_label="Time (s)",color_range=[thresh_val,max_plot])
+        for i in range(0,4):
+            try:
+                plt.axhline(y = modal_freqs[i], color = 'r', linestyle = '-', label = "{:.2f} Hz".format(modal_freqs[i]))
+                print(os.path.basename(case_path) + " Mode {}: {:.2f} Hz".format(modal_freqs[i],idy))
 
-        peak_idx_prev = peak_idx
+            except:
+                print("final mode found")
 
-    modal_freqs = freqs[peak_idx_filtered]
+        #print(os.path.basename(case_path) + " Mode 0: {:.2f} Hz, Mode 1: {:.2f} Hz, Mode 2: {:.2f} Hz, Mode 3: {:.2f} Hz, ts {}".format(modal_freqs[0],modal_freqs[1],modal_freqs[2],modal_freqs[3],idy))
+        plt.axvline(x = bins[idy_time], color = 'b', linestyle = '-')
+        plt.legend()
+        fig2.savefig(path_to_fig)
 
-    # create separate spectrogram figure
-    fig2, ax2_1 = plt.subplots()
-    fig2.set_size_inches(7.5, 5) #fig1.set_size_inches(10, 7)
-    title = "threshold Pxx = {}".format(thresh_val)
-    path_to_fig = os.path.join(imageFolder, fullname)
-
-    spec.plot_spectrogram(fig2,ax2_1,bins,freqs,Pxx,ylim,title=title,path=path_to_fig,x_label="Time (s)",color_range=[thresh_val,max_plot])
-    for i in range(0,4):
-        plt.axhline(y = modal_freqs[i], color = 'r', linestyle = '-', label = "{:.2f} Hz".format(modal_freqs[i]))
-
-    print(os.path.basename(case_path) + " Mode 0: {:.2f} Hz, Mode 1: {:.2f} Hz, Mode 2: {:.2f} Hz, Mode 3: {:.2f} Hz,".format(modal_freqs[0],modal_freqs[1],modal_freqs[2],modal_freqs[3]))
-  
-    plt.axvline(x = bins[idy_time], color = 'b', linestyle = '-')
-    plt.legend()
-    fig2.savefig(path_to_fig)
 
 
 if __name__ == '__main__':

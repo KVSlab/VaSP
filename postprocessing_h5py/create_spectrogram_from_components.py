@@ -70,7 +70,7 @@ def create_spectrogram_composite(case_path, dvp, n_samples, thresh_val, max_plot
     fig2.set_size_inches(7.5, 5) #fig1.set_size_inches(10, 7)
     title = "threshold Pxx = {}".format(thresh_val)
     path_to_fig = os.path.join(imageFolder, fullname)
-    spec.plot_spectrogram(fig2,ax2_1,bins,freqs,Pxx,ylim,title=title,path=path_to_fig,x_label="Time (s)",color_range=[thresh_val,max_plot])
+    spec.plot_spectrogram(fig2,ax2_1,bins,freqs,Pxx,ylim,title=title,x_label="Time (s)",color_range=[thresh_val,max_plot])
     fig2.savefig(path_to_fig)
 
 

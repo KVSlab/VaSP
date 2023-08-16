@@ -541,7 +541,7 @@ def compute_average_spectrogram(df, fs, nWindow,overlapFrac,window,start_t,end_t
     #print('Pxx_scaled max', Pxx_scaled.max())
     return bins, freqs, Pxx_scaled, max_val, min_val, lower_thresh
 
-def plot_spectrogram(fig1,ax1,bins,freqs,Pxx,ylim_,title=None,path=None,convert_a=0.0,convert_b=0.0,x_label=None,color_range=None):
+def plot_spectrogram(fig1,ax1,bins,freqs,Pxx,ylim_,title=None,convert_a=0.0,convert_b=0.0,x_label=None,color_range=None):
     #plt.figure(figsize=(14,7)) #fig size same as before
 
     
@@ -570,15 +570,6 @@ def plot_spectrogram(fig1,ax1,bins,freqs,Pxx,ylim_,title=None,path=None,convert_
         ax2.set_xticklabels(time_convert(ax1.get_xticks()))
         ax2.set_xlabel(x_label)
 
-
-    if path != None:
-        fig1.savefig(path)
-        path_csv = path.replace(".png",".csv")
-        #freqs_txt = np.array2string(freqs, precision=2, separator=',',)
-        data_csv = np.append(freqs[np.newaxis].T,Pxx, axis=1)
-        bins_txt =  np.array2string(bins, max_line_width=10000, precision=2, separator=',',).replace("[","").replace("]","")
-        print(bins_txt)
-        np.savetxt(path_csv, data_csv,header=bins_txt, delimiter=",")
 
 def plot_spectrogram_1ax(bins,freqs,Pxx,ylim_,title=None,path=None,convert_a=1.0,convert_b=0.0,x_label=None,color_range=None):
     #plt.figure(figsize=(14,7)) #fig size same as before
