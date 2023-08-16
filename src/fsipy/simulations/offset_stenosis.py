@@ -188,7 +188,7 @@ def create_bcs(t, DVP, mesh, boundaries, mu_f,
     # Assemble boundary conditions
     bcs = u_inlet + [d_inlet, u_inlet_s, d_inlet_s, d_rigid]
 
-    # Load fourier coefficients for the pressure and scale by flow rate
+    # Load Fourier coefficients for the pressure and scale by flow rate
     An_P, Bn_P = np.loadtxt(os.path.join(os.path.dirname(os.path.abspath(__file__)), P_FC_File)).T
 
     # Apply pulsatile pressure at the fsi interface by modifying the variational form
