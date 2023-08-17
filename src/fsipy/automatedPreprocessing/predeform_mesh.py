@@ -11,7 +11,7 @@ displacement to the original mesh, this script generates a predeformed mesh for
 subsequent simulation steps.
 """
 
-from argparse import ArgumentParser, RawDescriptionHelpFormatter
+import argparse
 import h5py
 from pathlib import Path
 
@@ -22,7 +22,7 @@ def parse_arguments() -> argparse.Namespace:
     Returns:
         argparse.Namespace: Parsed command-line arguments.
     """
-    parser = ArgumentParser(description=__doc__, formatter_class=RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--folder', type=str, required=True, help="Path to simulation results")
     parser.add_argument('--mesh-path', type=str, default=None,
                         help="Path to the mesh file (default: <folder_path>/Checkpoint/mesh.h5)")
@@ -39,6 +39,8 @@ def predeform_mesh(folder_path: str, mesh_path: str) -> None:
     Returns:
         None
     """
+    print("Predeforming mesh...")
+
     # Path to the displacement file
     disp_path = Path(folder_path) / "Visualization" / "displacement.h5"
     if mesh_path is None:
@@ -61,6 +63,8 @@ def predeform_mesh(folder_path: str, mesh_path: str) -> None:
             vectorArray = vectorData[ArrayName]
             modified = vectorData[ArrayName][:, :] + disp_array * scaleFactor
             vectorArray[...] = modified
+
+    print("Mesh predeformed successfully!")
 
 def main() -> None:
     """
