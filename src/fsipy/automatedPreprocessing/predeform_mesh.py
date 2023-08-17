@@ -18,11 +18,15 @@ from pathlib import Path
 def parse_arguments():
     parser = ArgumentParser(description=__doc__, formatter_class=RawDescriptionHelpFormatter)
     parser.add_argument('--folder', type=str, help="Path to simulation results")
+    parser.add_argument('--mesh-path', type=str, default=None,
+                        help="Path to the mesh file (default: <folder_path>/Checkpoint/mesh.h5)")
     return parser.parse_args()
 
-def predeform_mesh(folder_path):
+def predeform_mesh(folder_path, mesh_path):
     # Path to the displacement file
     disp_path = Path(folder_path) / "Visualization" / "displacement.h5"
+    if mesh_path is None:
+        mesh_path = Path(folder_path) / "Checkpoint" / "mesh.h5"
     mesh_path = Path(folder_path) / "Checkpoint" / "mesh.h5"
     predeformed_mesh_path = mesh_path.with_name(mesh_path.stem + "_predeformed.h5")
 
@@ -45,7 +49,7 @@ def predeform_mesh(folder_path):
 
 def main():
     args = parse_arguments()
-    predeform_mesh(args.folder)
+    predeform_mesh(args.folder, args.mesh_path)
 
 if __name__ == '__main__':
     main()
