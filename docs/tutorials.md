@@ -2,6 +2,6 @@
 
 ## Link to tutorials
 
-- [stenosis](tutorial:stenosis)
+- [offset stenosis](tutorial:offset_stenosis)
 - [aneurysm](tutorial:aneurysm)
 - [avf](tutorial:avf)
