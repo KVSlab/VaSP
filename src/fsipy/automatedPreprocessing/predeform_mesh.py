@@ -15,19 +15,34 @@ from argparse import ArgumentParser, RawDescriptionHelpFormatter
 import h5py
 from pathlib import Path
 
-def parse_arguments():
+def parse_arguments() -> argparse.Namespace:
+    """
+    Parse command line arguments.
+
+    Returns:
+        argparse.Namespace: Parsed command-line arguments.
+    """
     parser = ArgumentParser(description=__doc__, formatter_class=RawDescriptionHelpFormatter)
-    parser.add_argument('--folder', type=str, help="Path to simulation results")
+    parser.add_argument('--folder', type=str, required=True, help="Path to simulation results")
     parser.add_argument('--mesh-path', type=str, default=None,
                         help="Path to the mesh file (default: <folder_path>/Checkpoint/mesh.h5)")
     return parser.parse_args()
 
-def predeform_mesh(folder_path, mesh_path):
+def predeform_mesh(folder_path: str, mesh_path: str) -> None:
+    """
+    Predeform the mesh for FSI simulation.
+
+    Args:
+        folder_path (str): Path to the simulation results folder.
+        mesh_path (str): Path to the mesh file.
+
+    Returns:
+        None
+    """
     # Path to the displacement file
     disp_path = Path(folder_path) / "Visualization" / "displacement.h5"
     if mesh_path is None:
         mesh_path = Path(folder_path) / "Checkpoint" / "mesh.h5"
-    mesh_path = Path(folder_path) / "Checkpoint" / "mesh.h5"
     predeformed_mesh_path = mesh_path.with_name(mesh_path.stem + "_predeformed.h5")
 
     # Read the displacement file and get the displacement from the last time step
@@ -47,7 +62,13 @@ def predeform_mesh(folder_path, mesh_path):
             modified = vectorData[ArrayName][:, :] + disp_array * scaleFactor
             vectorArray[...] = modified
 
-def main():
+def main() -> None:
+    """
+    Main function for parsing arguments and predeforming the mesh.
+
+    Returns:
+        None
+    """
     args = parse_arguments()
     predeform_mesh(args.folder, args.mesh_path)
 
