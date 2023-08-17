@@ -23,11 +23,7 @@ def parse_arguments():
     return parser.parse_args()
 
 
-def predeform_mesh():
-    args = parse_arguments()
-
-    folder_path = args.folder
-
+def predeform_mesh(folder_path):
     # Path to the displacement file
     disp_path = path.join(folder_path, "Visualization", "displacement.h5")
     mesh_path = path.join(folder_path, "Checkpoint", "mesh.h5")
@@ -57,5 +53,10 @@ def predeform_mesh():
     vectorData.close()
 
 
+def main():
+    args = parse_arguments()
+    predeform_mesh(args.folder)
+
+
 if __name__ == '__main__':
-    predeform_mesh()
+    main()

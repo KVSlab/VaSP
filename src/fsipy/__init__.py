@@ -7,6 +7,7 @@ from importlib.metadata import metadata
 # Imports from pre-processing
 from .automatedPreprocessing import automated_preprocessing
 from .automatedPreprocessing import preprocessing_common
+from .automatedPreprocessing import predeform_mesh
 # Imports from simulation scripts
 #from .simulation import Aneurysm
 #from .simulation import AVF
@@ -25,6 +26,7 @@ __all__ = [
 #    "postprocessing_common",
     "automated_preprocessing",
     "preprocessing_common",
+    "predeform_mesh",
 #    "Aneurysm",
 #    "AVF",
 #    "Stenosis",
