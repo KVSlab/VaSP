@@ -4,23 +4,29 @@
 # PURPOSE.
 
 """
-This script is used to predeform the mesh for the FSI simulation.
-It is assumed that the simulation has already been run and the displacement is available as the displacement.h5 file.
-By applying the reverse of the displacement to the original mesh, we can obtain the predeformed mesh.
+This script is used to predeform the mesh for an FSI simulation. It assumes
+that the simulation has already been executed, and the displacement information
+is available in the 'displacement.h5' file. By applying the reverse of the
+displacement to the original mesh, this script generates a predeformed mesh for
+subsequent simulation steps.
 """
 
-
-from argparse import ArgumentParser
+from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from os import path
 import h5py
 from shutil import copyfile
 
 
-def predeform_mesh():
-
-    parser = ArgumentParser()
+def parse_arguments():
+    parser = ArgumentParser(description=__doc__, formatter_class=RawDescriptionHelpFormatter)
     parser.add_argument('--folder', type=str, help="Path to simulation results")
-    folder_path = parser.parse_args().folder
+    return parser.parse_args()
+
+
+def predeform_mesh():
+    args = parse_arguments()
+
+    folder_path = args.folder
 
     # Path to the displacement file
     disp_path = path.join(folder_path, "Visualization", "displacement.h5")
