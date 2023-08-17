@@ -5,8 +5,8 @@
 
 #######################################################################################
 # Book settings
-title: [to be filled]  # The title of the book. Will be placed in the left navbar.
-author: [to be filled]  # The author of the book
+title: to be filled  # The title of the book. Will be placed in the left navbar.
+author: to be filled  # The author of the book
 copyright: "2023"  # Copyright year to be placed in the footer
 logo: logo.png  # A path to the book logo
 
@@ -27,7 +27,7 @@ bibtex_bibfiles:
 
 # Information about where the book exists on the web
 repository:
-  url: https://github.com/kvslab/fsipy/ # TODO: change the webpage name once we agree on the software name
+  url: https://github.com/KVSlab/Aneurysm_Workflow_FSI
   path_to_book: docs  # Optional path to your book, relative to the repository root
   branch: gh-pages # Which branch of the repository should be used when creating links (optional)
 
