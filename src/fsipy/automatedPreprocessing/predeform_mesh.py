@@ -15,6 +15,7 @@ import argparse
 import h5py
 from pathlib import Path
 
+
 def parse_arguments() -> argparse.Namespace:
     """
     Parse command line arguments.
@@ -27,6 +28,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument('--mesh-path', type=str, default=None,
                         help="Path to the mesh file (default: <folder_path>/Checkpoint/mesh.h5)")
     return parser.parse_args()
+
 
 def predeform_mesh(folder_path: str, mesh_path: str) -> None:
     """
@@ -66,6 +68,7 @@ def predeform_mesh(folder_path: str, mesh_path: str) -> None:
 
     print("Mesh predeformed successfully!")
 
+
 def main() -> None:
     """
     Main function for parsing arguments and predeforming the mesh.
@@ -75,6 +78,7 @@ def main() -> None:
     """
     args = parse_arguments()
     predeform_mesh(args.folder, args.mesh_path)
+
 
 if __name__ == '__main__':
     main()
