@@ -48,14 +48,17 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
         visualize (bool): Visualize resulting surface model with flow rates
         config_path (str): Path to configuration file for remote simulation
         coarsening_factor (float): Refine or coarsen the standard mesh size with given factor
-        region_points (list): User defined points to define which region to refine
-        edge_length (float): Edge length used for meshing with constant element size
         inlet_flow_extension_length (float): Factor defining length of flow extensions at the inlet(s)
         outlet_flow_extension_length (float): Factor defining length of flow extensions at the outlet(s)
+        number_of_sublayers_fluid (int): Number of sublayers for fluid
+        number_of_sublayers_solid (int): Number of sublayers for solid
+        edge_length (float): Edge length used for meshing with constant element size
+        region_points (list): User defined points to define which region to refine
         compress_mesh (bool): Compresses finalized mesh if True
         add_boundary_layer (bool): Adds boundary layers to walls if True
         scale_factor (float): Scale input model by this factor
         resampling_step (float): Float value determining the resampling step for centerline computations, in [m]
+        meshing_parameters (list): Parameters for meshing method 'distancetospheres'
         remove_all (bool): Remove mesh and all pre-processing files
         solid_thickness (str): Constant or variable mesh thickness
         solid_thickness_parameters (list): Specify parameters for solid thickness
