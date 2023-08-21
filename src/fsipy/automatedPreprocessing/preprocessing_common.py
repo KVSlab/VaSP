@@ -1,16 +1,19 @@
 from fsipy.automatedPreprocessing.vmtkmeshgeneratorfsi import vmtkMeshGeneratorFsi
 from vmtk import vmtkdistancetospheres
 from morphman import vmtkscripts, write_polydata
+from vtk import vtkPolyData
 from dolfin import Mesh, MeshFunction, File, HDF5File
 from pathlib import Path
+
 
 # Global array names
 distanceToSpheresArrayName = "DistanceToSpheres"
 distanceToSpheresArrayNameSolid = "Thickness"
 
 
-def distance_to_spheres_solid_thickness(surface, save_path, distance_offset=0, distance_scale=0.1,
-                                        min_distance=0.25, max_distance=0.3):
+def distance_to_spheres_solid_thickness(surface: vtkPolyData, save_path: str,
+                                        distance_offset: float = 0, distance_scale: float = 0.1,
+                                        min_distance: float = 0.25, max_distance: float = 0.3) -> vtkPolyData:
     """
     Determines the solid thickness using vmtkdistancetospheres.
 
@@ -41,7 +44,9 @@ def distance_to_spheres_solid_thickness(surface, save_path, distance_offset=0, d
     return distance_to_sphere
 
 
-def dist_sphere_spheres(surface, save_path, distance_offset, distance_scale, min_distance, max_distance):
+def dist_sphere_spheres(surface: vtkPolyData, save_path: str,
+                        distance_offset: float, distance_scale: float,
+                        min_distance: float, max_distance: float) -> vtkPolyData:
     """
     Determines the target edge length for each cell on the surface, including
     potential refinement or coarsening of certain user specified areas.
@@ -92,25 +97,30 @@ def dist_sphere_spheres(surface, save_path, distance_offset, distance_scale, min
     return distance_to_sphere
 
 
-def generate_mesh(surface, number_of_sublayers_fluid, number_of_sublayers_solid,
-                  solid_thickness, solid_thickness_parameters):
+def generate_mesh(surface: vtkPolyData, number_of_sublayers_fluid: int, number_of_sublayers_solid: int,
+                  solid_thickness: str, solid_thickness_parameters: list) -> tuple:
     """
-    Generates a mesh suitable for FSI from a input surface model.
+    Generates a mesh suitable for FSI from an input surface model.
 
     Args:
         surface (vtkPolyData): Surface model to be meshed.
+        number_of_sublayers_fluid (int): Number of sublayers for fluid.
+        number_of_sublayers_solud (int): Number of sublayers for solid.
+        solid_thickness (str): Type of solid thickness ('variable' or 'constant').
+        solid_thickness_parameters (list): List of parameters for solid thickness.
 
     Returns:
-        mesh (vtkUnstructuredGrid): Output mesh
-        remeshedsurface (vtkPolyData): Remeshed version of the input model
+        tuple: A tuple containing the generated mesh (vtkUnstructuredGrid) and the remeshed surface (vtkPolyData).
     """
     print("--- Creating FSI mesh")
+
     meshGenerator = vmtkMeshGeneratorFsi()
     meshGenerator.Surface = surface
+
+    # Mesh Parameters
     meshGenerator.ElementSizeMode = "edgelengtharray"  # Variable size mesh
     meshGenerator.TargetEdgeLengthArrayName = "Size"  # Variable size mesh
     meshGenerator.LogOn = 1
-    # For boundary layer (used for both fluid boundary layer and solid domain)
     meshGenerator.BoundaryLayer = 1
     meshGenerator.NumberOfSubLayersSolid = number_of_sublayers_fluid
     meshGenerator.NumberOfSubLayersFluid = number_of_sublayers_solid
@@ -118,35 +128,34 @@ def generate_mesh(surface, number_of_sublayers_fluid, number_of_sublayers_solid,
     meshGenerator.SubLayerRatioFluid = 0.75
     meshGenerator.SubLayerRatioSolid = 0.75
     meshGenerator.BoundaryLayerThicknessFactor = 0.5
+    meshGenerator.Tetrahedralize = 1
+    meshGenerator.VolumeElementScaleFactor = 0.8
+    meshGenerator.EndcapsEdgeLengthFactor = 1.0
+
+    # Solid thickness handling
     if solid_thickness == 'variable':
         meshGenerator.ElementSizeModeSolid = "edgelengtharray"
         meshGenerator.TargetEdgeLengthArrayNameSolid = distanceToSpheresArrayNameSolid
     else:
         meshGenerator.ElementSizeModeSolid = "edgelength"
         meshGenerator.SolidThickness = solid_thickness_parameters[0]
-    meshGenerator.Tetrahedralize = 1
-    meshGenerator.VolumeElementScaleFactor = 0.8
-    meshGenerator.EndcapsEdgeLengthFactor = 1.0
-    # Cells and walls numbering
+
+    # IDs
     meshGenerator.SolidSideWallId = 11
     meshGenerator.InterfaceId_fsi = 22
     meshGenerator.InterfaceId_outer = 33
     meshGenerator.VolumeId_fluid = 0  # (keep to 0)
     meshGenerator.VolumeId_solid = 1
 
-    # Mesh
+    # Generate mesh
     meshGenerator.Execute()
+    remeshed_surface = meshGenerator.RemeshedSurface
+    generated_mesh = meshGenerator.Mesh
 
-    # Remeshed surface, store for later
-    remeshSurface = meshGenerator.RemeshedSurface
-
-    # Full mesh
-    mesh = meshGenerator.Mesh
-
-    return mesh, remeshSurface
+    return generated_mesh, remeshed_surface
 
 
-def convert_xml_mesh_to_hdf5(file_name_xml_mesh, scaling_factor=0.001):
+def convert_xml_mesh_to_hdf5(file_name_xml_mesh: str, scaling_factor: float = 0.001) -> None:
     """Converts an XML mesh to an HDF5 mesh.
 
     Args:
@@ -162,11 +171,11 @@ def convert_xml_mesh_to_hdf5(file_name_xml_mesh, scaling_factor=0.001):
     """
 
     # Check if the XML mesh file exists
-    file_name_xml_mesh = Path(file_name_xml_mesh)
-    if not file_name_xml_mesh.is_file():
-        raise FileNotFoundError(f"The file '{str(file_name_xml_mesh)}' does not exist.")
+    xml_mesh_path = Path(file_name_xml_mesh)
+    if not xml_mesh_path.is_file():
+        raise FileNotFoundError(f"The file '{xml_mesh_path}' does not exist.")
 
-    mesh = Mesh(str(file_name_xml_mesh))
+    mesh = Mesh(str(xml_mesh_path))
 
     # Rescale the mesh coordinates
     x = mesh.coordinates()
@@ -177,19 +186,19 @@ def convert_xml_mesh_to_hdf5(file_name_xml_mesh, scaling_factor=0.001):
     boundaries = MeshFunction("size_t", mesh, 2, mesh.domains())
     boundaries.set_values(boundaries.array() + 1)  # FIXME: Explain why this is necessary
 
-    base, first_dot, rest = file_name_xml_mesh.name.partition('.')
-    file_name_boundaries = str(file_name_xml_mesh.with_name(base + "_boundaries.pvd"))
+    base, first_dot, rest = xml_mesh_path.name.partition('.')
+    file_name_boundaries = str(xml_mesh_path.with_name(base + "_boundaries.pvd"))
     boundary_file = File(file_name_boundaries)
     boundary_file << boundaries
 
     domains = MeshFunction("size_t", mesh, 3, mesh.domains())
     domains.set_values(domains.array() + 1)  # in order to have fluid==1 and solid==2
 
-    file_name_domains = str(file_name_xml_mesh.with_name(base + "_domains.pvd"))
+    file_name_domains = str(xml_mesh_path.with_name(base + "_domains.pvd"))
     domain_file = File(file_name_domains)
     domain_file << domains
 
-    file_name_h5_mesh = str(file_name_xml_mesh.with_name(base + '.h5'))
+    file_name_h5_mesh = str(xml_mesh_path.with_name(base + '.h5'))
     hdf = HDF5File(mesh.mpi_comm(), file_name_h5_mesh, "w")
     hdf.write(mesh, "/mesh")
     hdf.write(boundaries, "/boundaries")
