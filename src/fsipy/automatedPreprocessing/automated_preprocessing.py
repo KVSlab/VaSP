@@ -14,18 +14,19 @@ from morphman import get_uncapped_surface, write_polydata, get_parameters, vtk_c
 from vampy.automatedPreprocessing import ToolRepairSTL
 from vampy.automatedPreprocessing.preprocessing_common import read_polydata, get_centers_for_meshing, \
     dist_sphere_diam, dist_sphere_curvature, dist_sphere_constant, get_regions_to_refine, add_flow_extension, \
-    write_mesh, mesh_alternative, generate_mesh, find_boundaries, compute_flow_rate, setup_model_network, \
+    write_mesh, mesh_alternative, find_boundaries, compute_flow_rate, setup_model_network, \
     radiusArrayName, scale_surface, get_furtest_surface_point, check_if_closed_surface
 from vampy.automatedPreprocessing.simulate import run_simulation
 from vampy.automatedPreprocessing.visualize import visualize_model
 
 from fsipy.automatedPreprocessing.preprocessing_common import generate_mesh, distance_to_spheres_solid_thickness, \
-     dist_sphere_spheres, convert_xml_mesh_to_hdf5
+    dist_sphere_spheres, convert_xml_mesh_to_hdf5
 
 
 def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_factor, smoothing_iterations,
                        meshing_method, refine_region, is_atrium, add_flow_extensions, visualize, config_path,
-                       coarsening_factor, inlet_flow_extension_length, outlet_flow_extension_length, edge_length,
+                       coarsening_factor, inlet_flow_extension_length, outlet_flow_extension_length,
+                       number_of_sublayers_fluid, number_of_sublayers_solid, edge_length,
                        region_points, compress_mesh, add_boundary_layer, scale_factor, resampling_step,
                        meshing_parameters, remove_all, solid_thickness, solid_thickness_parameters):
     """
@@ -391,22 +392,34 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
             print("ERROR: Invalid parameter for constant solid thickness. This should be a " +
                   "single number greater than zero.")
             sys.exit(-1)
-            
+
     # Compute mesh
     if not path.isfile(file_name_vtu_mesh):
         print("--- Computing mesh\n")
         try:
-            mesh, remeshed_surface = generate_mesh(distance_to_sphere, solid_thickness, solid_thickness_parameters)
+            mesh, remeshed_surface = generate_mesh(distance_to_sphere,
+                                                   number_of_sublayers_fluid,
+                                                   number_of_sublayers_solid,
+                                                   solid_thickness,
+                                                   solid_thickness_parameters)
         except Exception:
             distance_to_sphere = mesh_alternative(distance_to_sphere)
-            mesh, remeshed_surface = generate_mesh(distance_to_sphere, solid_thickness, solid_thickness_parameters)
+            mesh, remeshed_surface = generate_mesh(distance_to_sphere,
+                                                   number_of_sublayers_fluid,
+                                                   number_of_sublayers_solid,
+                                                   solid_thickness,
+                                                   solid_thickness_parameters)
 
         assert mesh.GetNumberOfPoints() > 0, "No points in mesh, try to remesh."
         assert remeshed_surface.GetNumberOfPoints() > 0, "No points in surface mesh, try to remesh."
 
         if mesh.GetNumberOfPoints() < remeshed_surface.GetNumberOfPoints():
             print("--- An error occurred during meshing. Will attempt to re-mesh \n")
-            mesh, remeshed_surface = generate_mesh(distance_to_sphere, solid_thickness, solid_thickness_parameters)
+            mesh, remeshed_surface = generate_mesh(distance_to_sphere,
+                                                   number_of_sublayers_fluid,
+                                                   number_of_sublayers_solid,
+                                                   solid_thickness,
+                                                   solid_thickness_parameters)
 
         write_mesh(compress_mesh, file_name_surface_name, file_name_vtu_mesh, file_name_xml_mesh,
                    mesh, remeshed_surface)
@@ -417,7 +430,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
     else:
         mesh = read_polydata(file_name_vtu_mesh)
 
-    print(f"--- Converting XML mesh to HDF5\n")
+    print("--- Converting XML mesh to HDF5\n")
     convert_xml_mesh_to_hdf5(file_name_xml_mesh)
 
     network, probe_points = setup_model_network(centerlines, file_name_probe_points, region_center, verbose_print)
@@ -525,9 +538,9 @@ def read_command_line(input_path=None):
                              " based on the surface curvature and the distance from the " +
                              "centerline to the surface, respectively. The 'distancetospheres' method allows to " +
                              "place spheres where the surface is pointing by pressing 'space'. By pressing 'd', the " +
-                             "surface is coloured by the distance to the spheres. By pressing 'a', a scaling function " +
-                             "can be specified by four parameters: 'offset', 'scale', 'min' and 'max'. These parameters " +
-                             "for the scaling function can also be controlled by the -mp argument.")
+                             "surface is coloured by the distance to the spheres. By pressing 'a', a scaling " +
+                             "function can be specified by four parameters: 'offset', 'scale', 'min' and 'max'. " +
+                             "These parameters for the scaling function can also be controlled by the -mp argument.")
 
     parser.add_argument('-el', '--edge-length',
                         default=None,
@@ -570,6 +583,16 @@ def read_command_line(input_path=None):
                         default=5,
                         type=float,
                         help="Length of flow extensions at outlet(s).")
+
+    parser.add_argument('-nbf', '--number-of-sublayers-fluid',
+                        default=2,
+                        type=int,
+                        help="Number of sublayers in the fluid domain.")
+
+    parser.add_argument('-nbs', '--number-of-sublayers-solid',
+                        default=2,
+                        type=int,
+                        help="Number of sublayers in the solid domain.")
 
     parser.add_argument('-viz', '--visualize',
                         default=True,
@@ -661,7 +684,9 @@ def read_command_line(input_path=None):
                 meshing_method=args.meshing_method, refine_region=args.refine_region, is_atrium=args.is_atrium,
                 add_flow_extensions=args.add_flowextensions, config_path=args.config_path, edge_length=args.edge_length,
                 coarsening_factor=args.coarsening_factor, inlet_flow_extension_length=args.inlet_flowextension,
-                visualize=args.visualize, region_points=args.region_points, compress_mesh=args.compress_mesh,
+                number_of_sublayers_fluid=args.number_of_sublayers_fluid,
+                number_of_sublayers_solid=args.number_of_sublayers_solid, visualize=args.visualize,
+                region_points=args.region_points, compress_mesh=args.compress_mesh,
                 outlet_flow_extension_length=args.outlet_flowextension, add_boundary_layer=args.add_boundary_layer,
                 scale_factor=args.scale_factor, resampling_step=args.resampling_step,
                 meshing_parameters=args.meshing_parameters, remove_all=args.remove_all,

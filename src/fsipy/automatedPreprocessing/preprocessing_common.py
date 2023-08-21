@@ -1,6 +1,6 @@
 from fsipy.automatedPreprocessing.vmtkmeshgeneratorfsi import vmtkMeshGeneratorFsi
 from vmtk import vmtkdistancetospheres
-from morphman import vmtkscripts, write_polydata, get_point_data_array, create_vtk_array
+from morphman import vmtkscripts, write_polydata
 from dolfin import Mesh, MeshFunction, File, HDF5File
 from pathlib import Path
 
@@ -92,7 +92,8 @@ def dist_sphere_spheres(surface, save_path, distance_offset, distance_scale, min
     return distance_to_sphere
 
 
-def generate_mesh(surface, solid_thickness, solid_thickness_parameters):
+def generate_mesh(surface, number_of_sublayers_fluid, number_of_sublayers_solid,
+                  solid_thickness, solid_thickness_parameters):
     """
     Generates a mesh suitable for FSI from a input surface model.
 
@@ -111,8 +112,8 @@ def generate_mesh(surface, solid_thickness, solid_thickness_parameters):
     meshGenerator.LogOn = 1
     # For boundary layer (used for both fluid boundary layer and solid domain)
     meshGenerator.BoundaryLayer = 1
-    meshGenerator.NumberOfSubLayersSolid = 2
-    meshGenerator.NumberOfSubLayersFluid = 2
+    meshGenerator.NumberOfSubLayersSolid = number_of_sublayers_fluid
+    meshGenerator.NumberOfSubLayersFluid = number_of_sublayers_solid
     meshGenerator.BoundaryLayerOnCaps = 0
     meshGenerator.SubLayerRatioFluid = 0.75
     meshGenerator.SubLayerRatioSolid = 0.75
@@ -144,12 +145,14 @@ def generate_mesh(surface, solid_thickness, solid_thickness_parameters):
 
     return mesh, remeshSurface
 
+
 def convert_xml_mesh_to_hdf5(file_name_xml_mesh, scaling_factor=0.001):
     """Converts an XML mesh to an HDF5 mesh.
 
     Args:
         file_name_xml_mesh (str): The name of the XML mesh file.
-        scaling_factor (float, optional): A scaling factor to apply to the mesh coordinates. The default value is 0.001, which converts from millimeters to meters.
+        scaling_factor (float, optional): A scaling factor to apply to the mesh coordinates.
+                                          The default value is 0.001, which converts from millimeters to meters.
 
     Returns:
         None
