@@ -14,24 +14,21 @@ from morphman import get_uncapped_surface, write_polydata, get_parameters, vtk_c
 from vampy.automatedPreprocessing import ToolRepairSTL
 from vampy.automatedPreprocessing.preprocessing_common import read_polydata, get_centers_for_meshing, \
     dist_sphere_diam, dist_sphere_curvature, dist_sphere_constant, get_regions_to_refine, add_flow_extension, \
-    write_mesh, mesh_alternative, generate_mesh, find_boundaries, compute_flow_rate, setup_model_network, \
+    write_mesh, mesh_alternative, find_boundaries, compute_flow_rate, setup_model_network, \
     radiusArrayName, scale_surface, get_furtest_surface_point, check_if_closed_surface
 from vampy.automatedPreprocessing.simulate import run_simulation
 from vampy.automatedPreprocessing.visualize import visualize_model
 
-
-import sys
-from os.path import dirname
-sys.path.append(dirname(__file__))
-
-from preprocessing_common import generate_mesh, distance_to_spheres_solid_thickness, dist_sphere_spheres
+from fsipy.automatedPreprocessing.preprocessing_common import generate_mesh, distance_to_spheres_solid_thickness, \
+    dist_sphere_spheres, convert_xml_mesh_to_hdf5
 
 
 def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_factor, smoothing_iterations,
                        meshing_method, refine_region, is_atrium, add_flow_extensions, visualize, config_path,
-                       coarsening_factor, inlet_flow_extension_length, outlet_flow_extension_length, edge_length,
+                       coarsening_factor, inlet_flow_extension_length, outlet_flow_extension_length,
+                       number_of_sublayers_fluid, number_of_sublayers_solid, edge_length,
                        region_points, compress_mesh, add_boundary_layer, scale_factor, resampling_step,
-                       remove_all, solid_thickness, solid_thickness_parameters):
+                       meshing_parameters, remove_all, solid_thickness, solid_thickness_parameters):
     """
     Automatically generate mesh of surface model in .vtu and .xml format, including prescribed
     flow rates at inlet and outlet based on flow network model.
@@ -51,14 +48,17 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
         visualize (bool): Visualize resulting surface model with flow rates
         config_path (str): Path to configuration file for remote simulation
         coarsening_factor (float): Refine or coarsen the standard mesh size with given factor
-        region_points (list): User defined points to define which region to refine
-        edge_length (float): Edge length used for meshing with constant element size
         inlet_flow_extension_length (float): Factor defining length of flow extensions at the inlet(s)
         outlet_flow_extension_length (float): Factor defining length of flow extensions at the outlet(s)
+        number_of_sublayers_fluid (int): Number of sublayers for fluid
+        number_of_sublayers_solid (int): Number of sublayers for solid
+        edge_length (float): Edge length used for meshing with constant element size
+        region_points (list): User defined points to define which region to refine
         compress_mesh (bool): Compresses finalized mesh if True
         add_boundary_layer (bool): Adds boundary layers to walls if True
         scale_factor (float): Scale input model by this factor
         resampling_step (float): Float value determining the resampling step for centerline computations, in [m]
+        meshing_parameters (list): Parameters for meshing method 'distancetospheres'
         remove_all (bool): Remove mesh and all pre-processing files
         solid_thickness (str): Constant or variable mesh thickness
         solid_thickness_parameters (list): Specify parameters for solid thickness
@@ -285,10 +285,18 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
             print("--- Adding flow extensions\n")
             # Add extension normal on boundary for atrium models
             extension = "centerlinedirection" if is_atrium else "boundarynormal"
-            surface_extended = add_flow_extension(surface, centerlines, include_outlet=False,
+            if is_atrium:
+                # Flip lengths if model is atrium
+                inlet_flow_extension_length, outlet_flow_extension_length = \
+                    outlet_flow_extension_length, inlet_flow_extension_length
+
+            # Add extensions to inlet (artery)
+            surface_extended = add_flow_extension(surface, centerlines, is_inlet=True,
                                                   extension_length=inlet_flow_extension_length,
                                                   extension_mode=extension)
-            surface_extended = add_flow_extension(surface_extended, centerlines, include_outlet=True,
+
+            # Add extensions to outlets (artery)
+            surface_extended = add_flow_extension(surface_extended, centerlines, is_inlet=False,
                                                   extension_length=outlet_flow_extension_length)
 
             surface_extended = vmtk_smooth_surface(surface_extended, "laplace", iterations=200)
@@ -354,8 +362,13 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
             distance_to_sphere = read_polydata(file_name_distance_to_sphere_diam)
     elif meshing_method == "distancetospheres":
         if not path.isfile(file_name_distance_to_sphere_spheres):
-            distance_to_sphere = dist_sphere_spheres(surface_extended, centerlines, region_center, misr_max,
-                                                     file_name_distance_to_sphere_spheres, coarsening_factor)
+            if len(meshing_parameters) == 4:
+                distance_to_sphere = dist_sphere_spheres(surface_extended, file_name_distance_to_sphere_spheres,
+                                                         *meshing_parameters)
+            else:
+                print("ERROR: Invalid parameters for meshing method 'distancetospheres'. This should be " +
+                      "given as four parameters: 'offset', 'scale', 'min' and 'max.")
+                sys.exit(-1)
         else:
             distance_to_sphere = read_polydata(file_name_distance_to_sphere_spheres)
 
@@ -372,39 +385,56 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
                 distance_to_sphere = distance_to_spheres_solid_thickness(distance_to_sphere,
                                                                          file_name_distance_to_sphere_solid_thickness)
             else:
-                print("ERROR: Invalid parameters for variable solid thickness. This should be "+
+                print("ERROR: Invalid parameters for variable solid thickness. This should be " +
                       "given as four parameters: 'offset', 'scale', 'min' and 'max.")
                 sys.exit(-1)
         else:
             distance_to_sphere = read_polydata(file_name_distance_to_sphere_solid_thickness)
-                
     else:
-        pass  # FIXME: how to set constant thickness
-            
+        if len(solid_thickness_parameters) != 1 or solid_thickness_parameters[0] <= 0:
+            print("ERROR: Invalid parameter for constant solid thickness. This should be a " +
+                  "single number greater than zero.")
+            sys.exit(-1)
+
     # Compute mesh
     if not path.isfile(file_name_vtu_mesh):
         print("--- Computing mesh\n")
         try:
-            mesh, remeshed_surface = generate_mesh(distance_to_sphere, add_boundary_layer, meshing_method,
-                                                   solid_thickness, solid_thickness_parameters)
+            mesh, remeshed_surface = generate_mesh(distance_to_sphere,
+                                                   number_of_sublayers_fluid,
+                                                   number_of_sublayers_solid,
+                                                   solid_thickness,
+                                                   solid_thickness_parameters)
         except Exception:
             distance_to_sphere = mesh_alternative(distance_to_sphere)
-            mesh, remeshed_surface = generate_mesh(distance_to_sphere, add_boundary_layer, meshing_method,
-                                                   solid_thickness, solid_thickness_parameters)
+            mesh, remeshed_surface = generate_mesh(distance_to_sphere,
+                                                   number_of_sublayers_fluid,
+                                                   number_of_sublayers_solid,
+                                                   solid_thickness,
+                                                   solid_thickness_parameters)
 
         assert mesh.GetNumberOfPoints() > 0, "No points in mesh, try to remesh."
         assert remeshed_surface.GetNumberOfPoints() > 0, "No points in surface mesh, try to remesh."
 
         if mesh.GetNumberOfPoints() < remeshed_surface.GetNumberOfPoints():
             print("--- An error occurred during meshing. Will attempt to re-mesh \n")
-            mesh, remeshed_surface = generate_mesh(distance_to_sphere, add_boundary_layer, meshing_method,
-                                                   solid_thickness, solid_thickness_parameters)
+            mesh, remeshed_surface = generate_mesh(distance_to_sphere,
+                                                   number_of_sublayers_fluid,
+                                                   number_of_sublayers_solid,
+                                                   solid_thickness,
+                                                   solid_thickness_parameters)
 
         write_mesh(compress_mesh, file_name_surface_name, file_name_vtu_mesh, file_name_xml_mesh,
                    mesh, remeshed_surface)
 
+        # Add .gz to XML mesh file if compressed
+        if compress_mesh:
+            file_name_xml_mesh = file_name_xml_mesh + ".gz"
     else:
         mesh = read_polydata(file_name_vtu_mesh)
+
+    print("--- Converting XML mesh to HDF5\n")
+    convert_xml_mesh_to_hdf5(file_name_xml_mesh)
 
     network, probe_points = setup_model_network(centerlines, file_name_probe_points, region_center, verbose_print)
 
@@ -511,8 +541,9 @@ def read_command_line(input_path=None):
                              " based on the surface curvature and the distance from the " +
                              "centerline to the surface, respectively. The 'distancetospheres' method allows to " +
                              "place spheres where the surface is pointing by pressing 'space'. By pressing 'd', the " +
-                             "surface is coloured by the distance to the spheres. By pressing 'a', a scaling function " +
-                             "can be specified by four parameters: 'offset', 'scale', 'min' and 'max'.")
+                             "surface is coloured by the distance to the spheres. By pressing 'a', a scaling " +
+                             "function can be specified by four parameters: 'offset', 'scale', 'min' and 'max'. " +
+                             "These parameters for the scaling function can also be controlled by the -mp argument.")
 
     parser.add_argument('-el', '--edge-length',
                         default=None,
@@ -556,6 +587,16 @@ def read_command_line(input_path=None):
                         type=float,
                         help="Length of flow extensions at outlet(s).")
 
+    parser.add_argument('-nbf', '--number-of-sublayers-fluid',
+                        default=2,
+                        type=int,
+                        help="Number of sublayers in the fluid domain.")
+
+    parser.add_argument('-nbs', '--number-of-sublayers-solid',
+                        default=2,
+                        type=int,
+                        help="Number of sublayers in the solid domain.")
+
     parser.add_argument('-viz', '--visualize',
                         default=True,
                         type=str2bool,
@@ -583,6 +624,14 @@ def read_command_line(input_path=None):
                         type=float,
                         help="Resampling step used to resample centerline in [m].")
 
+    parser.add_argument('-mp', '--meshing-parameters',
+                        type=float,
+                        nargs="+",
+                        default=[0, 0.1, 0.4, 0.6],
+                        help="Parameters for meshing method 'distancetospheres'. This should be given as " +
+                             "four numbers for the distancetosphere scaling function: 'offset', 'scale', 'min' " +
+                             "and 'max'. For example --meshing-parameters 0 0.1 0.3 0.4")
+
     remove_all = parser.add_mutually_exclusive_group(required=False)
     remove_all.add_argument('-ra', '--remove-all',
                             action="store_true",
@@ -602,7 +651,7 @@ def read_command_line(input_path=None):
                         nargs="+",
                         default=[0.3],
                         help="Parameters for solid thickness. For constant solid thickness, this should be " +
-                             "given as a single float. For 'variable' solid thickness, this should be given " +
+                             "given as a single float. For 'variable' solid thickness, this should be given as " +
                              "four floats for the distancetosphere scaling function: 'offset', 'scale', 'min' " +
                              "and 'max'. For example --solid-thickness-parameters 0 0.1 0.25 0.3")
 
@@ -638,9 +687,12 @@ def read_command_line(input_path=None):
                 meshing_method=args.meshing_method, refine_region=args.refine_region, is_atrium=args.is_atrium,
                 add_flow_extensions=args.add_flowextensions, config_path=args.config_path, edge_length=args.edge_length,
                 coarsening_factor=args.coarsening_factor, inlet_flow_extension_length=args.inlet_flowextension,
-                visualize=args.visualize, region_points=args.region_points, compress_mesh=args.compress_mesh,
+                number_of_sublayers_fluid=args.number_of_sublayers_fluid,
+                number_of_sublayers_solid=args.number_of_sublayers_solid, visualize=args.visualize,
+                region_points=args.region_points, compress_mesh=args.compress_mesh,
                 outlet_flow_extension_length=args.outlet_flowextension, add_boundary_layer=args.add_boundary_layer,
-                scale_factor=args.scale_factor, resampling_step=args.resampling_step, remove_all=args.remove_all,
+                scale_factor=args.scale_factor, resampling_step=args.resampling_step,
+                meshing_parameters=args.meshing_parameters, remove_all=args.remove_all,
                 solid_thickness=args.solid_thickness, solid_thickness_parameters=args.solid_thickness_parameters)
 
 

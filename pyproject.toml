@@ -16,6 +16,7 @@ dependencies = [
 
 [project.scripts]
 fsipy-mesh = "fsipy.automatedPreprocessing.automated_preprocessing:main_meshing"
+fsipy-predeform-mesh = "fsipy.automatedPreprocessing.predeform_mesh:main"
 
 [project.optional-dependencies]
 test = [
