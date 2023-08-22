@@ -1,0 +1,32 @@
+# Table of contents
+# Learn more at https://jupyterbook.org/customize/toc.html
+
+format: jb-book
+root: index
+
+parts:
+  - caption: Installation
+    chapters:
+      - file: installation
+      - file: conda
+      - file: docker
+      - file: issues
+
+  - caption: Using [software name]
+    chapters:
+    - file: preprocess
+    - file: simulation
+    - file: postprocess
+    - file: cluster
+    - file: features
+
+  - caption: Tutorials
+    chapters:
+    - file: tutorials
+    - file: offset_stenosis
+    - file: aneurysm
+    - file: avf
+
+  - caption: Python API
+    chapters:
+    - file: api

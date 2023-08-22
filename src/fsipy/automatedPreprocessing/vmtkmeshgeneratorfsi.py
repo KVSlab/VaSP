@@ -58,8 +58,8 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
         self.NumberOfSubLayersSolid = 2
         self.SubLayerRatioFluid = 0.75
         self.SubLayerRatioSolid = 0.5
-        self.BoundaryLayerThicknessFactorFluid = 0.85
-        self.BoundaryLayerThicknessFactorSolid = 0.25
+        self.BoundaryLayerThicknessFactor = 0.85
+        self.SolidThickness = 1
 
         self.NumberOfSubsteps = 2000
         self.Relaxation = 0.01
@@ -118,8 +118,7 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
             ['SubLayerRatioFluid', 'sublayerratiofluid', 'float', 1, '(0.0,)'],
             ['SubLayerRatioSolid', 'sublayerratiosolid', 'float', 1, '(0.0,)'],
             ['BoundaryLayerThicknessFactor', 'thicknessfactor', 'float', 1, '(0.0,)'],
-            ['BoundaryLayerThicknessFactorFluid', 'thicknessfactorfluid', 'float', 1, '(0.0,)'],
-            ['BoundaryLayerThicknessFactorSolid', 'thicknessfactorsolid', 'float', 1, '(0.0,)'],
+            ['SolidThickness', 'solidthickness', 'float', 1, '(0.0,)'],
             ['RemeshCapsOnly', 'remeshcapsonly', 'bool', 1, ''],
             ['BoundaryLayerOnCaps', 'boundarylayeroncaps', 'bool', 1, ''],
             ['Tetrahedralize', 'tetrahedralize', 'bool', 1, ''],
@@ -211,9 +210,9 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
             boundaryLayer.Relaxation = self.Relaxation
             boundaryLayer.LocalCorrectionFactor = self.LocalCorrectionFactor
             boundaryLayer.SubLayerRatio = self.SubLayerRatioFluid
-            boundaryLayer.Thickness = self.BoundaryLayerThicknessFactorFluid * self.TargetEdgeLength
-            boundaryLayer.ThicknessRatio = self.BoundaryLayerThicknessFactorFluid * self.TargetEdgeLengthFactor
-            boundaryLayer.MaximumThickness = self.BoundaryLayerThicknessFactorFluid * self.MaxEdgeLength
+            boundaryLayer.Thickness = self.BoundaryLayerThicknessFactor * self.TargetEdgeLength
+            boundaryLayer.ThicknessRatio = self.BoundaryLayerThicknessFactor * self.TargetEdgeLengthFactor
+            boundaryLayer.MaximumThickness = self.BoundaryLayerThicknessFactor * self.MaxEdgeLength
             if not self.BoundaryLayerOnCaps:
                 boundaryLayer.SidewallCellEntityId = placeholderCellEntityId
                 boundaryLayer.InnerSurfaceCellEntityId = wallEntityOffset
@@ -236,9 +235,8 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
             boundaryLayer2.Relaxation = self.Relaxation
             boundaryLayer2.LocalCorrectionFactor = self.LocalCorrectionFactor
             boundaryLayer2.SubLayerRatio = self.SubLayerRatioSolid
-            boundaryLayer2.Thickness = self.BoundaryLayerThicknessFactorSolid * self.TargetEdgeLength
-            boundaryLayer2.ThicknessRatio = self.BoundaryLayerThicknessFactorSolid * self.TargetEdgeLengthFactor
-            boundaryLayer2.MaximumThickness = self.BoundaryLayerThicknessFactorSolid * self.MaxEdgeLength
+            boundaryLayer2.Thickness = self.SolidThickness
+            boundaryLayer2.ThicknessRatio = 1
             if not self.BoundaryLayerOnCaps:
                 boundaryLayer2.SidewallCellEntityId = self.SolidSideWallId  # placeholderCellEntityId
                 boundaryLayer2.InnerSurfaceCellEntityId = self.InterfaceId_fsi  # wallEntityOffset
@@ -252,11 +250,12 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
 
             innerSurface = meshToSurface.Surface
 
+            # FIXME: Not sure when this should be used
             if self.isAVF:
                 self.PrintLog("Generating centerlines.")
                 centerlinesExtract = vmtkscripts.vmtkCenterlines()
                 centerlinesExtract.Surface = innerSurface
-                centerlinesExtract.SeedSelectorName = "openprofiles"
+                centerlinesExtract.SeedSelectorName = "carotidprofiles"
                 centerlinesExtract.Execute()
     
                 extractGroups = vmtkscripts.vmtkBranchExtractor()
@@ -374,52 +373,8 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
             tetgen.RegionAttrib = 0
             tetgen.Execute()
 
-            # ADDING CELL IDs
-
-            #array = vtk.vtkDoubleArray()
-            # array.SetNumberOfTuples(tetgen.Mesh.GetNumberOfCells())
-            # array.SetNumberOfComponents(1)
-            #array.FillComponent(0, 1.0)
-            # array.SetName('RegionIDs')
-            # tetgen.Mesh.GetCellData().AddArray(array)
-
-            #array = vtk.vtkDoubleArray()
-            # array.SetNumberOfTuples(boundaryLayer.Mesh.GetNumberOfCells())
-            # array.SetNumberOfComponents(1)
-            #array.FillComponent(0, 1.0)
-            # array.SetName('RegionIDs')
-            # boundaryLayer.Mesh.GetCellData().AddArray(array)
-
-            #array = vtk.vtkDoubleArray()
-            # array.SetNumberOfTuples(boundaryLayer2.Mesh.GetNumberOfCells())
-            # array.SetNumberOfComponents(1)
-            #array.FillComponent(0, 2.0)
-            # array.SetName('RegionIDs')
-            # boundaryLayer2.Mesh.GetCellData().AddArray(array)
-
-            #####
-
-            # w1 = vtk.vtkXMLUnstructuredGridWriter()
-            # w1.SetInputData(boundaryLayer2.Mesh)
-            # w1.SetFileName('BoundaryLayer2.vtu')
-            # w1.Write()
-            #
-            # w2 = vtk.vtkXMLUnstructuredGridWriter()
-            # w2.SetInputData(tetgen.Mesh)
-            # w2.SetFileName('Tetgen.vtu')
-            # w2.Write()
-            #
-            # w3 = vtk.vtkXMLUnstructuredGridWriter()
-            # w3.SetInputData(boundaryLayer.Mesh)
-            # w3.SetFileName('BoundaryLayer.vtu')
-            # w3.Write()
-            #
-            # w4 = vtk.vtkXMLUnstructuredGridWriter()
-            # w4.SetInputData(boundaryLayer.InnerSurfaceMesh)
-            # w4.SetFileName('InnerLayer.vtu')
-            # w4.Write()
-
-            #from IPython import embed; embed()
+            if tetgen.Mesh.GetNumberOfCells() == 0 and surfaceToMesh.Mesh.GetNumberOfCells() > 0:
+                self.PrintLog('An error occurred during tetrahedralization. Will only output surface mesh and boundary layer.')
 
             self.PrintLog("Assembling fluid mesh")
             appendFilter = vtkvmtk.vtkvmtkAppendFilter()
