@@ -11,6 +11,7 @@ readme = "README.md"
 dependencies = [
     'numpy',
     'matplotlib',
+    'vampy@git+https://github.com/KVSlab/VaMPy',
 ]
 
 [project.scripts]
