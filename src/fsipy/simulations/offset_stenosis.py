@@ -7,7 +7,7 @@ import numpy as np
 from vampy.simulation.Womersley import make_womersley_bcs, compute_boundary_geometry_acrn
 from turtleFSI.problems import *
 from dolfin import HDF5File, Mesh, MeshFunction, facets, cells, assemble, UserExpression, sqrt, FacetNormal, ds, \
-    DirichletBC, Measure, inner
+    DirichletBC, Measure, inner, parameters
 
 # set compiler arguments
 parameters["form_compiler"]["quadrature_degree"] = 6
