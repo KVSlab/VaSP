@@ -11,7 +11,7 @@ readme = "README.md"
 dependencies = [
     'numpy',
     'matplotlib',
-    'vampy',
+    'vampy@git+https://github.com/KVSlab/VaMPy',
 ]
 
 [project.scripts]
@@ -24,6 +24,10 @@ test = [
     'mypy',
     "pytest",
     "pytest-cov"
+]
+
+docs = [
+    "jupyter-book"
 ]
 
 [tool.pytest.ini_options]
