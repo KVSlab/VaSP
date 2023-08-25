@@ -32,13 +32,13 @@ def parse_arguments() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def predeform_mesh(folder_path: str, mesh_path: str, scale_factor: float) -> None:
+def predeform_mesh(folder_path: Path, mesh_path: Path, scale_factor: float) -> None:
     """
     Predeform the mesh for FSI simulation.
 
     Args:
-        folder_path (str): Path to the simulation results folder.
-        mesh_path (str): Path to the mesh file.
+        folder_path (Path): Path to the simulation results folder.
+        mesh_path (Path): Path to the mesh file.
         scale_factor (float): Scale factor for mesh deformation.
 
     Returns:
@@ -47,10 +47,8 @@ def predeform_mesh(folder_path: str, mesh_path: str, scale_factor: float) -> Non
     print("Predeforming mesh...")
 
     # Path to the displacement file
-    disp_path = Path(folder_path) / "Visualization" / "displacement.h5"
-    if mesh_path is None:
-        mesh_path = Path(folder_path) / "Checkpoint" / "mesh.h5"
-    predeformed_mesh_path = Path(mesh_path).with_name(mesh_path.stem + "_predeformed.h5")
+    disp_path = folder_path / "Visualization" / "displacement.h5"
+    predeformed_mesh_path = mesh_path.with_name(mesh_path.stem + "_predeformed.h5")
 
     # Make a copy of the original mesh
     predeformed_mesh_path.write_bytes(mesh_path.read_bytes())
@@ -79,7 +77,14 @@ def main() -> None:
         None
     """
     args = parse_arguments()
-    predeform_mesh(args.folder, args.mesh_path, args.scale_factor)
+
+    folder_path = Path(args.folder)
+    if args.mesh_path is None:
+        mesh_path = folder_path / "Checkpoint" / "mesh.h5"
+    else:
+        mesh_path = Path(args.mesh_path)
+
+    predeform_mesh(folder_path, Path(mesh_path), args.scale_factor)
 
 
 if __name__ == '__main__':
