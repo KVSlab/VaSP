@@ -37,12 +37,12 @@ def set_problem_parameters(default_variables, **namespace):
         checkpoint_step=50,  # Save frequency of checkpoint files
         # Linear solver parameters
         linear_solver="mumps",
-        atol=1e-10,  # Absolute tolerance in the Newton solver
-        rtol=1e-9,  # Relative tolerance in the Newton solver
+        atol=1e-6,  # Absolute tolerance in the Newton solver
+        rtol=1e-6,  # Relative tolerance in the Newton solver
         recompute=20,  # Recompute the Jacobian matix within time steps
         recompute_tstep=20,  # Recompute the Jacobian matix over time steps
         # boundary condition parameters
-        inlet_id=2,  # inlet id for the fluid
+        inlet_id=3,  # inlet id for the fluid
         inlet_outlet_s_id=11,  # inlet and outlet id for solid
         fsi_id=22,  # id for fsi surface
         rigid_id=11,  # "rigid wall" id for the fluid
@@ -52,7 +52,7 @@ def set_problem_parameters(default_variables, **namespace):
         P_mean=11200,
         T_Cycle=0.951,  # Used to define length of flow waveform
         rho_f=[1.000E3, 1.000E3],  # Fluid density [kg/m3]
-        mu_f=[3.5E-3, 7.0E-2],  # Fluid dynamic viscosity [Pa.s]
+        mu_f=[1.5E-3, 1.0E-2],  # Fluid dynamic viscosity [Pa.s]
         dx_f_id=[1, 1001],  # ID of marker in the fluid domain
         # mesh lifting parameters (see turtleFSI for options)
         extrapolation="laplace",
@@ -64,12 +64,12 @@ def set_problem_parameters(default_variables, **namespace):
         lambda_s=lambda_s_val,  # Solid Young's modulus [Pa]
         dx_s_id=2,  # ID of marker in the solid domain
         # FSI parameters
-        fsi_region=[0.003, 0, 0, 0.01],  # x, y, and z coordinate of FSI region center, and radius of FSI region sphere
+        fsi_x_range= [0.0, 0.016],  # range of x coordinates for fsi region
         # Simulation parameters
         folder="offset_stenosis_results",  # Folder name generated for the simulation
         mesh_path="mesh/file_stenosis.h5",
-        FC_file="FC_MCA_10",  # File name containing the fourier coefficients for the flow waveform
-        P_FC_File="FC_Pressure",  # File name containing the fourier coefficients for the pressure waveform
+        FC_file="FC_MCA_10",  # File name containing the Fourier coefficients for the flow waveform
+        P_FC_File="FC_Pressure",  # File name containing the Fourier coefficients for the pressure waveform
         compiler_parameters=_compiler_parameters,  # Update the defaul values of the compiler arguments (FEniCS)
         save_deg=2,  # Degree of the functions saved for visualisation
     ))
@@ -77,7 +77,7 @@ def set_problem_parameters(default_variables, **namespace):
     return default_variables
 
 
-def get_mesh_domain_and_boundaries(mesh_path, fsi_region, dx_f_id, fsi_id, rigid_id, outer_id, **namespace):
+def get_mesh_domain_and_boundaries(mesh_path, fsi_x_range, dx_f_id, fsi_id, rigid_id, outer_id, **namespace):
 
     # Read mesh
     mesh = Mesh()
@@ -88,31 +88,28 @@ def get_mesh_domain_and_boundaries(mesh_path, fsi_region, dx_f_id, fsi_id, rigid
     domains = MeshFunction("size_t", mesh, 3)
     hdf.read(domains, "/domains")
 
-    # Only consider FSI in domain within this sphere
-    sph_x = fsi_region[0]
-    sph_y = fsi_region[1]
-    sph_z = fsi_region[2]
-    sph_rad = fsi_region[3]
+    # Only consider FSI in domain within fsi_x_range
+    fsi_x_min = fsi_x_range[0]
+    fsi_x_max = fsi_x_range[1]
 
     i = 0
     for submesh_facet in facets(mesh):
         idx_facet = boundaries.array()[i]
         if idx_facet == fsi_id or idx_facet == outer_id:
             mid = submesh_facet.midpoint()
-            dist_sph_center = sqrt((mid.x() - sph_x) ** 2 + (mid.y() - sph_y) ** 2 + (mid.z() - sph_z) ** 2)
-            if dist_sph_center > sph_rad:
-                boundaries.array()[i] = rigid_id  # changed "fsi" idx to "rigid wall" idx
+            if mid.x() < fsi_x_min or mid.x() > fsi_x_max:
+                boundaries.array()[i] = rigid_id  # changed "fsi" id to "rigid wall" id
         i += 1
 
     # In this region, make fluid more viscous
-    x_min = 0.023
+    x_min = 0.024
     i = 0
     for cell in cells(mesh):
         idx_cell = domains.array()[i]
         if idx_cell == dx_f_id[0]:
             mid = cell.midpoint()
             if mid.x() > x_min:
-                domains.array()[i] = dx_f_id[1]  # assign this region lowest E
+                domains.array()[i] = dx_f_id[1]
         i += 1
 
     return mesh, domains, boundaries
@@ -163,7 +160,7 @@ def create_bcs(t, DVP, mesh, boundaries, mu_f,
                rigid_id, psi, F_solid_linear, p_deg, FC_file,
                Q_mean, P_FC_File, P_mean, T_Cycle, **namespace):
 
-    # Load fourier coefficients for the velocity and scale by flow rate
+    # Load Fourier coefficients for the velocity and scale by flow rate
     An, Bn = np.loadtxt(os.path.join(os.path.dirname(os.path.abspath(__file__)), FC_file)).T
     # Convert to complex fourier coefficients
     Cn = (An - Bn * 1j) * Q_mean
