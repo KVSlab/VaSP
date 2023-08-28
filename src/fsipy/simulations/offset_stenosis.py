@@ -6,7 +6,7 @@ import numpy as np
 
 from vampy.simulation.Womersley import make_womersley_bcs, compute_boundary_geometry_acrn
 from turtleFSI.problems import *
-from dolfin import HDF5File, Mesh, MeshFunction, facets, cells, assemble, UserExpression, sqrt, FacetNormal, ds, \
+from dolfin import HDF5File, Mesh, MeshFunction, facets, cells, assemble, UserExpression, FacetNormal, ds, \
     DirichletBC, Measure, inner, parameters
 
 # set compiler arguments
@@ -64,7 +64,7 @@ def set_problem_parameters(default_variables, **namespace):
         lambda_s=lambda_s_val,  # Solid Young's modulus [Pa]
         dx_s_id=2,  # ID of marker in the solid domain
         # FSI parameters
-        fsi_x_range= [0.0, 0.016],  # range of x coordinates for fsi region
+        fsi_x_range=[0.0, 0.016],  # range of x coordinates for fsi region
         # Simulation parameters
         folder="offset_stenosis_results",  # Folder name generated for the simulation
         mesh_path="mesh/file_stenosis.h5",
