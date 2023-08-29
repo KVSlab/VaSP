@@ -1,6 +1,6 @@
 import vtk
 from pathlib import Path
-from dolfin import Mesh, XDMFFile
+from dolfin import Mesh, HDF5File, XDMFFile
 from vampy.automatedPreprocessing.preprocessing_common import read_polydata
 from fsipy.automatedPreprocessing.automated_preprocessing import read_command_line, \
     run_pre_processing
@@ -13,7 +13,7 @@ def test_mesh_model_with_one_inlet():
     # Define test data paths
     model_path = Path("tests/test_data/tube/tube.stl")
     mesh_path_vtu = model_path.with_suffix(".vtu")
-    mesh_path_xdmf = model_path.with_suffix(".xdmf")
+    mesh_path_hdf5 = model_path.with_suffix(".h5")
 
     # Define expected values
     expected_num_points = 3626
@@ -39,21 +39,21 @@ def test_mesh_model_with_one_inlet():
 
     # Check that mesh files are created
     assert mesh_path_vtu.is_file(), f"VTU mesh file not found at {mesh_path_vtu}"
-    assert mesh_path_xdmf.is_file(), f"XDMF mesh file not found at {mesh_path_xdmf}"
+    assert mesh_path_hdf5.is_file(), f"HDF5 mesh file not found at {mesh_path_hdf5}"
 
     # Check that mesh files are not empty and have expected sizes
     mesh_vtu = read_polydata(str(mesh_path_vtu))
-    mesh_xdmf = Mesh()
+    mesh_hdf5 = Mesh()
     try:
-        with XDMFFile(str(mesh_path_xdmf)) as xdmf_file:
-            xdmf_file.read(mesh_xdmf)
+        hdf5_file = HDF5File(mesh_hdf5.mpi_comm(), str(mesh_path_hdf5), "r")
+        hdf5_file.read(mesh_hdf5, "/mesh", False)
     except Exception as e:
-        print(f"Error reading XDMF mesh: {e}")
+        print(f"Error reading HDF5 mesh: {e}")
 
     assert mesh_vtu.GetNumberOfPoints() == expected_num_points, \
         f"VTU mesh has {mesh_vtu.GetNumberOfPoints()} points, expected {expected_num_points}"
-    assert mesh_xdmf.num_cells() == expected_num_cells, \
-        f"XDMF mesh has {mesh_xdmf.num_cells()} cells, expected {expected_num_cells}"
+    assert mesh_hdf5.num_cells() == expected_num_cells, \
+        f"HDF5 mesh has {mesh_hdf5.num_cells()} cells, expected {expected_num_cells}"
 
 
 def test_mesh_model_with_one_inlet_and_one_outlet():
@@ -63,7 +63,7 @@ def test_mesh_model_with_one_inlet_and_one_outlet():
     # Define test data paths
     model_path = Path("tests/test_data/cylinder/cylinder.vtp")
     mesh_path_vtu = model_path.with_suffix(".vtu")
-    mesh_path_xdmf = model_path.with_suffix(".xdmf")
+    mesh_path_hdf5 = model_path.with_suffix(".h5")
 
     # Define expected values
     expected_num_points = 2153
@@ -89,21 +89,21 @@ def test_mesh_model_with_one_inlet_and_one_outlet():
 
     # Check that mesh files are created
     assert mesh_path_vtu.is_file(), f"VTU mesh file not found at {mesh_path_vtu}"
-    assert mesh_path_xdmf.is_file(), f"XDMF mesh file not found at {mesh_path_xdmf}"
+    assert mesh_path_hdf5.is_file(), f"HDF5 mesh file not found at {mesh_path_hdf5}"
 
     # Check that mesh files are not empty and have expected sizes
     mesh_vtu = read_polydata(str(mesh_path_vtu))
-    mesh_xdmf = Mesh()
+    mesh_hdf5 = Mesh()
     try:
-        with XDMFFile(str(mesh_path_xdmf)) as xdmf_file:
-            xdmf_file.read(mesh_xdmf)
+        hdf5_file = HDF5File(mesh_hdf5.mpi_comm(), str(mesh_path_hdf5), "r")
+        hdf5_file.read(mesh_hdf5, "/mesh", False)
     except Exception as e:
-        print(f"Error reading XDMF mesh: {e}")
+        print(f"Error reading HDF5 mesh: {e}")
 
     assert mesh_vtu.GetNumberOfPoints() == expected_num_points, \
         f"VTU mesh has {mesh_vtu.GetNumberOfPoints()} points, expected {expected_num_points}"
-    assert mesh_xdmf.num_cells() == expected_num_cells, \
-        f"XDMF mesh has {mesh_xdmf.num_cells()} cells, expected {expected_num_cells}"
+    assert mesh_hdf5.num_cells() == expected_num_cells, \
+        f"HDF5 mesh has {mesh_hdf5.num_cells()} cells, expected {expected_num_cells}"
 
 
 def test_mesh_model_with_one_inlet_and_two_outlets():
@@ -113,7 +113,7 @@ def test_mesh_model_with_one_inlet_and_two_outlets():
     # Define test data paths
     model_path = Path("tests/test_data/artery/artery.stl")
     mesh_path_vtu = model_path.with_suffix(".vtu")
-    mesh_path_xdmf = model_path.with_suffix(".xdmf")
+    mesh_path_hdf5 = model_path.with_suffix(".h5")
 
     # Define expected values
     expected_num_points = 5860
@@ -139,21 +139,21 @@ def test_mesh_model_with_one_inlet_and_two_outlets():
 
     # Check that mesh files are created
     assert mesh_path_vtu.is_file(), f"VTU mesh file not found at {mesh_path_vtu}"
-    assert mesh_path_xdmf.is_file(), f"XDMF mesh file not found at {mesh_path_xdmf}"
+    assert mesh_path_hdf5.is_file(), f"HDF5 mesh file not found at {mesh_path_hdf5}"
 
     # Check that mesh files are not empty and have expected sizes
     mesh_vtu = read_polydata(str(mesh_path_vtu))
-    mesh_xdmf = Mesh()
+    mesh_hdf5 = Mesh()
     try:
-        with XDMFFile(str(mesh_path_xdmf)) as xdmf_file:
-            xdmf_file.read(mesh_xdmf)
+        hdf5_file = HDF5File(mesh_hdf5.mpi_comm(), str(mesh_path_hdf5), "r")
+        hdf5_file.read(mesh_hdf5, "/mesh", False)
     except Exception as e:
-        print(f"Error reading XDMF mesh: {e}")
+        print(f"Error reading HDF5 mesh: {e}")
 
     assert mesh_vtu.GetNumberOfPoints() == expected_num_points, \
         f"VTU mesh has {mesh_vtu.GetNumberOfPoints()} points, expected {expected_num_points}"
-    assert mesh_xdmf.num_cells() == expected_num_cells, \
-        f"XDMF mesh has {mesh_xdmf.num_cells()} cells, expected {expected_num_cells}"
+    assert mesh_hdf5.num_cells() == expected_num_cells, \
+        f"HDF5 mesh has {mesh_hdf5.num_cells()} cells, expected {expected_num_cells}"
 
 
 def test_mesh_model_with_variable_mesh_density():
@@ -167,7 +167,7 @@ def test_mesh_model_with_variable_mesh_density():
     copied_sphere_file_path = sphere_file_path.with_name(model_path.stem + "_distance_to_sphere_spheres.vtp")
 
     mesh_path_vtu = model_path.with_suffix(".vtu")
-    mesh_path_xdmf = model_path.with_suffix(".xdmf")
+    mesh_path_hdf5 = model_path.with_suffix(".h5")
 
     # Make copies of the original model and sphere files using pathlib
     model_path.write_text(original_model_path.read_text())
@@ -197,21 +197,21 @@ def test_mesh_model_with_variable_mesh_density():
 
     # Check that mesh files are created
     assert mesh_path_vtu.is_file(), f"VTU mesh file not found at {mesh_path_vtu}"
-    assert mesh_path_xdmf.is_file(), f"XDMF mesh file not found at {mesh_path_xdmf}"
+    assert mesh_path_hdf5.is_file(), f"HDF5 mesh file not found at {mesh_path_hdf5}"
 
     # Check that mesh files are not empty and have expected sizes
     mesh_vtu = read_polydata(str(mesh_path_vtu))
-    mesh_xdmf = Mesh()
+    mesh_hdf5 = Mesh()
     try:
-        with XDMFFile(str(mesh_path_xdmf)) as xdmf_file:
-            xdmf_file.read(mesh_xdmf)
+        hdf5_file = HDF5File(mesh_hdf5.mpi_comm(), str(mesh_path_hdf5), "r")
+        hdf5_file.read(mesh_hdf5, "/mesh", False)
     except Exception as e:
-        print(f"Error reading XDMF mesh: {e}")
+        print(f"Error reading HDF5 mesh: {e}")
 
     assert mesh_vtu.GetNumberOfPoints() == expected_num_points, \
         f"VTU mesh has {mesh_vtu.GetNumberOfPoints()} points, expected {expected_num_points} points"
-    assert mesh_xdmf.num_cells() == expected_num_cells, \
-        f"XDMF mesh has {mesh_xdmf.num_cells()} cells, expected {expected_num_cells} cells"
+    assert mesh_hdf5.num_cells() == expected_num_cells, \
+        f"HDF5 mesh has {mesh_hdf5.num_cells()} cells, expected {expected_num_cells} cells"
 
 
 def compute_cylinder_diameter_at_cut(mesh, point_coords, plane_normal):
@@ -252,7 +252,7 @@ def test_mesh_model_with_variable_solid_thickness():
     copied_sphere_file_path = sphere_file_path.with_name(model_path.stem + "_distance_to_sphere_solid_thickness.vtp")
 
     mesh_path_vtu = model_path.with_suffix(".vtu")
-    mesh_path_xdmf = model_path.with_suffix(".xdmf")
+    mesh_path_hdf5 = model_path.with_suffix(".h5")
 
     # Make copies of the original model and sphere files using pathlib
     model_path.write_text(original_model_path.read_text())
@@ -286,6 +286,70 @@ def test_mesh_model_with_variable_solid_thickness():
 
     # Check that mesh files are created
     assert mesh_path_vtu.is_file(), f"VTU mesh file not found at {mesh_path_vtu}"
+    assert mesh_path_hdf5.is_file(), f"HDF5 mesh file not found at {mesh_path_hdf5}"
+
+    # Check that mesh files are not empty and have expected sizes
+    mesh_vtu = read_polydata(str(mesh_path_vtu))
+    mesh_hdf5 = Mesh()
+    try:
+        hdf5_file = HDF5File(mesh_hdf5.mpi_comm(), str(mesh_path_hdf5), "r")
+        hdf5_file.read(mesh_hdf5, "/mesh", False)
+    except Exception as e:
+        print(f"Error reading HDF5 mesh: {e}")
+
+    assert mesh_vtu.GetNumberOfPoints() == expected_num_points, \
+        f"VTU mesh has {mesh_vtu.GetNumberOfPoints()} points, expected {expected_num_points} points"
+    assert mesh_hdf5.num_cells() == expected_num_cells, \
+        f"HDF5 mesh has {mesh_hdf5.num_cells()} cells, expected {expected_num_cells} cells"
+
+    # Compute diameter at inlet and outlet
+    diameter_at_inlet = compute_cylinder_diameter_at_cut(mesh_vtu, [0, -3.1, 0], [0, 1, 0])
+    diameter_at_outlet = compute_cylinder_diameter_at_cut(mesh_vtu, [0, 3.1, 0], [0, 1, 0])
+
+    assert diameter_at_inlet == expected_diameter_at_inlet, \
+        f"VTU mesh has diameter {diameter_at_inlet} at inlet, expected {expected_diameter_at_inlet}"
+    assert diameter_at_outlet == expected_diameter_at_outlet, \
+        f"VTU mesh has diameter {diameter_at_outlet} at outlet, expected {expected_diameter_at_outlet}"
+
+
+def test_xdmf_mesh_format():
+    """
+    Test meshing procedure with generated mesh in XDMF format.
+    """
+    # Define test data paths
+    original_model_path = Path("tests/test_data/cylinder/cylinder.vtp")
+    model_path = original_model_path.with_name(original_model_path.stem + "_xdmf_mesh_format.vtp")
+    mesh_path_vtu = model_path.with_suffix(".vtu")
+    mesh_path_xdmf = model_path.with_suffix(".xdmf")
+
+    # Make copies of the original model
+    model_path.write_text(original_model_path.read_text())
+
+    # Define expected values
+    expected_num_points = 2153
+    expected_num_cells = 11459
+
+    # Get default input parameters
+    common_input = read_command_line(str(model_path))
+    common_input.update(
+        dict(
+            meshing_method="diameter",
+            smoothing_method="no_smooth",
+            refine_region=False,
+            coarsening_factor=1.3,
+            visualize=False,
+            compress_mesh=False,
+            outlet_flow_extension_length=1,
+            inlet_flow_extension_length=1,
+            mesh_format="xdmf",
+        )
+    )
+
+    # Run pre processing
+    run_pre_processing(**common_input)
+
+    # Check that mesh files are created
+    assert mesh_path_vtu.is_file(), f"VTU mesh file not found at {mesh_path_vtu}"
     assert mesh_path_xdmf.is_file(), f"XDMF mesh file not found at {mesh_path_xdmf}"
 
     # Check that mesh files are not empty and have expected sizes
@@ -298,18 +362,9 @@ def test_mesh_model_with_variable_solid_thickness():
         print(f"Error reading XDMF mesh: {e}")
 
     assert mesh_vtu.GetNumberOfPoints() == expected_num_points, \
-        f"VTU mesh has {mesh_vtu.GetNumberOfPoints()} points, expected {expected_num_points} points"
+        f"VTU mesh has {mesh_vtu.GetNumberOfPoints()} points, expected {expected_num_points}"
     assert mesh_xdmf.num_cells() == expected_num_cells, \
-        f"XDMF mesh has {mesh_xdmf.num_cells()} cells, expected {expected_num_cells} cells"
-
-    # Compute diameter at inlet and outlet
-    diameter_at_inlet = compute_cylinder_diameter_at_cut(mesh_vtu, [0, -3.1, 0], [0, 1, 0])
-    diameter_at_outlet = compute_cylinder_diameter_at_cut(mesh_vtu, [0, 3.1, 0], [0, 1, 0])
-
-    assert diameter_at_inlet == expected_diameter_at_inlet, \
-        f"VTU mesh has diameter {diameter_at_inlet} at inlet, expected {expected_diameter_at_inlet}"
-    assert diameter_at_outlet == expected_diameter_at_outlet, \
-        f"VTU mesh has diameter {diameter_at_outlet} at outlet, expected {expected_diameter_at_outlet}"
+        f"XDMF mesh has {mesh_xdmf.num_cells()} cells, expected {expected_num_cells}"
 
 
 if __name__ == "__main__":
@@ -318,3 +373,4 @@ if __name__ == "__main__":
     test_mesh_model_with_one_inlet_and_two_outlets()
     test_mesh_model_with_variable_mesh_density()
     test_mesh_model_with_variable_solid_thickness()
+    test_xdmf_mesh_format()
