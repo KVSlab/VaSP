@@ -208,7 +208,7 @@ def convert_xml_mesh_to_hdf5(file_name_xml_mesh: str, scaling_factor: float = 0.
 
 def convert_vtu_mesh_to_xdmf(file_name_vtu_mesh: str, file_name_xdmf_mesh: str) -> None:
     """
-    Convert a VTU mesh to XDMF format using meshio.
+    Convert a VTU mesh to XDMF format using meshio. This function is intended to run in serial.
 
     Args:
         file_name_vtu_mesh (str): Path to the input VTU mesh file.
