@@ -1,10 +1,13 @@
-from fsipy.automatedPreprocessing.vmtkmeshgeneratorfsi import vmtkMeshGeneratorFsi
-from vmtk import vmtkdistancetospheres
-from morphman import vmtkscripts, write_polydata
+from typing import List, Dict
+from pathlib import Path
+
+import meshio
 from vtk import vtkPolyData
 from dolfin import Mesh, MeshFunction, File, HDF5File
-from pathlib import Path
-import meshio
+from vmtk import vmtkdistancetospheres
+from morphman import vmtkscripts, write_polydata
+
+from fsipy.automatedPreprocessing.vmtkmeshgeneratorfsi import vmtkMeshGeneratorFsi
 
 
 # Global array names
@@ -248,3 +251,32 @@ def convert_vtu_mesh_to_xdmf(file_name_vtu_mesh: str, file_name_xdmf_mesh: str) 
 
     print(f"Tetra mesh XDMF file written to: {tetra_xdmf_path}")
     print(f"Triangle mesh XDMF file written to: {triangle_xdmf_path}\n")
+
+
+def compute_flow_rate(is_atrium: bool, inlet: List[float], parameters: Dict[str, float],
+                      flow_rate_factor: float) -> float:
+    """
+    Computes mean flow rate used as a boundary condition for pulsatile flow condition
+
+    Args:
+        is_atrium (bool): Determines if model is atrium or artery
+        inlet (list): List of points representing midpoint of boundaries
+        parameters (dict): Dictionary containing model parameters
+        flow_rate_factor (float): Factor to adjust flow rate calculation
+
+    Returns:
+        mean_inflow_rate (float): Mean inflow rate
+    """
+    if is_atrium:
+        # Calculate total inlet area for atrium case
+        total_inlet_area = 0
+        num_inlets = len(inlet)
+        for i in range(num_inlets):
+            inlet_area_key = "inlet{}_area".format(i)
+            total_inlet_area += parameters.get(inlet_area_key, 0)
+        mean_inflow_rate = flow_rate_factor * total_inlet_area
+    else:
+        # Use single inlet area for artery case
+        mean_inflow_rate = flow_rate_factor * parameters.get("inlet_area", 0)
+
+    return mean_inflow_rate

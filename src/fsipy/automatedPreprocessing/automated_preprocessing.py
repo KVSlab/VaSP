@@ -14,13 +14,13 @@ from morphman import get_uncapped_surface, write_polydata, get_parameters, vtk_c
 from vampy.automatedPreprocessing import ToolRepairSTL
 from vampy.automatedPreprocessing.preprocessing_common import read_polydata, get_centers_for_meshing, \
     dist_sphere_diam, dist_sphere_curvature, dist_sphere_constant, get_regions_to_refine, add_flow_extension, \
-    write_mesh, mesh_alternative, find_boundaries, compute_flow_rate, setup_model_network, \
+    write_mesh, mesh_alternative, find_boundaries, setup_model_network, \
     radiusArrayName, scale_surface, get_furtest_surface_point, check_if_closed_surface
 from vampy.automatedPreprocessing.simulate import run_simulation
 from vampy.automatedPreprocessing.visualize import visualize_model
 
 from fsipy.automatedPreprocessing.preprocessing_common import generate_mesh, distance_to_spheres_solid_thickness, \
-    dist_sphere_spheres, convert_xml_mesh_to_hdf5, convert_vtu_mesh_to_xdmf
+    dist_sphere_spheres, convert_xml_mesh_to_hdf5, convert_vtu_mesh_to_xdmf, compute_flow_rate
 
 
 def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_factor, smoothing_iterations,
@@ -28,7 +28,8 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
                        coarsening_factor, inlet_flow_extension_length, outlet_flow_extension_length,
                        number_of_sublayers_fluid, number_of_sublayers_solid, edge_length,
                        region_points, compress_mesh, add_boundary_layer, scale_factor, resampling_step,
-                       meshing_parameters, remove_all, solid_thickness, solid_thickness_parameters, mesh_format):
+                       meshing_parameters, remove_all, solid_thickness, solid_thickness_parameters, mesh_format,
+                       flow_rate_factor):
     """
     Automatically generate mesh of surface model in .vtu and .xml format, including prescribed
     flow rates at inlet and outlet based on flow network model.
@@ -63,6 +64,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
         solid_thickness (str): Constant or variable mesh thickness
         solid_thickness_parameters (list): Specify parameters for solid thickness
         mesh_format (str): Specify the format for the generated mesh
+        flow_rate_factor (float): Flow rate factor
     """
     # Get paths
     case_name = input_model.rsplit(path.sep, 1)[-1].rsplit('.')[0]
@@ -452,7 +454,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
     parameters = get_parameters(base_path)
 
     print("--- Computing flow rates and flow split, and setting boundary IDs\n")
-    mean_inflow_rate = compute_flow_rate(is_atrium, inlet, parameters)
+    mean_inflow_rate = compute_flow_rate(is_atrium, inlet, parameters, flow_rate_factor)
 
     find_boundaries(base_path, mean_inflow_rate, network, mesh, verbose_print, is_atrium)
 
@@ -671,6 +673,11 @@ def read_command_line(input_path=None):
                         default="hdf5",
                         help="Specify the format for the generated mesh. Available options: 'xml', 'hdf5', 'xdmf'.")
 
+    parser.add_argument('-fr', '--flow-rate-factor',
+                        default=0.31,
+                        type=float,
+                        help="Flow rate factor.")
+
     # Parse path to get default values
     if required:
         args = parser.parse_args()
@@ -710,7 +717,7 @@ def read_command_line(input_path=None):
                 scale_factor=args.scale_factor, resampling_step=args.resampling_step,
                 meshing_parameters=args.meshing_parameters, remove_all=args.remove_all,
                 solid_thickness=args.solid_thickness, solid_thickness_parameters=args.solid_thickness_parameters,
-                mesh_format=args.mesh_format)
+                mesh_format=args.mesh_format, flow_rate_factor=args.flow_rate_factor)
 
 
 def main_meshing():
