@@ -12,6 +12,7 @@ dependencies:
   - pip
   - python >=3.8
   - git
+  - meshio
   - pip:
       - git+https://github.com/KVSlab/VaMPy.git
       - git+https://github.com/KVSlab/turtleFSI.git

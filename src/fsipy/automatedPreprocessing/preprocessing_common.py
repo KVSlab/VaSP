@@ -4,6 +4,7 @@ from morphman import vmtkscripts, write_polydata
 from vtk import vtkPolyData
 from dolfin import Mesh, MeshFunction, File, HDF5File
 from pathlib import Path
+import meshio
 
 
 # Global array names
@@ -203,3 +204,47 @@ def convert_xml_mesh_to_hdf5(file_name_xml_mesh: str, scaling_factor: float = 0.
     hdf.write(mesh, "/mesh")
     hdf.write(boundaries, "/boundaries")
     hdf.write(domains, "/domains")
+
+
+def convert_vtu_mesh_to_xdmf(file_name_vtu_mesh: str, file_name_xdmf_mesh: str) -> None:
+    """
+    Convert a VTU mesh to XDMF format using meshio. This function is intended to run in serial.
+
+    Args:
+        file_name_vtu_mesh (str): Path to the input VTU mesh file.
+        file_name_xdmf_mesh (str): Path to the output XDMF file.
+    """
+    print("--- Converting VTU mesh to XDMF")
+
+    # Load the VTU mesh
+    vtu_mesh = meshio.read(file_name_vtu_mesh)
+
+    # Extract cell data
+    tetra_data = vtu_mesh.cell_data_dict.get("CellEntityIds", {}).get("tetra", None)
+    triangle_data = vtu_mesh.cell_data_dict.get("CellEntityIds", {}).get("triangle", None)
+
+    # Extract cell types and data
+    tetra_cells = None
+    triangle_cells = None
+    for cell in vtu_mesh.cells:
+        if cell.type == "tetra":
+            tetra_cells = cell.data
+        elif cell.type == "triangle":
+            triangle_cells = cell.data
+
+    # Create mesh objects
+    tetra_mesh = meshio.Mesh(points=vtu_mesh.points, cells={"tetra": tetra_cells},
+                             cell_data={"CellEntityIds": [tetra_data]})
+    triangle_mesh = meshio.Mesh(points=vtu_mesh.points, cells=[("triangle", triangle_cells)],
+                                cell_data={"CellEntityIds": [triangle_data]})
+
+    # Define Path objects
+    tetra_xdmf_path = Path(file_name_xdmf_mesh)
+    triangle_xdmf_path = tetra_xdmf_path.with_name(tetra_xdmf_path.stem + '_triangle.xdmf')
+
+    # Write the VTU mesh to XDMF format
+    meshio.write(tetra_xdmf_path, tetra_mesh)
+    meshio.write(triangle_xdmf_path, triangle_mesh)
+
+    print(f"Tetra mesh XDMF file written to: {tetra_xdmf_path}")
+    print(f"Triangle mesh XDMF file written to: {triangle_xdmf_path}\n")
