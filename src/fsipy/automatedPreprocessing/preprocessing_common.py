@@ -269,7 +269,7 @@ def compute_flow_rate(is_atrium: bool, inlet: List[float], parameters: Dict[str,
     """
     if is_atrium:
         # Calculate total inlet area for atrium case
-        total_inlet_area = 0
+        total_inlet_area = 0.0
         num_inlets = len(inlet)
         for i in range(num_inlets):
             inlet_area_key = "inlet{}_area".format(i)
