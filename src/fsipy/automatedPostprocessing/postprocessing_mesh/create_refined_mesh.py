@@ -139,8 +139,6 @@ def create_refined_mesh(folder_path, mesh_path):
             for name in array_name_list:
                 vectorArray = vectorData[name + "/coordinates"]
                 vectorArray[...] = correctNumberNodes[:, [1, 2, 3]]
-
-            for name in array_name_list:
                 vectorArray = vectorData[name + "/topology"]
                 vectorArray[...] = wrongNumberBdTopology if name == "boundaries" else wrongNumberTopology
 
