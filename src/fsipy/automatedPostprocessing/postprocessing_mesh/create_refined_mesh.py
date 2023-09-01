@@ -1,9 +1,9 @@
 import numpy as np
 import h5py
 import shutil
-import os 
+from pathlib import Path
 
-import common_meshing
+import postprocessing_mesh_common
 
 from dolfin import *
 
@@ -24,45 +24,37 @@ folder, mesh_name = common_meshing.read_command_line()
 mesh_path = os.path.join(folder,"mesh",mesh_name +".h5")
 """
 
-def main():
+def create_refined_mesh(folder_path, mesh_path):
+    """
+    args:
 
-    # find the visualization path (used to determine correct node numbering)
-    for file in os.listdir(folder):
-        file_path = os.path.join(folder, file)
-        if os.path.exists(os.path.join(file_path, "1")):
-            visualization_path = os.path.join(file_path, "1/Visualization")
-        elif os.path.exists(os.path.join(file_path, "Visualization")):
-            visualization_path = os.path.join(file_path, "Visualization")
-
+    folder: path to simulation results folder
+    """
     # Read in original FSI mesh
     mesh = Mesh()
-    hdf = HDF5File(mesh.mpi_comm(), mesh_path, "r")
-    hdf.read(mesh, "/mesh", False)
+    with HDF5File(mesh.mpi_comm(), str(mesh_path), "r") as hdf:
+        hdf.read(mesh, "/mesh", False)
+        domains = MeshFunction("size_t", mesh, mesh.topology().dim())
+        hdf.read(domains, "/domains")
+        boundaries = MeshFunction("size_t", mesh, mesh.topology().dim()-1)
+        hdf.read(boundaries, "/boundaries")
 
-    domains = MeshFunction("size_t", mesh, 3)
-    hdf.read(domains, "/domains") 
-    boundaries = MeshFunction("size_t", mesh, 2)
-    hdf.read(boundaries, "/boundaries")
-
-    # Refine Mesh and domains
-    mesh_refine = refine(mesh)
-    domains_refine = adapt(domains,mesh_refine)
-    boundaries_refine = adapt(boundaries,mesh_refine) # This doesnt wrk for some reason... 
+    # Refine mesh and domains
+    refined_mesh = refine(mesh)
+    refined_domains = adapt(domains, refined_mesh)
+    refined_boundaries = adapt(boundaries, refined_mesh) # This doesnt wrk for some reason... comment by David Bruneau
 
     # Create path for refined mesh
-    refined_mesh_path = mesh_path.replace(".h5","_refined.h5")
+    refined_mesh_path = mesh_path.with_name(mesh_path.stem + "_refined.h5")
 
     # Save refined mesh
-    hdf = HDF5File(mesh_refine.mpi_comm(), refined_mesh_path, "w")
-    hdf.write(mesh_refine, "/mesh")
-    hdf.write(domains_refine, "/domains")
-    hdf.write(boundaries_refine, "/boundaries")
+    with HDF5File(refined_mesh.mpi_comm(), str(refined_mesh_path), "w") as hdf:
+        hdf.write(refined_mesh, "/mesh")
+        hdf.write(refined_domains, "/domains")
+        hdf.write(refined_boundaries, "/boundaries")
 
-    print("Refined mesh saved to:")
-    print(refined_mesh_path)    
-
-    hdf.close()
-
+    print(f"Refined mesh saved to: {refined_mesh_path}")
+    
 
     """ -----------------------------------------------------------
     ----------------2. Correct node numbering-----------------------
@@ -154,6 +146,18 @@ def main():
 
     print("Fixed refined mesh wih correct node numbering. Mesh saved to:")
     print(refined_mesh_path)
+
+
+def main() -> None:
+    args = postprocessing_mesh_common.parse_arguments()
+
+    folder_path = Path(args.folder)
+    if args.mesh_path is None:
+        mesh_path = folder_path / "Mesh" / "mesh.h5"
+    else:
+        mesh_path = Path(args.mesh_path)
+
+    create_refined_mesh(folder_path, mesh_path)
 
 if __name__ == "__main__":
     main()
