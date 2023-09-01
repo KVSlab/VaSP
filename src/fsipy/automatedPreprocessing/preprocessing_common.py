@@ -1,10 +1,12 @@
-from fsipy.automatedPreprocessing.vmtkmeshgeneratorfsi import vmtkMeshGeneratorFsi
-from vmtk import vmtkdistancetospheres
-from morphman import vmtkscripts, write_polydata
+from pathlib import Path
+
+import meshio
 from vtk import vtkPolyData
 from dolfin import Mesh, MeshFunction, File, HDF5File
-from pathlib import Path
-import meshio
+from vmtk import vmtkdistancetospheres
+from morphman import vmtkscripts, write_polydata
+
+from fsipy.automatedPreprocessing.vmtkmeshgeneratorfsi import vmtkMeshGeneratorFsi
 
 
 # Global array names
