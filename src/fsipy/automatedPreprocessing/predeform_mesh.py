@@ -80,7 +80,7 @@ def main() -> None:
 
     folder_path = Path(args.folder)
     if args.mesh_path is None:
-        mesh_path = folder_path / "Checkpoint" / "mesh.h5"
+        mesh_path = folder_path / "Mesh" / "mesh.h5"
     else:
         mesh_path = Path(args.mesh_path)
 
