@@ -1,18 +1,8 @@
-import numpy as np
-import h5py
-from pathlib import Path
-
-import postprocessing_mesh_common
-
-from dolfin import MPI, Mesh, MeshFunction, HDF5File, refine, adapt, parameters
-
-# This is required to get the boundary refinement to work
-parameters["refinement_algorithm"] = "plaza_with_parent_facets"
+# Copyright (c) 2023 David Bruneau
+# Modified by Kei Yamamoto 2023
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 """
-Copyright (c) 2023 David Bruneau
-Modified by Kei Yamamoto 2023
-
 This script creates a refined mesh with domain markers from a specified mesh. However, the node numbering may not be the
 same as the output file with save_deg = 2, so the node numbering is corrected to match the output file
 the output files. Currently, it only runs in serial (not parallel) due to the "adapt" function used in fenics.
@@ -24,12 +14,26 @@ https://fenicsproject.discourse.group/t/why-are-boundary-and-surface-markers-not
    -Add domain creation in other meshing scripts
 """
 
+import numpy as np
+import h5py
+from pathlib import Path
 
-def create_refined_mesh(folder_path, mesh_path):
+from fsipy.automatedPostprocessing.postprocessing_mesh import postprocessing_mesh_common
+
+from dolfin import MPI, Mesh, MeshFunction, HDF5File, refine, adapt, parameters
+
+# This is required to get the boundary refinement to work
+parameters["refinement_algorithm"] = "plaza_with_parent_facets"
+
+
+def create_refined_mesh(folder_path: Path, mesh_path: Path) -> None:
     """
     args:
+        folder_path (Path): Path to the simulation results folder.
+        mesh_path (Path): Path to the mesh file.
 
-    folder: path to simulation results folder
+    Returns:
+        None
     """
     # Read in original FSI mesh
     mesh = Mesh()
@@ -59,7 +63,7 @@ def create_refined_mesh(folder_path, mesh_path):
             hdf.write(refined_domains, "/domains")
             hdf.write(refined_boundaries, "/boundaries")
 
-        print(f"--- Refined mesh saved to: {refined_mesh_path} ")
+        print(f"--- Refined mesh saved to: {refined_mesh_path} \n")
 
     print("--- Correcting node numbering in refined mesh \n")
     # Define mesh Paths (The refined mesh with domains but incorrect numbering is called "wrongNumberMesh",
@@ -74,13 +78,19 @@ def create_refined_mesh(folder_path, mesh_path):
         wrongNumberNodes = wrongNumberMesh['mesh/coordinates'][:]
         correctNumberNodes = correctNumberMesh['Mesh/0/mesh/geometry'][:]
 
+        if (wrongNumberNodes == correctNumberNodes).all():
+            print('--- Node numbering is already correct. Exiting ... \n')
+            return
+        else:
+            print('--- Node numbering is incorrect between the refined mesh and the output velocity.h5 file \n')
+
         # add index to the node coordinates
         wrongNumberNodes = np.hstack((np.arange(len(wrongNumberNodes), dtype=int).reshape(-1, 1),
                                       wrongNumberNodes))
         correctNumberNodes = np.hstack((np.arange(len(correctNumberNodes), dtype=int).reshape(-1, 1),
                                         correctNumberNodes))
 
-        # Sort both nodal arrays by all 3 nodal coordinates.
+        # Sort both nodal arrays by all 3 nodal coordinates. (if x is unique, sort by x, else sort by x, y, z)
         # This gives us the mapping between both the wrong and correct node numbering scheme
         print('--- Sorting node coordinates \n')
         if correctNumberNodes[:, 1].size == np.unique(correctNumberNodes[:, 1]).size:
@@ -104,7 +114,7 @@ def create_refined_mesh(folder_path, mesh_path):
         # We will modify this array to change it to the correct node numbering scheme
         wrongNumberTopology = wrongNumberMesh['mesh/topology'][:]
 
-        # this loop replaces the node numbers in the topology array one by one
+        # This loop replaces the node numbers in the topology array one by one
         print('--- Correcting node numbering of the tpology array in the refined mesh \n')
         for row in range(wrongNumberTopology.shape[0]):
             for column in range(wrongNumberTopology.shape[1]):
