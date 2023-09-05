@@ -87,26 +87,21 @@ def print_mesh_summary(mesh: Mesh) -> None:
 
         # Print various mesh statistics
         print("=== Mesh Information Summary ===")
-        print("X range: {} to {} (delta: {:.4f})"
-              .format(combined_info['x_min'], combined_info['x_max'],
-                      combined_info['x_max'] - combined_info['x_min']))
-        print("Y range: {} to {} (delta: {:.4f})"
-              .format(combined_info['y_min'], combined_info['y_max'],
-                      combined_info['y_max'] - combined_info['y_min']))
-        print("Z range: {} to {} (delta: {:.4f})"
-              .format(combined_info['z_min'], combined_info['z_max'],
-                      combined_info['z_max'] - combined_info['z_min']))
-        print("Number of cells: {}".format(combined_info['num_cells']))
-        print("Number of cells per processor: {}"
-              .format(int(np.mean(num_cells_per_processor))))
-        print("Number of edges: {}".format(combined_info['num_edges']))
-        print("Number of faces: {}".format(combined_info['num_faces']))
-        print("Number of facets: {}".format(combined_info['num_facets']))
-        print("Number of vertices: {}".format(combined_info['num_vertices']))
-        print("Volume: {}".format(volume))
-        print("Number of cells per volume: {}"
-              .format(combined_info['num_cells'] / volume))
-        print()
+        print(f"X range: {combined_info['x_min']} to {combined_info['x_max']} "
+              f"(delta: {combined_info['x_max'] - combined_info['x_min']:.4f})")
+        print(f"Y range: {combined_info['y_min']} to {combined_info['y_max']} "
+              f"(delta: {combined_info['y_max'] - combined_info['y_min']:.4f})")
+        print(f"Z range: {combined_info['z_min']} to {combined_info['z_max']} "
+              f"(delta: {combined_info['z_max'] - combined_info['z_min']:.4f})")
+        print(f"Number of cells: {combined_info['num_cells']}")
+        print(f"Number of cells per processor: {int(np.mean(num_cells_per_processor))}")
+        print(f"Number of edges: {combined_info['num_edges']}")
+        print(f"Number of faces: {combined_info['num_faces']}")
+        print(f"Number of facets: {combined_info['num_facets']}")
+        print(f"Number of vertices: {combined_info['num_vertices']}")
+        print(f"Volume: {volume}")
+        print(f"Number of cells per volume: {combined_info['num_cells'] / volume}\n")
+
 
 
 def load_mesh_info(mesh_path: str) -> Tuple[List[int], List[int], int, float, List[float], List[float]]:
