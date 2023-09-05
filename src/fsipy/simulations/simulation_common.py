@@ -26,7 +26,7 @@ def load_mesh_and_data(mesh_path: str) -> Tuple[Mesh, MeshFunction, MeshFunction
     mesh = Mesh()
 
     # Open the HDF5 file in read-only mode
-    hdf5 = HDF5File(MPI.comm_world, mesh_path, "r")
+    hdf5 = HDF5File(mesh.mpi_comm(), mesh_path, "r")
 
     # Read mesh data
     hdf5.read(mesh, "/mesh", False)
@@ -74,7 +74,7 @@ def print_mesh_summary(mesh: Mesh) -> None:
     }
 
     # Gather local information from all processors to processor 0
-    comm = MPI.comm_world
+    comm = mesh.mpi_comm()
     gathered_info = comm.gather(local_info, 0)
     num_cells_per_processor = comm.gather(local_info["num_cells"], 0)
 
@@ -240,7 +240,7 @@ def calculate_and_print_flow_properties(dt: float, mesh: Mesh, v: Function, inle
     local_V_min = V_vector.min()
     local_V_max = V_vector.max()
 
-    comm = MPI.comm_world
+    comm = mesh.mpi_comm()
     # Gather data from all processes
     V_mean = comm.gather(local_V_mean, 0)
     V_min = comm.gather(local_V_min, 0)
