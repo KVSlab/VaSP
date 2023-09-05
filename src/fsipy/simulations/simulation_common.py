@@ -105,7 +105,6 @@ def print_mesh_summary(mesh: Mesh) -> None:
         print(f"Number of cells per volume: {combined_info['num_cells'] / volume}\n")
 
 
-
 def load_mesh_info(mesh_path: str) -> Tuple[List[int], List[int], int, float, List[float], List[float]]:
     """
     Load and process mesh information from a JSON file.
