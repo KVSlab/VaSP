@@ -4,8 +4,8 @@
 
 """
 This script creates a refined mesh with domain markers from a specified mesh. However, the node numbering may not be the
-same as the output file with save_deg = 2, so the node numbering is corrected to match the output file
-the output files. Currently, it only runs in serial (not parallel) due to the "adapt" function used in fenics.
+same as the output file with save_deg = 2, so the node numbering is corrected to match the output files.
+Currently, it only runs in serial (not parallel) due to the "adapt" function used in fenics.
 This mesh is later used in  the "postprocessing_h5" and "postprocessing_fenics" scripts.
 See:
 https://fenicsproject.discourse.group/t/why-are-boundary-and-surface-markers-not-carried-over-to-the-refined-mesh/5822/2
@@ -115,7 +115,7 @@ def create_refined_mesh(folder_path: Path, mesh_path: Path) -> None:
         wrongNumberTopology = wrongNumberMesh['mesh/topology'][:]
 
         # This loop replaces the node numbers in the topology array one by one
-        print('--- Correcting node numbering of the tpology array in the refined mesh \n')
+        print('--- Correcting node numbering of the topology array in the refined mesh \n')
         for row in range(wrongNumberTopology.shape[0]):
             for column in range(wrongNumberTopology.shape[1]):
                 wrongNumberTopology[row, column] = np.rint(orderedIndexMap[wrongNumberTopology[row, column], 1])
