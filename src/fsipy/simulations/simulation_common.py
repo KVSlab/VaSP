@@ -8,7 +8,7 @@ from dolfin import Mesh, assemble, Constant, MPI, HDF5File, Measure, project, in
     Function, sqrt, Expression
 
 
-def load_mesh_and_data(mesh_path: str) -> tuple:
+def load_mesh_and_data(mesh_path: str) -> Tuple[Mesh, MeshFunction, MeshFunction]:
     """
     Load mesh, boundary data, and domain data from an HDF5 file.
 
@@ -16,9 +16,11 @@ def load_mesh_and_data(mesh_path: str) -> tuple:
         mesh_path (str): Path to the HDF5 file containing mesh and data.
 
     Returns:
-        mesh (dolfin.Mesh): Loaded mesh.
-        boundaries (dolfin.MeshFunction): Loaded boundary data.
-        domains (dolfin.MeshFunction): Loaded domain data.
+        Tuple[Mesh, MeshFunction, MeshFunction]:
+            A tuple containing:
+            - mesh (dolfin.Mesh): Loaded mesh.
+            - boundaries (dolfin.MeshFunction): Loaded boundary data.
+            - domains (dolfin.MeshFunction): Loaded domain data.
     """
     # Initialize an empty mesh
     mesh = Mesh()
