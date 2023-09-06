@@ -12,6 +12,57 @@ from fsipy.automatedPostprocessing.postprocessing_mesh import postprocessing_mes
 from dolfin import MPI, Mesh, MeshFunction, HDF5File, SubMesh, File
 
 
+def fix_topology(mesh_path: Path, fluid_domain_id: int, solid_domain_id: int) -> None:
+    """
+    args:
+        mesh_path (Path): Path to the mesh file.
+        domain_id (int): Domain ID for domain of interest.
+    
+    Returns:
+        None
+    """
+    with h5py.File(mesh_path) as vectorData:
+        domain_values = vectorData['domains/values'][:]
+        domain_topology = vectorData['domains/topology'][:, :]
+        domain_coordinates = vectorData['mesh/coordinates'][:, :]
+
+    for domain_id, domain_name in zip([fluid_domain_id, solid_domain_id], ["fluid", "solid"]):
+        # non-zero is used to find the indices of the domain of interest
+        domain_of_interest_index = (domain_values == domain_id).nonzero()
+        # extract the topology of the domain of interest
+        domain_of_interest_topology = domain_topology[domain_of_interest_index, :]
+        # Here, we want to extract the coordinates of the domain of interest
+        # We can do this by extracting the unique node IDs of the domain of interest from the topology
+        domain_of_interest_ids = np.unique(domain_of_interest_topology)  # unique will return sorted array
+        domain_of_interest_coordinates = domain_coordinates[domain_of_interest_ids, :]
+        # Fix topology of the each domain
+        # This is necessary because the node numbering may not be continuous
+        # while there is one to one correspondence between the node IDs and the coordinates
+        print(f" --- Fixing topology of {domain_name} domain \n")
+        if not np.all(np.diff(domain_of_interest_ids) == 1):
+            for node_id in range(len(domain_of_interest_ids)):
+                domain_of_interest_topology = np.where(domain_of_interest_topology == domain_of_interest_ids[node_id], 
+                                                    node_id, domain_of_interest_topology)
+        else:
+            print(f" --- {domain_name} topology does not need to be fixed \n")
+        # Create path for fixed mesh file and copy mesh file to new "fixed" file for safety reasons
+        print("--- Saving the fixed mesh file \n")
+        domain_of_interest_path = mesh_path.with_name(mesh_path.stem + f"_{domain_name}.h5")
+        domain_of_interest_fixed_path = mesh_path.with_name(mesh_path.stem + f"_{domain_name}_fixed.h5")
+        domain_of_interest_fixed_path.write_bytes(domain_of_interest_path.read_bytes())
+
+        with h5py.File(domain_of_interest_fixed_path, "r+") as vectorData:
+            coordinate_array = vectorData["mesh/coordinates"]
+            coordinate_array[...] = domain_of_interest_coordinates
+            topology_array = vectorData["mesh/topology"]
+            topology_array[...] = domain_of_interest_topology
+
+        
+        # remove the original mesh file and rename the fixed mesh file
+        domain_of_interest_path.unlink()
+        domain_of_interest_fixed_path.rename(domain_of_interest_path)
+
+
 def separate_domain(mesh_path: Path, fluid_domain_id: int, solid_domain_id: int, view: bool = False) -> None:
     """
     args:
@@ -47,42 +98,6 @@ def separate_domain(mesh_path: Path, fluid_domain_id: int, solid_domain_id: int,
         
 
     print(" --- Done separating domains \n")
-    
-    with h5py.File(mesh_path) as vectorData:
-        domains_values = vectorData['domains/values'][:]
-        domain_topology = vectorData['domains/topology'][:, :]
-        domain_coordinates = vectorData['mesh/coordinates'][:, :]
-    
-
-    for domain_id, domain_name in zip([fluid_domain_id, solid_domain_id], ["fluid", "solid"]):
-
-        domain_of_interest_index = (domains_values == domain_id).nonzero()
-        domain_of_interest_topology = domain_topology[domain_of_interest_index, :]
-        domain_of_interest_ids = np.unique(domain_of_interest_topology)
-        domain_of_interest_coordinates = domain_coordinates[domain_of_interest_ids, :]
-
-         # Fix topology of the each domain
-        print(f" --- Fixing topology of {domain_name} domain \n")
-        for node_id in range(len(domain_of_interest_ids)):
-            domain_of_interest_topology = np.where(domain_of_interest_topology == domain_of_interest_ids[node_id], 
-                                                   node_id, domain_of_interest_topology)
-        
-        # Create path for fixed mesh file and copy mesh file to new "fixed" file for safety reasons
-        print("--- Saving the fixed mesh file \n")
-        domain_of_interest_path = mesh_path.with_name(mesh_path.stem + f"_{domain_name}.h5")
-        domain_of_interest_fixed_path = mesh_path.with_name(mesh_path.stem + f"_{domain_name}_fixed.h5")
-        domain_of_interest_fixed_path.write_bytes(domain_of_interest_path.read_bytes())
-
-        with h5py.File(domain_of_interest_fixed_path, "r+") as vectorData:
-            coordinate_array = vectorData["mesh/coordinates"]
-            coordinate_array[...] = domain_of_interest_coordinates
-            topology_array = vectorData["mesh/topology"]
-            topology_array[...] = domain_of_interest_topology
-
-        
-        # remove the original mesh file and rename the fixed mesh file
-        domain_of_interest_path.unlink()
-        domain_of_interest_fixed_path.rename(domain_of_interest_path)
 
 
 def main() -> None:
