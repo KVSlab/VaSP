@@ -8,12 +8,12 @@ from dolfin import Mesh, assemble, Constant, MPI, HDF5File, Measure, inner, Mesh
     Function, sqrt, Expression, TrialFunction, TestFunction, LocalSolver, dx
 
 
-def load_mesh_and_data(mesh_path: str) -> Tuple[Mesh, MeshFunction, MeshFunction]:
+def load_mesh_and_data(mesh_path: Union[str, Path]) -> Tuple[Mesh, MeshFunction, MeshFunction]:
     """
     Load mesh, boundary data, and domain data from an HDF5 file.
 
     Args:
-        mesh_path (str): Path to the HDF5 file containing mesh and data.
+        mesh_path (str or Path): Path to the HDF5 file containing mesh and data.
 
     Returns:
         Tuple[Mesh, MeshFunction, MeshFunction]:
@@ -22,11 +22,13 @@ def load_mesh_and_data(mesh_path: str) -> Tuple[Mesh, MeshFunction, MeshFunction
             - boundaries (dolfin.MeshFunction): Loaded boundary data.
             - domains (dolfin.MeshFunction): Loaded domain data.
     """
+    mesh_path = Path(mesh_path)
+
     # Initialize an empty mesh
     mesh = Mesh()
 
     # Open the HDF5 file in read-only mode
-    hdf5 = HDF5File(mesh.mpi_comm(), mesh_path, "r")
+    hdf5 = HDF5File(mesh.mpi_comm(), str(mesh_path), "r")
 
     # Read mesh data
     hdf5.read(mesh, "/mesh", False)
@@ -105,12 +107,12 @@ def print_mesh_summary(mesh: Mesh) -> None:
         print(f"Number of cells per volume: {combined_info['num_cells'] / volume}\n")
 
 
-def load_mesh_info(mesh_path: str) -> Tuple[List[int], List[int], int, float, List[float], List[float]]:
+def load_mesh_info(mesh_path: Union[str, Path]) -> Tuple[List[int], List[int], int, float, List[float], List[float]]:
     """
     Load and process mesh information from a JSON file.
 
     Args:
-        mesh_path (str): The path to the mesh file.
+        mesh_path (str or Path): The path to the mesh file.
 
     Returns:
         Tuple[List[int], List[int], int, float, List[float], List[float]]:
