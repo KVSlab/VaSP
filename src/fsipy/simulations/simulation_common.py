@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 from mpi4py import MPI as mpi
 from dolfin import Mesh, assemble, Constant, MPI, HDF5File, Measure, project, inner, MeshFunction, FunctionSpace, \
-    Function, sqrt, Expression
+    Function, sqrt, Expression, TrialFunction, TestFunction, LocalSolver, dx
 
 
 def load_mesh_and_data(mesh_path: str) -> Tuple[Mesh, MeshFunction, MeshFunction]:
@@ -209,6 +209,29 @@ def peval(f: Function, x: Union[float, np.ndarray]) -> np.ndarray:
     return yglob
 
 
+def local_project(f: Function, V: FunctionSpace) -> Function:
+    """
+    Project a given function 'f' onto a finite element function space 'V' in a reusable way.
+
+    Args:
+        f (Function): The function to be projected onto 'V'.
+        V (FunctionSpace): The finite element function space.
+
+    Returns:
+        Function: The projected solution in 'V'.
+    """
+    u = TrialFunction(V)
+    v = TestFunction(V)
+    a_proj = inner(u, v) * dx
+    b_proj = inner(f, v) * dx
+    solver = LocalSolver(a_proj, b_proj)
+    solver.factorize()
+    projected_u = Function(V)
+    solver.solve_local_rhs(projected_u)
+
+    return projected_u
+
+
 def calculate_and_print_flow_properties(dt: float, mesh: Mesh, v: Function, inlet_area: float, mu_f: float,
                                         n: Expression, dsi: Measure) -> None:
     """
@@ -228,7 +251,7 @@ def calculate_and_print_flow_properties(dt: float, mesh: Mesh, v: Function, inle
     """
     # Calculate the DG vector of velocity magnitudes
     DG = FunctionSpace(mesh, "DG", 0)
-    V_vector = project(sqrt(inner(v, v)), DG).vector().get_local()
+    V_vector = local_project(sqrt(inner(v, v)), DG).vector().get_local()
     h = mesh.hmin()
 
     # Calculate flow rate at the inlet
