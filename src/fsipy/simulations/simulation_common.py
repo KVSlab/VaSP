@@ -4,7 +4,7 @@ from pathlib import Path
 
 import numpy as np
 from mpi4py import MPI as mpi
-from dolfin import Mesh, assemble, Constant, MPI, HDF5File, Measure, project, inner, MeshFunction, FunctionSpace, \
+from dolfin import Mesh, assemble, Constant, MPI, HDF5File, Measure, inner, MeshFunction, FunctionSpace, \
     Function, sqrt, Expression, TrialFunction, TestFunction, LocalSolver, dx
 
 
