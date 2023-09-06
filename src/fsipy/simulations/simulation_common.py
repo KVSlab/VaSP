@@ -32,8 +32,8 @@ def load_mesh_and_data(mesh_path: str) -> Tuple[Mesh, MeshFunction, MeshFunction
     hdf5.read(mesh, "/mesh", False)
 
     # Create MeshFunction objects for boundaries and domains
-    boundaries = MeshFunction("size_t", mesh, 2)
-    domains = MeshFunction("size_t", mesh, 3)
+    boundaries = MeshFunction("size_t", mesh, mesh.topology().dim() - 1)
+    domains = MeshFunction("size_t", mesh, mesh.topology().dim())
 
     # Read boundary and domain data
     hdf5.read(boundaries, "/boundaries")
