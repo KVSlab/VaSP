@@ -11,7 +11,7 @@ from .automatedPreprocessing import predeform_mesh
 # Imports from simulation scripts
 #from .simulation import Aneurysm
 #from .simulation import AVF
-#from .simulation import simulation_common
+from .simulations import simulation_common
 
 
 meta = metadata("fsipy")
@@ -30,5 +30,5 @@ __all__ = [
 #    "Aneurysm",
 #    "AVF",
 #    "Stenosis",
-#    "simulation_common",
+    "simulation_common",
 ]
