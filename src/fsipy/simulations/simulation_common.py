@@ -211,13 +211,15 @@ def peval(f: Function, x: Union[float, np.ndarray]) -> np.ndarray:
     return yglob
 
 
-def local_project(f: Function, V: FunctionSpace) -> Function:
+def local_project(f: Function, V: FunctionSpace, local_rhs: bool = False) -> Function:
     """
     Project a given function 'f' onto a finite element function space 'V' in a reusable way.
 
     Args:
         f (Function): The function to be projected onto 'V'.
         V (FunctionSpace): The finite element function space.
+        local_rhs (bool, optional): If True, solve using a local right-hand side assembly.
+            If False (default), solve using a global right-hand side assembly.
 
     Returns:
         Function: The projected solution in 'V'.
@@ -229,13 +231,16 @@ def local_project(f: Function, V: FunctionSpace) -> Function:
     solver = LocalSolver(a_proj, b_proj)
     solver.factorize()
     projected_u = Function(V)
-    solver.solve_local_rhs(projected_u)
+    if local_rhs:
+        solver.solve_local_rhs(projected_u)
+    else:
+        solver.solve_global_rhs(projected_u)
 
     return projected_u
 
 
 def calculate_and_print_flow_properties(dt: float, mesh: Mesh, v: Function, inlet_area: float, mu_f: float,
-                                        n: Expression, dsi: Measure) -> None:
+                                        n: Expression, dsi: Measure, local_rhs: bool = False) -> None:
     """
     Calculate and print flow properties.
 
@@ -247,13 +252,15 @@ def calculate_and_print_flow_properties(dt: float, mesh: Mesh, v: Function, inle
         mu_f (float): Fluid dynamic viscosity.
         n (dolfin.Expression): FacetNormal expression.
         dsi (dolfin.Measure): Measure for inlet boundary.
+        local_rhs (bool, optional): If True, solve using a local right-hand side assembly.
+            If False (default), solve using a global right-hand side assembly.
 
     Returns:
         None
     """
     # Calculate the DG vector of velocity magnitudes
     DG = FunctionSpace(mesh, "DG", 0)
-    V_vector = local_project(sqrt(inner(v, v)), DG).vector().get_local()
+    V_vector = local_project(sqrt(inner(v, v)), DG, local_rhs).vector().get_local()
     h = mesh.hmin()
 
     # Calculate flow rate at the inlet
