@@ -81,6 +81,29 @@ def test_load_mesh_and_data(temporary_hdf5_file):
     assert domains.array().max() > 0, \
         "Loaded domains have zero data, expected non-zero data."
 
+    # Check if the number of boundaries and domains match the mesh topology
+    expected_num_boundaries = mesh.num_faces()  # Assuming each face is a boundary
+    expected_num_domains = mesh.num_cells()  # Assuming each cell is a domain
+
+    assert boundaries.size() == expected_num_boundaries, \
+        f"Number of boundaries ({boundaries.size()}) does not match mesh topology ({expected_num_boundaries})."
+    assert domains.size() == expected_num_domains, \
+        f"Number of domains ({domains.size()}) does not match mesh topology ({expected_num_domains})."
+
+    # Validate the boundary and domain IDs
+    known_boundary_ids = [0, 1, 2, 3, 11, 22, 33]
+    known_domain_ids = [1, 2]
+
+    # Check if the known boundary IDs exists in the loaded boundaries
+    for known_boundary_id in known_boundary_ids:
+        assert known_boundary_id in boundaries.array(), \
+            f"Known boundary ID ({known_boundary_id}) not found in loaded boundaries."
+
+    # Check if the known domain IDs exists in the loaded domains
+    for known_domain_id in known_domain_ids:
+        assert known_domain_id in domains.array(), \
+            f"Known domain ID ({known_domain_id}) not found in loaded domains."
+
 
 def test_load_mesh_info(temporary_hdf5_file):
     """
@@ -132,7 +155,7 @@ def test_print_mesh_summary(temporary_hdf5_file):
     # Get the captured output as a string
     printed_summary = captured_output.getvalue()
 
-    # Define expected summary strings (you may adjust them as needed)
+    # Define expected summary strings
     expected_strings = [
         "=== Mesh Information Summary ===",
         "X range: 0.029932 to 0.0368581 (delta: 0.0069)",
@@ -151,7 +174,8 @@ def test_print_mesh_summary(temporary_hdf5_file):
     # Check if each expected summary string is present in the printed output
     for expected_string in expected_strings:
         assert expected_string in printed_summary, \
-            f"Expected string not found in printed output: {expected_string}"
+            f"Expected string '{expected_string}' not found in printed output:\n{printed_summary}"
+
 
 
 def test_load_probe_points(temporary_hdf5_file):
@@ -174,4 +198,4 @@ def test_load_probe_points(temporary_hdf5_file):
 
     # Check if the loaded probe points match the expected data
     assert np.allclose(loaded_probe_points, expected_probe_points), \
-        "Loaded probe points do not match expected values."
+        f"Loaded probe points:\n{loaded_probe_points}\n do not match expected values:\n{expected_probe_points}"
