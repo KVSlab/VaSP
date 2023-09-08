@@ -177,7 +177,6 @@ def test_print_mesh_summary(temporary_hdf5_file):
             f"Expected string '{expected_string}' not found in printed output:\n{printed_summary}"
 
 
-
 def test_load_probe_points(temporary_hdf5_file):
     """
     Test the load_probe_points function by comparing loaded probe points with expected values.
