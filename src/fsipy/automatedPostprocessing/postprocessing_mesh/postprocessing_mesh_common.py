@@ -3,6 +3,7 @@
 
 import argparse
 
+
 def parse_arguments() -> argparse.Namespace:
     """
     Parse command line arguments.
@@ -18,6 +19,6 @@ def parse_arguments() -> argparse.Namespace:
                         help="Path to the mesh file (default: <folder_path>/Mesh/mesh.h5)")
 
     parser.add_argument('-v', '--view', action='store_true', default=False,
-                               help="Determine whether or not to save a pvd file for viewing in paraview")
+                        help="Determine whether or not to save a pvd file for viewing in paraview")
 
     return parser.parse_args()
