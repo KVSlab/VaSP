@@ -103,31 +103,40 @@ def main() -> None:
     else:
         mesh_path = Path(args.mesh_path)
 
-    parameter_path = folder_path / "Checkpoint" / "default_variables.pickle"
-    with open(parameter_path, "rb") as f:
-        parameters = pickle.load(f)
-        fluid_domain_id = parameters["dx_f_id"]
-        solid_domain_id = parameters["dx_s_id"]
+    # First, check if the domain specific mesh files already exist
+    fluid_domain_path = mesh_path.with_name(mesh_path.stem + "_fluid.h5")
+    solid_domain_path = mesh_path.with_name(mesh_path.stem + "_solid.h5")
 
-        if type(fluid_domain_id) is not int:
-            fluid_domain_id = fluid_domain_id[0]
-            print("fluid_domain_id is not int, using first element of list \n")
-        if type(solid_domain_id) is not int:
-            solid_domain_id = solid_domain_id[0]
-            print("solid_domain_id is not int, using first element of list \n")
-
-    print(" --- Separating fluid and solid domains using domain IDs \n")
-    print(f" --- Fluid domain ID: {fluid_domain_id} and Solid domain ID: {solid_domain_id} \n")
-
-    separate_domain(mesh_path, fluid_domain_id, solid_domain_id)
-
-    # Check if refined mesh exists
-    refined_mesh_path = mesh_path.with_name(mesh_path.stem + "_refined.h5")
-    if refined_mesh_path.exists():
-        print(" --- Refined mesh exists, separating domains for refined mesh \n")
-        separate_domain(refined_mesh_path, fluid_domain_id, solid_domain_id, view=args.view)
+    if fluid_domain_path.exists() and solid_domain_path.exists():
+        print(" --- Domain specific mesh files already exist. Exiting ... \n")
+        return
     else:
-        print(" --- Refined mesh does not exist \n")
+        print(" --- Separating fluid and solid domains using domain IDs \n")
+
+        parameter_path = folder_path / "Checkpoint" / "default_variables.pickle"
+        with open(parameter_path, "rb") as f:
+            parameters = pickle.load(f)
+            fluid_domain_id = parameters["dx_f_id"]
+            solid_domain_id = parameters["dx_s_id"]
+
+            if type(fluid_domain_id) is not int:
+                fluid_domain_id = fluid_domain_id[0]
+                print("fluid_domain_id is not int, using first element of list \n")
+            if type(solid_domain_id) is not int:
+                solid_domain_id = solid_domain_id[0]
+                print("solid_domain_id is not int, using first element of list \n")
+
+        print(f" --- Fluid domain ID: {fluid_domain_id} and Solid domain ID: {solid_domain_id} \n")
+
+        separate_domain(mesh_path, fluid_domain_id, solid_domain_id)
+
+        # Check if refined mesh exists
+        refined_mesh_path = mesh_path.with_name(mesh_path.stem + "_refined.h5")
+        if refined_mesh_path.exists():
+            print(" --- Refined mesh exists, separating domains for refined mesh \n")
+            separate_domain(refined_mesh_path, fluid_domain_id, solid_domain_id, view=args.view)
+        else:
+            print(" --- Refined mesh does not exist \n")
 
 
 if __name__ == "__main__":
