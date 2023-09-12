@@ -445,13 +445,12 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
     if mesh_format == "hdf5":
         print("--- Converting XML mesh to HDF5\n")
         convert_xml_mesh_to_hdf5(file_name_xml_mesh)
-         # Evaluate edge length for inspection
+        # Evaluate edge length for inspection
         edge_length_evaluator(file_name_xml_mesh, file_name_edge_length_xdmf)
     elif mesh_format == "xdmf":
         convert_vtu_mesh_to_xdmf(file_name_vtu_mesh, file_name_xdmf_mesh)
         # Evaluate edge length for inspection
         edge_length_evaluator(file_name_xdmf_mesh, file_name_edge_length_xdmf)
-    
 
     network, probe_points = setup_model_network(centerlines, file_name_probe_points, region_center, verbose_print)
 
