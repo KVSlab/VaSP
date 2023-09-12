@@ -61,19 +61,17 @@ def separate_domain(mesh_path: Path, fluid_domain_id: int, solid_domain_id: int,
         domain_of_interest_topology = domain_topology[domain_of_interest_index[0], :]
         # Here, we want to extract the coordinates of the domain of interest
         # We can do this by extracting the unique node IDs of the domain of interest from the topology
-        domain_of_interest_ids = np.unique(domain_of_interest_topology)  # unique will return sorted array
-        domain_of_interest_coordinates = domain_coordinates[domain_of_interest_ids, :]
+        unique_node_ids = np.unique(domain_of_interest_topology)
+        domain_of_interest_coordinates = domain_coordinates[unique_node_ids, :]
         # Fix topology of the domain of interest
         # This is necessary because the node numbering may not be continuous
         # while there is one to one correspondence between the node IDs and the coordinates
-        print(f" --- Fixing topology of {domain_name} domain \n")
-        print(" --- This is computationally expensive \n")
-        if not np.all(np.diff(domain_of_interest_ids) == 1):
-            for node_id, domain_id in enumerate(domain_of_interest_ids):
-                if node_id % 1000 == 0:
-                    print(f" --- Fixing topology of {domain_name} domain: {node_id} / {len(domain_of_interest_ids)} \n")
-                mask = domain_of_interest_topology == domain_id
-                domain_of_interest_topology[mask] = node_id
+        if not np.all(np.diff(unique_node_ids) == 1):
+            print(f" --- Fixing topology of {domain_name} domain \n")
+            # Create a mapping from old node IDs to new continuous node IDs
+            node_id_mapping = {old_id: new_id for new_id, old_id in enumerate(unique_node_ids)}
+            # Replace old node IDs with new continuous node IDs in the topology array
+            domain_of_interest_topology = np.vectorize(node_id_mapping.get)(domain_of_interest_topology)
         else:
             print(f" --- {domain_name} topology does not need to be fixed \n")
 
