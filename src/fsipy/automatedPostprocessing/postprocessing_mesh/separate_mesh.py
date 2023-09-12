@@ -12,7 +12,7 @@ from fsipy.automatedPostprocessing.postprocessing_mesh import postprocessing_mes
 from dolfin import MPI, Mesh, MeshFunction, HDF5File, SubMesh, File
 
 
-def separate_domain(mesh_path: Path, fluid_domain_id: int, solid_domain_id: int, view: bool = False) -> None:
+def separate_mesh(mesh_path: Path, fluid_domain_id: int, solid_domain_id: int, view: bool = False) -> None:
     """
     Given a mesh file that contains fluid and solid domains, this function separates the domains and saves them as
     separate mesh files. These domain specific mesh files are later used in the other postprocessing scripts.
@@ -128,13 +128,13 @@ def main() -> None:
 
         print(f" --- Fluid domain ID: {fluid_domain_id} and Solid domain ID: {solid_domain_id} \n")
 
-        separate_domain(mesh_path, fluid_domain_id, solid_domain_id)
+        separate_mesh(mesh_path, fluid_domain_id, solid_domain_id)
 
         # Check if refined mesh exists
         refined_mesh_path = mesh_path.with_name(mesh_path.stem + "_refined.h5")
         if refined_mesh_path.exists():
             print(" --- Refined mesh exists, separating domains for refined mesh \n")
-            separate_domain(refined_mesh_path, fluid_domain_id, solid_domain_id, view=args.view)
+            separate_mesh(refined_mesh_path, fluid_domain_id, solid_domain_id, view=args.view)
         else:
             print(" --- Refined mesh does not exist \n")
 
