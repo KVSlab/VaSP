@@ -442,30 +442,32 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
     else:
         mesh = read_polydata(file_name_vtu_mesh)
 
-    # Evaluate edge length for inspection
-    edge_length_evaluator(file_name_xml_mesh, file_name_edge_length_xdmf)
-
     if mesh_format == "hdf5":
         print("--- Converting XML mesh to HDF5\n")
         convert_xml_mesh_to_hdf5(file_name_xml_mesh)
+         # Evaluate edge length for inspection
+        edge_length_evaluator(file_name_xml_mesh, file_name_edge_length_xdmf)
     elif mesh_format == "xdmf":
         convert_vtu_mesh_to_xdmf(file_name_vtu_mesh, file_name_xdmf_mesh)
+        # Evaluate edge length for inspection
+        edge_length_evaluator(file_name_xdmf_mesh, file_name_edge_length_xdmf)
+    
 
-    network, probe_points = setup_model_network(centerlines, file_name_probe_points, region_center, verbose_print)
+    # network, probe_points = setup_model_network(centerlines, file_name_probe_points, region_center, verbose_print)
 
-    # Load updated parameters following meshing
-    parameters = get_parameters(base_path)
+    # # Load updated parameters following meshing
+    # parameters = get_parameters(base_path)
 
-    print("--- Computing flow rates and flow split, and setting boundary IDs\n")
-    mean_inflow_rate = compute_flow_rate(is_atrium, inlet, parameters, flow_rate_factor)
+    # print("--- Computing flow rates and flow split, and setting boundary IDs\n")
+    # mean_inflow_rate = compute_flow_rate(is_atrium, inlet, parameters, flow_rate_factor)
 
-    find_boundaries(base_path, mean_inflow_rate, network, mesh, verbose_print, is_atrium)
+    # find_boundaries(base_path, mean_inflow_rate, network, mesh, verbose_print, is_atrium)
 
-    # Display the flow split at the outlets, inlet flow rate, and probes.
-    if visualize:
-        print("--- Visualizing flow split at outlets, inlet flow rate, and probes in VTK render window. ")
-        print("--- Press 'q' inside the render window to exit.")
-        visualize_model(network.elements, probe_points, surface_extended, mean_inflow_rate)
+    # # Display the flow split at the outlets, inlet flow rate, and probes.
+    # if visualize:
+    #     print("--- Visualizing flow split at outlets, inlet flow rate, and probes in VTK render window. ")
+    #     print("--- Press 'q' inside the render window to exit.")
+    #     visualize_model(network.elements, probe_points, surface_extended, mean_inflow_rate)
 
     # Start simulation though ssh, without password
     if config_path is not None:

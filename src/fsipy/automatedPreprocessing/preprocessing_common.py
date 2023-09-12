@@ -253,21 +253,26 @@ def convert_vtu_mesh_to_xdmf(file_name_vtu_mesh: str, file_name_xdmf_mesh: str) 
     print(f"Triangle mesh XDMF file written to: {triangle_xdmf_path}\n")
 
 
-def edge_length_evaluator(file_name_xml_mesh: str, file_name_edge_length_xdmf: str) -> None:
+def edge_length_evaluator(file_name_mesh: str, file_name_edge_length_xdmf: str) -> None:
     """
     Evaluates the edge length of a mesh.
 
     Args:
-        file_name_xml_mesh (str): Path to the XML mesh file.
+        file_name_mesh (str): Path to the XML mesh file.
         file_name_edge_length_xdmf (str): Path to the output XDMF file.
     """
     print("--- Evaluating edge length")
     # Check if the XML mesh file exists
-    xml_mesh_path = Path(file_name_xml_mesh)
-    if not xml_mesh_path.is_file():
-        raise FileNotFoundError(f"The file '{xml_mesh_path}' does not exist.")
+    mesh_path = Path(file_name_mesh)
+    if not mesh_path.is_file():
+        raise FileNotFoundError(f"The file '{mesh_path}' does not exist.")
+    try:
+        mesh = Mesh(file_name_mesh)
+    except RuntimeError:
+        mesh = Mesh()
+        with XDMFFile(file_name_mesh) as xdmf:
+            xdmf.read(mesh)
 
-    mesh = Mesh(str(xml_mesh_path))
     mesh.init(1)
     num_cells = mesh.num_cells()
     V = FunctionSpace(mesh, "DG", 0)
