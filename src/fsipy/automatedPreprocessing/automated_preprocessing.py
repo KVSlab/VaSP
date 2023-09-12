@@ -27,8 +27,8 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
                        meshing_method, refine_region, is_atrium, add_flow_extensions, visualize, config_path,
                        coarsening_factor, inlet_flow_extension_length, outlet_flow_extension_length,
                        number_of_sublayers_fluid, number_of_sublayers_solid, edge_length,
-                       region_points, compress_mesh, add_boundary_layer, scale_factor, resampling_step,
-                       meshing_parameters, remove_all, solid_thickness, solid_thickness_parameters, mesh_format,
+                       region_points, compress_mesh, scale_factor, resampling_step, meshing_parameters,
+                       remove_all, solid_thickness, solid_thickness_parameters, mesh_format,
                        flow_rate_factor):
     """
     Automatically generate mesh of surface model in .vtu and .xml format, including prescribed
@@ -56,7 +56,6 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
         edge_length (float): Edge length used for meshing with constant element size
         region_points (list): User defined points to define which region to refine
         compress_mesh (bool): Compresses finalized mesh if True
-        add_boundary_layer (bool): Adds boundary layers to walls if True
         scale_factor (float): Scale input model by this factor
         resampling_step (float): Float value determining the resampling step for centerline computations, in [m]
         meshing_parameters (list): Parameters for meshing method 'distancetospheres'
@@ -717,7 +716,7 @@ def read_command_line(input_path=None):
                 number_of_sublayers_fluid=args.number_of_sublayers_fluid,
                 number_of_sublayers_solid=args.number_of_sublayers_solid, visualize=args.visualize,
                 region_points=args.region_points, compress_mesh=args.compress_mesh,
-                outlet_flow_extension_length=args.outlet_flowextension, add_boundary_layer=args.add_boundary_layer,
+                outlet_flow_extension_length=args.outlet_flowextension,
                 scale_factor=args.scale_factor, resampling_step=args.resampling_step,
                 meshing_parameters=args.meshing_parameters, remove_all=args.remove_all,
                 solid_thickness=args.solid_thickness, solid_thickness_parameters=args.solid_thickness_parameters,
