@@ -259,6 +259,7 @@ def edge_length_evaluator(file_name_xml_mesh: str, file_name_edge_length_xdmf: s
 
     Args:
         file_name_xml_mesh (str): Path to the XML mesh file.
+        file_name_edge_length_xdmf (str): Path to the output XDMF file.
     """
     print("--- Evaluating edge length")
     # Check if the XML mesh file exists
