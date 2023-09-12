@@ -20,7 +20,7 @@ from vampy.automatedPreprocessing.simulate import run_simulation
 from vampy.automatedPreprocessing.visualize import visualize_model
 
 from fsipy.automatedPreprocessing.preprocessing_common import generate_mesh, distance_to_spheres_solid_thickness, \
-    dist_sphere_spheres, convert_xml_mesh_to_hdf5, convert_vtu_mesh_to_xdmf
+    dist_sphere_spheres, convert_xml_mesh_to_hdf5, convert_vtu_mesh_to_xdmf, edge_length_evaluator
 
 
 def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_factor, smoothing_iterations,
@@ -93,6 +93,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
     file_name_xml_mesh = base_path + ".xml"
     file_name_vtu_mesh = base_path + ".vtu"
     file_name_xdmf_mesh = base_path + ".xdmf"
+    file_name_edge_length_xdmf = base_path + "_edge_length.xdmf"
     region_centerlines = None
 
     if remove_all:
@@ -441,6 +442,9 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
             write_polydata(mesh, file_name_vtu_mesh)
     else:
         mesh = read_polydata(file_name_vtu_mesh)
+
+    # Evaluate edge length for inspection
+    edge_length_evaluator(file_name_xml_mesh, file_name_edge_length_xdmf)
 
     if mesh_format == "hdf5":
         print("--- Converting XML mesh to HDF5\n")

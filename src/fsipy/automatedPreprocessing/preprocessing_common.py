@@ -1,8 +1,9 @@
 from pathlib import Path
 
+import numpy as np
 import meshio
 from vtk import vtkPolyData
-from dolfin import Mesh, MeshFunction, File, HDF5File
+from dolfin import Mesh, MeshFunction, File, HDF5File, FunctionSpace, Function, XDMFFile, cells, Edge
 from vmtk import vmtkdistancetospheres
 from morphman import vmtkscripts, write_polydata
 
@@ -250,3 +251,38 @@ def convert_vtu_mesh_to_xdmf(file_name_vtu_mesh: str, file_name_xdmf_mesh: str) 
 
     print(f"Tetra mesh XDMF file written to: {tetra_xdmf_path}")
     print(f"Triangle mesh XDMF file written to: {triangle_xdmf_path}\n")
+
+
+def edge_length_evaluator(file_name_xml_mesh: str, file_name_edge_length_xdmf: str) -> None:
+    """
+    Evaluates the edge length of a mesh.
+
+    Args:
+        file_name_xml_mesh (str): Path to the XML mesh file.
+    """
+    print("--- Evaluating edge length")
+    # Check if the XML mesh file exists
+    xml_mesh_path = Path(file_name_xml_mesh)
+    if not xml_mesh_path.is_file():
+        raise FileNotFoundError(f"The file '{xml_mesh_path}' does not exist.")
+
+    mesh = Mesh(str(xml_mesh_path))
+    mesh.init(1)
+    num_cells = mesh.num_cells()
+    V = FunctionSpace(mesh, "DG", 0)
+    u = Function(V)
+    values = np.zeros(num_cells, dtype=np.float64)
+
+    for cell in cells(mesh):
+        edges = cell.entities(1)
+        value = 0
+        for edge in edges:
+            value += Edge(mesh, edge).length()
+        values[cell.index()] = value / len(edges)
+
+    u.vector().set_local(values)
+    u.vector().apply("local")
+    u.rename("edge_length", "edge_length")
+
+    with XDMFFile(file_name_edge_length_xdmf) as xdmf:
+        xdmf.write(u)
