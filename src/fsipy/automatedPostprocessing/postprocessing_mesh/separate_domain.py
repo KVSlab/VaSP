@@ -14,8 +14,10 @@ from dolfin import MPI, Mesh, MeshFunction, HDF5File, SubMesh, File
 
 def separate_domain(mesh_path: Path, fluid_domain_id: int, solid_domain_id: int, view: bool = False) -> None:
     """
+    Given a mesh file that contains fluid and solid domains, this function separates the domains and saves them as
+    separate mesh files. These domain specific mesh files are later used in the other postprocessing scripts.
+
     args:
-        folder_path (Path): Path to the simulation results folder.
         mesh_path (Path): Path to the mesh file.
         fluid_domain_id (int): Domain ID for fluid domain.
         solid_domain_id (int): Domain ID for solid domain.
@@ -61,7 +63,7 @@ def separate_domain(mesh_path: Path, fluid_domain_id: int, solid_domain_id: int,
         # We can do this by extracting the unique node IDs of the domain of interest from the topology
         domain_of_interest_ids = np.unique(domain_of_interest_topology)  # unique will return sorted array
         domain_of_interest_coordinates = domain_coordinates[domain_of_interest_ids, :]
-        # Fix topology of the each domain
+        # Fix topology of the domain of interest
         # This is necessary because the node numbering may not be continuous
         # while there is one to one correspondence between the node IDs and the coordinates
         print(f" --- Fixing topology of {domain_name} domain \n")
