@@ -1,24 +1,21 @@
 #!/usr/bin/env python
 
-# MODIFICATION OF vmtkmeshgenerator.py FILE FROM VMTK
-# SUITABE FOR Fluid Structure Interaction MESH GENERATION
-# THIS FILE COULD BE ADDED AS A VMTK CLASS
-# MODIFICATION BY: Alban Souche, SIMULA, Fornebu (October 2018)
-
-######################## MODIFED FROM ##########################################
-## Program:   VMTK
-# Module:    $RCSfile: vmtkmeshgenerator.py,v $
-## Language:  Python
-# Date:      $Date: 2006/02/23 09:27:52 $
-# Version:   $Revision: 1.7 $
+# Program:   VMTK
+# Module:    $RCSfile: vmtkmeshgeneratorfsi.py,v $
+# Language:  Python
+# Date:      $$
+# Version:   $$
 
 # Copyright (c) Luca Antiga, David Steinman. All rights reserved.
 # See LICENCE file for details.
 
 # This software is distributed WITHOUT ANY WARRANTY; without even
 # the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
-# PURPOSE.  See the above copyright notices for more information.
-################################################################################
+# PURPOSE. See the above copyright notices for more information.
+
+# This class is a modified versions of vmtkmeshgenerator.
+# For Fluid-Structure Interaction mesh generation.
+# Modification by: Alban Souche, Simula Research Laboratory, Fornebu (October 2018)
 
 from __future__ import absolute_import  # NEEDS TO STAY AS TOP LEVEL MODULE FOR Py2-3 COMPATIBILITY
 import vtk
@@ -133,8 +130,7 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
 
     def Execute(self):
 
-        from vmtk import vmtkscripts
-        if self.Surface == None:
+        if self.Surface is None:
             self.PrintError('Error: No input surface.')
 
         wallEntityOffset = 1
@@ -257,13 +253,13 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
                 centerlinesExtract.Surface = innerSurface
                 centerlinesExtract.SeedSelectorName = "carotidprofiles"
                 centerlinesExtract.Execute()
-    
+
                 extractGroups = vmtkscripts.vmtkBranchExtractor()
                 extractGroups.Centerlines = centerlinesExtract.Centerlines
                 extractGroups.RadiusArrayName = centerlinesExtract.RadiusArrayName
                 extractGroups.GroupIdsArrayName = 'GroupIds'
                 extractGroups.Execute()
-    
+
                 clipVein = vmtkscripts.vmtkMeshBranchClipper()
                 clipVein.Mesh = boundaryLayer2.Mesh
                 clipVein.Centerlines = extractGroups.Centerlines
@@ -272,51 +268,51 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
                 clipVein.BlankingArrayName = extractGroups.BlankingArrayName
                 clipVein.Interactive = 1
                 clipVein.Execute()
-    
+
                 solidCellLocator = vtk.vtkCellLocator()
                 veinCellLocator = vtk.vtkCellLocator()
-    
+
                 solidCellLocator.SetDataSet(boundaryLayer2.Mesh)
                 solidCellLocator.BuildLocator()
-    
+
                 veinCellLocator.SetDataSet(clipVein.Mesh)
                 veinCellLocator.BuildLocator()
-    
+
                 solidCellIds = boundaryLayer2.Mesh.GetCellData().GetScalars("CellEntityIds")
-    
+
                 vtkIdList = vtk.vtkIdList()
                 solidCellLocator.FindCellsWithinBounds(clipVein.Mesh.GetBounds(), vtkIdList)
                 ids = np.array([vtkIdList.GetId(i) for i in range(vtkIdList.GetNumberOfIds())])
-    
+
                 cell = [0.0, 0.0, 0.0]
                 cellId = vtk.mutable(0)
                 subId = vtk.mutable(0)
                 dist = vtk.mutable(0.0)
-    
+
                 for id in ids:
                     point = boundaryLayer2.Mesh.GetCell(id).GetPoints().GetPoint(0)
                     veinCellLocator.FindClosestPoint(point, cell, cellId, subId, dist)
                     if dist == 0:
                         solidCellIds.SetValue(id, solidCellIds.GetValue(id) + self.VeinIdsOffset)
-    
+
                 boundaryLayer2.Mesh.GetCellData().Update()
-    
-#                clipArtery = vmtkscripts.vmtkMeshBranchClipper()
-#                clipArtery.Mesh = boundaryLayer2.Mesh
-#                clipArtery.Centerlines = extractGroups.Centerlines
-#                clipArtery.GroupIds = clipVein.GroupIds
-#                clipArtery.GroupIdsArrayName = extractGroups.GroupIdsArrayName
-#                clipArtery.RadiusArrayName = extractGroups.RadiusArrayName
-#                clipArtery.BlankingArrayName = extractGroups.BlankingArrayName
-#                clipArtery.InsideOut = 1
-#                clipArtery.Execute()
-#    
-#                mergeSolid = vmtkscripts.vmtkMeshMerge()
-#                mergeSolid.Mesh1 = clipVein.Mesh
-#                mergeSolid.Mesh2 = clipArtery.Mesh
-#                mergeSolid.CellEntityIdOffset1 = int(1000)
-#                mergeSolid.CellEntityIdOffset2 = 0
-#                mergeSolid.Execute()
+
+                # clipArtery = vmtkscripts.vmtkMeshBranchClipper()
+                # clipArtery.Mesh = boundaryLayer2.Mesh
+                # clipArtery.Centerlines = extractGroups.Centerlines
+                # clipArtery.GroupIds = clipVein.GroupIds
+                # clipArtery.GroupIdsArrayName = extractGroups.GroupIdsArrayName
+                # clipArtery.RadiusArrayName = extractGroups.RadiusArrayName
+                # clipArtery.BlankingArrayName = extractGroups.BlankingArrayName
+                # clipArtery.InsideOut = 1
+                # clipArtery.Execute()
+
+                # mergeSolid = vmtkscripts.vmtkMeshMerge()
+                # mergeSolid.Mesh1 = clipVein.Mesh
+                # mergeSolid.Mesh2 = clipArtery.Mesh
+                # mergeSolid.CellEntityIdOffset1 = int(1000)
+                # mergeSolid.CellEntityIdOffset2 = 0
+                # mergeSolid.Execute()
 
             if not self.BoundaryLayerOnCaps:
 
@@ -374,7 +370,8 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
             tetgen.Execute()
 
             if tetgen.Mesh.GetNumberOfCells() == 0 and surfaceToMesh.Mesh.GetNumberOfCells() > 0:
-                self.PrintLog('An error occurred during tetrahedralization. Will only output surface mesh and boundary layer.')
+                self.PrintLog('An error occurred during tetrahedralization. Will only output ' +
+                              'surface mesh and boundary layer.')
 
             self.PrintLog("Assembling fluid mesh")
             appendFilter = vtkvmtk.vtkvmtkAppendFilter()
@@ -424,7 +421,7 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
             appendFilter2 = vtkvmtk.vtkvmtkAppendFilter()
             appendFilter2.AddInputData(appendFilter.GetOutput())
             appendFilter2.AddInputData(boundaryLayer2.Mesh)
-            #appendFilter2.AddInputData(mergeSolid.GetOutput())
+            # appendFilter2.AddInputData(mergeSolid.GetOutput())
             appendFilter2.Update()
             self.Mesh = appendFilter2.GetOutput()
 
