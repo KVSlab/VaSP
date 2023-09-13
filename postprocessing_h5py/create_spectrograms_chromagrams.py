@@ -246,7 +246,7 @@ def sonify_point(case_name, dvp, df, start_t, end_t, overlapFrac, lowcut, imageF
 
 if __name__ == '__main__':
     # Load in case-specific parameters
-    case_path, mesh_name, save_deg, stride,  start_t, end_t, lowcut, ylim, r_sphere, x_sphere, y_sphere, z_sphere, dvp, _, _, interface_only, sampling_method, component, _, point_id = spec.read_command_line_spec()
+    case_path, mesh_name, save_deg, stride,  start_t, end_t, lowcut, ylim, sampling_region, fluid_sampling_domain_ID, solid_sampling_domain_ID, r_sphere, x_sphere, y_sphere, z_sphere, dvp, _, _, interface_only, sampling_method, component, _, point_id = spec.read_command_line_spec()
 
     # Read fixed spectrogram parameters from config file
     config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),"Spectrogram.config")
@@ -261,6 +261,9 @@ if __name__ == '__main__':
                                                                                                            end_t, 
                                                                                                            n_samples, 
                                                                                                            ylim, 
+                                                                                                           sampling_region,
+                                                                                                           fluid_sampling_domain_ID,
+                                                                                                           solid_sampling_domain_ID,
                                                                                                            r_sphere, 
                                                                                                            x_sphere, 
                                                                                                            y_sphere, 

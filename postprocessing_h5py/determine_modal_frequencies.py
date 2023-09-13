@@ -117,7 +117,7 @@ def determine_modal_frequencies(case_path, dvp, n_samples, thresh_val, max_plot)
 
 if __name__ == '__main__':
     # Load in case-specific parameters
-    case_path, mesh_name, save_deg, stride,  start_t, end_t, lowcut, ylim, r_sphere, x_sphere, y_sphere, z_sphere, dvp, _, _, interface_only, sampling_method, component, _, point_id = spec.read_command_line_spec()
+    case_path, mesh_name, save_deg, stride,  start_t, end_t, lowcut, ylim, _,_,_, r_sphere, x_sphere, y_sphere, z_sphere, dvp, _, _, interface_only, sampling_method, component, _, point_id = spec.read_command_line_spec()
 
     # Read fixed spectrogram parameters from config file
     config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),"Spectrogram.config")

@@ -76,6 +76,9 @@ def read_command_line_spec():
     parser.add_argument('--end_t', type=float, default=0.05, help="End time of simulation (s)")
     parser.add_argument('--lowcut', type=float, default=25, help="High pass filter cutoff frequency (Hz)")
     parser.add_argument('--ylim', type=float, default=800, help="y limit of spectrogram graph")
+    parser.add_argument('--sampling_region', type=str, default="sphere", help="sample within -sphere, or within specific -domain") 
+    parser.add_argument('--fluid_sampling_domain_ID', type=int, default=1, help="Domain ID for fluid region to be sampled (need to input a labelled mesh with this ID)")   
+    parser.add_argument('--solid_sampling_domain_ID', type=int, default=2, help="Domain ID for solid region to be sampled (need to input a labelled mesh with this ID)")    
     parser.add_argument('--r_sphere', type=float, default=1000000, help="Sphere in which to include points for spectrogram, this is the sphere radius")
     parser.add_argument('--x_sphere', type=float, default=0.0, help="Sphere in which to include points for spectrogram, this is the x coordinate of the center of the sphere (in m)")
     parser.add_argument('--y_sphere', type=float, default=0.0, help="Sphere in which to include points for spectrogram, this is the y coordinate of the center of the sphere (in m)")
@@ -91,10 +94,11 @@ def read_command_line_spec():
 
     args = parser.parse_args()
 
-    return args.case, args.mesh, args.save_deg, args.stride, args.start_t, args.end_t, args.lowcut, args.ylim, args.r_sphere, args.x_sphere, args.y_sphere, args.z_sphere, args.dvp, args.Re_a, args.Re_b, args.interface_only, args.sampling_method, args.component, args.n_samples, args.point_id
+    return args.case, args.mesh, args.save_deg, args.stride, args.start_t, args.end_t, args.lowcut, args.ylim, args.sampling_region, args.fluid_sampling_domain_ID, args.solid_sampling_domain_ID, args.r_sphere, args.x_sphere, args.y_sphere, args.z_sphere, args.dvp, args.Re_a, args.Re_b, args.interface_only, args.sampling_method, args.component, args.n_samples, args.point_id
 
 
-def read_spectrogram_data(case_path, mesh_name, save_deg, stride, start_t, end_t, n_samples, ylim, r_sphere, x_sphere, y_sphere, z_sphere, dvp, interface_only,component,point_id,flow_rate_file_name=None,sampling_method="RandomPoint"):
+def read_spectrogram_data(case_path, mesh_name, save_deg, stride, start_t, end_t, n_samples, ylim, sampling_region, fluid_sampling_domain_ID, solid_sampling_domain_ID,
+                          r_sphere, x_sphere, y_sphere, z_sphere, dvp, interface_only,component,point_id,flow_rate_file_name=None,sampling_method="RandomPoint"):
  
 
     start = time.time()
@@ -152,9 +156,7 @@ def read_spectrogram_data(case_path, mesh_name, save_deg, stride, start_t, end_t
     t = time.time()
     print("read matrix")
     print(t - start)         
-    # Get wall and fluid ids
-    fluidIDs, wallIDs, allIDs = postprocessing_common_h5py.get_domain_ids(mesh_path)
-    interfaceIDs = postprocessing_common_h5py.get_interface_ids(mesh_path)
+
     
     # We want to find the points in the sac, so we use a sphere to roughly define the sac.
     sac_center = np.array([x_sphere, y_sphere, z_sphere])  
@@ -163,13 +165,26 @@ def read_spectrogram_data(case_path, mesh_name, save_deg, stride, start_t, end_t
         surfaceElements, coords = postprocessing_common_h5py.get_surface_topology_coords(outFile)
     else:
         coords = postprocessing_common_h5py.get_coords(mesh_path)
-    
-    sphereIDs = find_points_in_sphere(sac_center,r_sphere,coords)
-    # Get nodes in sac only
-    allIDs=list(set(sphereIDs).intersection(allIDs))
-    fluidIDs=list(set(sphereIDs).intersection(fluidIDs))
-    wallIDs=list(set(sphereIDs).intersection(wallIDs))
-    interfaceIDs=list(set(sphereIDs).intersection(interfaceIDs))
+
+    if sampling_region == "sphere":
+        # Get wall and fluid ids
+        fluidIDs, wallIDs, allIDs = postprocessing_common_h5py.get_domain_ids(mesh_path)
+        interfaceIDs = postprocessing_common_h5py.get_interface_ids(mesh_path)    
+        sphereIDs = find_points_in_sphere(sac_center,r_sphere,coords)
+        # Get nodes in sac only
+        allIDs=list(set(sphereIDs).intersection(allIDs))
+        fluidIDs=list(set(sphereIDs).intersection(fluidIDs))
+        wallIDs=list(set(sphereIDs).intersection(wallIDs))
+        interfaceIDs=list(set(sphereIDs).intersection(interfaceIDs))
+
+    elif sampling_region == "domain": # To use this option, must input mesh with domain markers and indicate which domain represents the desired fluid region 
+                                      # for the spectrogram (fluid_sampling_domain_ID) and which domain represents desired solid region (solid_sampling_domain_ID)
+        fluidIDs, wallIDs, allIDs = postprocessing_common_h5py.get_domain_ids_specified_region(mesh_path,fluid_sampling_domain_ID,solid_sampling_domain_ID)
+        interfaceIDs_set = set(fluidIDs) - (set(fluidIDs) - set(wallIDs))
+        interfaceIDs = list(interfaceIDs_set)
+    else:
+        #print("Need to specify sampling method as -sphere or -domain, got " + sampling_region)
+        raise Exception("Need to specify sampling method as -sphere or -domain, got " + sampling_region)
 
     if dvp == "wss":
         region_ids = sphereIDs  # for wss spectrogram, we use all the nodes within the sphere because the input df only includes the wall
@@ -192,7 +207,7 @@ def read_spectrogram_data(case_path, mesh_name, save_deg, stride, start_t, end_t
         idx_sampled = [point_id]
         case_name=case_name+"_"+sampling_method+"_"+str(point_id)
         print("Single Point spectrogram for point: "+str(point_id))
-    elif sampling_method == "Spatial":
+    elif sampling_method == "Spatial": # This method only works with a specified sphere
         mesh, surf = postprocessing_common_pv.assemble_mesh(mesh_path)
 
         #bounds=surf.bounds
