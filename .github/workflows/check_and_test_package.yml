@@ -106,20 +106,19 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
 
       - name: Install FSIPy
-        run: python3 -m pip install .[test]
+        run: python3 -m pip install --editable .[test]
 
       - name: Run tests
         run: python3 -m pytest tests
 
-      # FIXME: Uncomment these lines later when we have decided on a package name
-      #- name: Upload coverage report to codecov
-      #  if: matrix.os == 'ubuntu-latest'
-      #  uses: codecov/codecov-action@v3
-      #  with:
-      #    token: ${{ secrets.CODECOV_TOKEN }}
-      #    files: ./coverage.xml
-      #    fail_ci_if_error: false
-      #    verbose: true
+      - name: Upload coverage report to codecov
+        if: matrix.os == 'ubuntu-latest'
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.xml
+          fail_ci_if_error: false
+          verbose: true
 
 # Original workflow authored by Henrik Kjeldsberg
 # Source Repository: https://github.com/KVSlab/VaMPy/
