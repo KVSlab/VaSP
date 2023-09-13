@@ -69,14 +69,18 @@ def create_spectrogram_composite(case_path, dvp, n_samples, thresh_val, max_plot
     fig2, ax2_1 = plt.subplots()
     fig2.set_size_inches(7.5, 5) #fig1.set_size_inches(10, 7)
     title = "threshold Pxx = {}".format(thresh_val)
-    path_to_fig = os.path.join(imageFolder, fullname)
-    spec.plot_spectrogram(fig2,ax2_1,bins,freqs,Pxx,ylim,title=title,path=path_to_fig,x_label="Time (s)",color_range=[thresh_val,max_plot])
-    fig2.savefig(path_to_fig)
+    path_to_spec = os.path.join(imageFolder, fullname)
+    spec.plot_spectrogram(fig2,ax2_1,bins,freqs,Pxx,ylim,title=title,x_label="Time (s)",color_range=[thresh_val,max_plot])
+    fig2.savefig(path_to_spec)
+    data_csv = np.append(freqs[np.newaxis].T,Pxx, axis=1)
+    path_csv = path_to_spec.replace(".png",".csv")
+    np.savetxt(path_csv, data_csv,header=bins_txt, delimiter=",")
+
 
 
 if __name__ == '__main__':
     # Load in case-specific parameters
-    case_path, mesh_name, save_deg, stride,  start_t, end_t, lowcut, ylim, r_sphere, x_sphere, y_sphere, z_sphere, dvp, _, _, interface_only, sampling_method, component, _, point_id = spec.read_command_line_spec()
+    case_path, mesh_name, save_deg, stride,  start_t, end_t, lowcut, ylim, _,_,_, r_sphere, x_sphere, y_sphere, z_sphere, dvp, _, _, interface_only, sampling_method, component, _, point_id = spec.read_command_line_spec()
 
     # Read fixed spectrogram parameters from config file
     config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),"Spectrogram.config")
