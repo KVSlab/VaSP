@@ -240,7 +240,7 @@ def local_project(f: Function, V: FunctionSpace, local_rhs: bool = False) -> Fun
 
 
 def calculate_and_print_flow_properties(dt: float, mesh: Mesh, v: Function, inlet_area: float, mu_f: float,
-                                        n: Expression, dsi: Measure, local_rhs: bool = False) -> None:
+                                        rho_f: float, n: Expression, dsi: Measure, local_rhs: bool = False) -> None:
     """
     Calculate and print flow properties.
 
@@ -250,6 +250,7 @@ def calculate_and_print_flow_properties(dt: float, mesh: Mesh, v: Function, inle
         v (dolfin.Function): Velocity field.
         inlet_area (float): Inlet area.
         mu_f (float): Fluid dynamic viscosity.
+        rho_f (float): Fluid density.
         n (dolfin.Expression): FacetNormal expression.
         dsi (dolfin.Measure): Measure for inlet boundary.
         local_rhs (bool, optional): If True, solve using a local right-hand side assembly.
@@ -285,9 +286,9 @@ def calculate_and_print_flow_properties(dt: float, mesh: Mesh, v: Function, inle
 
         # Calculate diameter at the inlet and Reynolds numbers
         diam_inlet = np.sqrt(4 * inlet_area / np.pi)
-        Re_mean = v_mean * diam_inlet / mu_f
-        Re_min = v_min * diam_inlet / mu_f
-        Re_max = v_max * diam_inlet / mu_f
+        Re_mean = rho_f * v_mean * diam_inlet / mu_f
+        Re_min = rho_f * v_min * diam_inlet / mu_f
+        Re_max = rho_f * v_max * diam_inlet / mu_f
 
         # Calculate CFL numbers
         CFL_mean = v_mean * dt / h
