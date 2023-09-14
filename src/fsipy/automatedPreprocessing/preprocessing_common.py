@@ -291,4 +291,4 @@ def edge_length_evaluator(file_name_mesh: str, file_name_edge_length_xdmf: str) 
     u.rename("edge_length", "edge_length")
 
     with XDMFFile(file_name_edge_length_xdmf) as xdmf:
-        xdmf.write(u)
+        xdmf.write_checkpoint(u, "edge_length", 0, append=False)
