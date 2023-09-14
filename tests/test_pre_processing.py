@@ -1,6 +1,6 @@
 import vtk
 from pathlib import Path
-from dolfin import Mesh, HDF5File, XDMFFile
+from dolfin import Mesh, HDF5File, XDMFFile, FunctionSpace, Function
 from vampy.automatedPreprocessing.preprocessing_common import read_polydata
 from fsipy.automatedPreprocessing.automated_preprocessing import read_command_line, \
     run_pre_processing
@@ -14,6 +14,7 @@ def test_mesh_model_with_one_inlet():
     model_path = Path("tests/test_data/tube/tube.stl")
     mesh_path_vtu = model_path.with_suffix(".vtu")
     mesh_path_hdf5 = model_path.with_suffix(".h5")
+    edge_length_mesh_path = model_path.with_name(model_path.stem + "_edge_length.xdmf")
 
     # Define expected values
     expected_num_points = 3626
@@ -40,6 +41,7 @@ def test_mesh_model_with_one_inlet():
     # Check that mesh files are created
     assert mesh_path_vtu.is_file(), f"VTU mesh file not found at {mesh_path_vtu}"
     assert mesh_path_hdf5.is_file(), f"HDF5 mesh file not found at {mesh_path_hdf5}"
+    assert edge_length_mesh_path.is_file(), f"Edge length mesh file not found at {edge_length_mesh_path}"
 
     # Check that mesh files are not empty and have expected sizes
     mesh_vtu = read_polydata(str(mesh_path_vtu))
@@ -50,10 +52,20 @@ def test_mesh_model_with_one_inlet():
     except Exception as e:
         print(f"Error reading HDF5 mesh: {e}")
 
+    try:
+        V = FunctionSpace(mesh_hdf5, "DG", 0)
+        v = Function(V)
+        edge_length_file = XDMFFile(str(edge_length_mesh_path))
+        edge_length_file.read_checkpoint(v, "edge_length")
+    except Exception as e:
+        print(f"Error reading edge length mesh: {e}")
+
     assert mesh_vtu.GetNumberOfPoints() == expected_num_points, \
         f"VTU mesh has {mesh_vtu.GetNumberOfPoints()} points, expected {expected_num_points}"
     assert mesh_hdf5.num_cells() == expected_num_cells, \
         f"HDF5 mesh has {mesh_hdf5.num_cells()} cells, expected {expected_num_cells}"
+    assert v.vector().min() > 0, \
+        "Edge length mesh has negative values"
 
 
 def test_mesh_model_with_one_inlet_and_one_outlet():
