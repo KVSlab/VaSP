@@ -19,6 +19,9 @@ import time
 
 """
 This script contains a number of helper functions to create visualizations outsside of fenics.
+
+All functions authored by David Bruneau unless specified
+
 """
 
 def read_command_line():
@@ -137,6 +140,7 @@ def get_interface_ids(meshFile):
 
 def get_sampling_constants(df,start_t,end_t):
     '''
+    Author: Daniel Macdonald
     T = period, in seconds, 
     nsamples = samples per cycle
     fs = sample rate
@@ -162,6 +166,10 @@ def read_csv_file(filepath):
     return df
 
 def filter_SPI(U, W_low_cut, tag):
+    """
+    Author: Mehdi Najafi
+
+    """
     if tag=="withmean":
         U_fft = fft(U)
     else:
@@ -185,6 +193,10 @@ def filter_SPI(U, W_low_cut, tag):
 
 
 def filter_SPI_print(U, W_low_cut, tag):
+   """
+    Author: Mehdi Najafi
+
+    """
     if tag=="withmean":
         U_fft = fft(U)
     else:
@@ -208,6 +220,10 @@ def filter_SPI_print(U, W_low_cut, tag):
     return Power_25Hz/Power_0Hz
 
 def calculate_spi(case_name, df, output_folder, meshFile,start_t,end_t,low_cut,high_cut, dvp):
+    """
+    Author: Mehdi Najafi and David Bruneau
+
+    """
     # cut, thresh
     # Get wall and fluid ids
     fluidIDs, wallIDs, allIDs = get_domain_ids(meshFile)
