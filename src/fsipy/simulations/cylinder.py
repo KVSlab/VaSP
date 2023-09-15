@@ -1,7 +1,6 @@
 """
 Propblem file for tiny cylinder FSI simulation
 """
-import os
 import numpy as np
 from turtleFSI.problems import *
 from dolfin import *
@@ -60,11 +59,10 @@ def set_problem_parameters(default_variables, **namespace):
             dx_s_id=2,  # ID of marker in the solid domain
             # mesh lifting parameters (see turtleFSI for options)
             extrapolation="laplace",  # laplace, elastic, biharmonic, no-extrapolation
-            extrapolation_sub_type="constant",  # ["constant", "small_constant", "volume", "volume_change", "bc1", "bc2"]
+            extrapolation_sub_type="constant",  # ["constant","small_constant","volume","volume_change","bc1","bc2"]
             folder="cylinder_test",  # output folder generated for simulation
             kill_time=100000,  # in seconds, after this time start dumping checkpoints every timestep
-            save_deg=1  # Default could be 1. 1 saves the nodal values only while 2 takes full advantage of the mide side nodes available in the P2 solution. P2 f0r nice visualisations :)
-            # probe point(s)
+            save_deg=1  # save_deg=1 saves corner nodes only, save_deg=2 saves corner + mid-point nodes for viz
         )
     )
 
