@@ -3,12 +3,11 @@ Propblem file for tiny cylinder FSI simulation
 """
 import numpy as np
 from turtleFSI.problems import *
-from dolfin import *
+from dolfin import HDF5File, Mesh, MeshFunction, assemble, UserExpression, FacetNormal, ds, \
+    DirichletBC, Measure, inner, parameters
 
 # set compiler arguments
-parameters["form_compiler"][
-    "quadrature_degree"
-] = 6  # Not investigated thorougly. See MSc theses of Gjertsen.
+parameters["form_compiler"]["quadrature_degree"] = 6
 parameters["form_compiler"]["optimize"] = True
 # The "ghost_mode" has to do with the assembly of form containing the facet
 # normals n('+') within interior boundaries (dS). for 3D mesh the value should
