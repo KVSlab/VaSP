@@ -12,7 +12,13 @@ def parse_arguments() -> argparse.Namespace:
         argparse.Namespace: Parsed command-line arguments.
     """
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+
     parser.add_argument('--folder', type=str, required=True, help="Path to simulation results")
+
     parser.add_argument('--mesh-path', type=str, default=None,
                         help="Path to the mesh file (default: <folder_path>/Mesh/mesh.h5)")
+
+    parser.add_argument('-v', '--view', action='store_true', default=False,
+                        help="Determine whether or not to save a pvd file for viewing in paraview")
+
     return parser.parse_args()
