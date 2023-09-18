@@ -38,7 +38,7 @@ def set_problem_parameters(default_variables, **namespace):
             recompute=20,  # Recompute the Jacobian matix within time steps
             recompute_tstep=20,  # Recompute the Jacobian matix over time steps
             # boundary condition parameters
-            mesh_path="artery_coarse_rescaled",
+            mesh_path="mesh/cylinder.h5",
             inlet_id=2,  # inlet id for the fluid
             inlet_outlet_s_id=11,  # inlet and outlet id for solid
             fsi_id=22,  # id for fsi interface
@@ -59,8 +59,7 @@ def set_problem_parameters(default_variables, **namespace):
             # mesh lifting parameters (see turtleFSI for options)
             extrapolation="laplace",  # laplace, elastic, biharmonic, no-extrapolation
             extrapolation_sub_type="constant",  # ["constant","small_constant","volume","volume_change","bc1","bc2"]
-            folder="cylinder_test",  # output folder generated for simulation
-            kill_time=100000,  # in seconds, after this time start dumping checkpoints every timestep
+            folder="cylinder_results",  # output folder generated for simulation
             save_deg=1  # save_deg=1 saves corner nodes only, save_deg=2 saves corner + mid-point nodes for viz
         )
     )
@@ -71,7 +70,7 @@ def set_problem_parameters(default_variables, **namespace):
 def get_mesh_domain_and_boundaries(mesh_path, folder, **namespace):
     print("Obtaining mesh, domains and boundaries...")
     mesh = Mesh()
-    hdf = HDF5File(mesh.mpi_comm(), "mesh/" + mesh_path + ".h5", "r")
+    hdf = HDF5File(mesh.mpi_comm(), mesh_path, "r")
     hdf.read(mesh, "/mesh", False)
     boundaries = MeshFunction("size_t", mesh, 2)
     hdf.read(boundaries, "/boundaries")
@@ -152,28 +151,15 @@ class InnerP(UserExpression):
         return ()
 
 
-def create_bcs(
-    dvp_,
-    DVP,
-    mesh,
-    boundaries,
-    P_final,
-    v_max_final,
-    fsi_id,
-    inlet_id,
-    inlet_outlet_s_id,
-    rigid_id,
-    psi,
-    F_solid_linear,
-    **namespace
-):
+def create_bcs(dvp_, DVP, mesh, boundaries, P_final, v_max_final, fsi_id, inlet_id,
+               inlet_outlet_s_id, rigid_id, psi, F_solid_linear, **namespace):
+
     # Apply pressure at the fsi interface by modifying the variational form
     p_out_bc_val = InnerP(t=0.0, t_ramp=0.1, P_final=P_final, degree=2)
     dSS = Measure("dS", domain=mesh, subdomain_data=boundaries)
     n = FacetNormal(mesh)
-    F_solid_linear += (
-        p_out_bc_val * inner(n("+"), psi("+")) * dSS(fsi_id)
-    )  # defined on the reference domain
+    # defined on the reference domain
+    F_solid_linear += (p_out_bc_val * inner(n("+"), psi("+")) * dSS(fsi_id))
 
     # Fluid velocity BCs
     dsi = ds(inlet_id, domain=mesh, subdomain_data=boundaries)
@@ -184,36 +170,21 @@ def create_bcs(
     normal = ni / n_len
 
     # Parabolic Inlet Velocity Profile
-    u_inflow_exp = VelInPara(
-        t=0.0,
-        t_ramp=0.1,
-        v_max_final=v_max_final,
-        n=normal,
-        dsi=dsi,
-        mesh=mesh,
-        degree=3,
-    )
+    u_inflow_exp = VelInPara(t=0.0, t_ramp=0.1, v_max_final=v_max_final,
+                             n=normal, dsi=dsi, mesh=mesh, degree=3)
     u_inlet = DirichletBC(DVP.sub(1), u_inflow_exp, boundaries, inlet_id)
-    u_inlet_s = DirichletBC(
-        DVP.sub(1), ((0.0, 0.0, 0.0)), boundaries, inlet_outlet_s_id
-    )
+    u_inlet_s = DirichletBC(DVP.sub(1), ((0.0, 0.0, 0.0)), boundaries, inlet_outlet_s_id)
 
     # Solid Displacement BCs
     d_inlet = DirichletBC(DVP.sub(0), ((0.0, 0.0, 0.0)), boundaries, inlet_id)
-    d_inlet_s = DirichletBC(
-        DVP.sub(0), ((0.0, 0.0, 0.0)), boundaries, inlet_outlet_s_id
-    )
+    d_inlet_s = DirichletBC(DVP.sub(0), ((0.0, 0.0, 0.0)), boundaries, inlet_outlet_s_id)
     d_rigid = DirichletBC(DVP.sub(0), ((0.0, 0.0, 0.0)), boundaries, rigid_id)
 
     # Assemble boundary conditions
     bcs = [u_inlet, d_inlet, u_inlet_s, d_inlet_s, d_rigid]
 
-    return dict(
-        bcs=bcs,
-        u_inflow_exp=u_inflow_exp,
-        p_out_bc_val=p_out_bc_val,
-        F_solid_linear=F_solid_linear,
-    )
+    return dict(bcs=bcs, u_inflow_exp=u_inflow_exp, p_out_bc_val=p_out_bc_val,
+                F_solid_linear=F_solid_linear)
 
 
 def pre_solve(t, u_inflow_exp, p_out_bc_val, **namespace):
