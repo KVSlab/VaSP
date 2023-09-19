@@ -27,7 +27,7 @@ try:
 except:
     print("Could not import pyvista and/or vtk, install these packages or use 'RandomPoint' sampling for spectrograms.")
 """
-This library contains helper functions for creating spectrograms.
+This library contains helper functions for creating spectrograms. All functions authored by David Bruneau unless otherwise specified.
 """
 
 def read_spec_config(config_file,dvp):
@@ -210,19 +210,8 @@ def read_spectrogram_data(case_path, mesh_name, save_deg, stride, start_t, end_t
     elif sampling_method == "Spatial": # This method only works with a specified sphere
         mesh, surf = postprocessing_common_pv.assemble_mesh(mesh_path)
 
-        #bounds=surf.bounds
         bounds = [x_sphere-r_sphere, x_sphere+r_sphere, y_sphere-r_sphere, y_sphere+r_sphere, z_sphere-r_sphere, z_sphere+r_sphere]
-        #def generate_points(bounds, subdivisions=50):
-        #    x_points=np.linspace(bounds[0], bounds[1],num=subdivisions)
-        #    y_points=np.linspace(bounds[2], bounds[3],num=subdivisions)
-        #    z_points=np.linspace(bounds[4], bounds[5],num=subdivisions)
-        #    points = np.array([[x_points[0], y_points[0], z_points[0]],[x_points[0], y_points[0], z_points[1]]])
-        #    for i in range(subdivisions):
-        #        for j in range(subdivisions):
-        #            for k in range(subdivisions):
-        #                points=np.append(points,[[x_points[i], y_points[j], z_points[k]]], axis=0)
-        #    return points[2:,:]
- 
+
 
         def generate_points(bounds, subdivisions=50):
             x_points=np.linspace(bounds[0], bounds[1],num=subdivisions)
@@ -254,10 +243,6 @@ def read_spectrogram_data(case_path, mesh_name, save_deg, stride, start_t, end_t
         t = time.time()
         print("shaped point cloud")
         print(t - start)  
-        #coords_sphere = coords[region_ids]
-        #print(coords_sphere)
-        #print("Length of coords array")
-        #print(coords.shape)
         tree = KDTree(coords)
         _, idx = tree.query(sphere_sel.points) #find closest node to the points in the equispaced points  
 
@@ -266,21 +251,10 @@ def read_spectrogram_data(case_path, mesh_name, save_deg, stride, start_t, end_t
         print("queried kdtree")
         print(t - start)  
 
-        #print("Unsampled equispaced data")
-        #print(len(idx))
-        #print(idx)
-        #
+        
         # Make sure this is the correct order
         equispaced_fluid_ids = [x for x in idx if x in region_ids]
-        #equispaced_fluid_ids=list(set(region_ids).intersection(idx))
-        #print("Unsampled equispaced fluid data")
-        #print(len(equispaced_fluid_ids))
-        #print(equispaced_fluid_ids)
-
         idx_sampled = np.random.choice(equispaced_fluid_ids, n_samples)
-        #print("Sampled equispaced fluid data")
-        #print(len(idx_sampled))
-        #print(idx_sampled)
 
         idx_sampled_set = set(idx_sampled)
         # compare the length and print if the list contains duplicates
@@ -290,17 +264,13 @@ def read_spectrogram_data(case_path, mesh_name, save_deg, stride, start_t, end_t
             print("No duplicates found in the list")
         
         #sampled_point_cloud=pv.PolyData(coords[idx_sampled])
-##
         #plotter= pv.Plotter(off_screen=True)
-        #
+        
         #plotter.add_mesh(surf, 
         #                color='red', 
         #                show_scalar_bar=False,
         #                opacity=0.05)
-###
         #plotter.add_points(sampled_point_cloud, render_points_as_spheres=True, point_size=0.03)
-        #
-        #
         #plotter.show(auto_close=False)  
         #plotter.show(screenshot=imageFolder + "/points"+str(idx_sampled[0])+".png")
 
@@ -325,32 +295,6 @@ def get_location_from_pointID(probeID,polydata):
     return nearestPointLoc
 
 
-#def find_nearest_points_in_radius(probe_pos,pl,num_points,polyData,radius):
-#    """
-#    probeID is actual ID of nearest point
-#    nearestPointLoc is xyz location of probeID
-#    nearestNeighbours is all the points within the radius
-#    nearest_points is sample of nearest_Neighbours
-#    NOTE: nearest_points is likely unneccesary after implementing masking 
-#    function. 
-#    """
-#    probeID = pl.FindClosestPoint(probe_pos) 
-#    nearestPointLoc = [10000,10000,10000] 
-#    polyData.GetPoint(probeID,nearestPointLoc) 
-#    nearestNeighbours = vtk.vtkIdList() 
-#    pl.FindPointsWithinRadius(radius,probe_pos,nearestNeighbours) 
-#    num_Ids = nearestNeighbours.GetNumberOfIds()
-#    print('There are',num_Ids,'in radius',radius)
-#    idList = []
-#    if num_Ids >= 1:
-#        if num_points > num_Ids: 
-#            num_points = num_Ids 
-#        random_index = random.sample(range(num_Ids), num_points-1)
-#        idList = [nearestNeighbours.GetId(idx) for idx in random_index]
-#    nearest_points = [probeID] + idList
-#    return nearest_points
-
-
 def find_points_in_sphere(cent,rad,coords):
     
     # Calculate vector from  center to each node in the mesh
@@ -371,42 +315,9 @@ def find_points_in_sphere(cent,rad,coords):
     return points_in_sphere
 
 
-
-#def vtk_read_unstructured_grid(FILE):
-#    '''
-#    Reads vtu file. Create a more general reader, particularly for h5 mesh
-#    going forward.
-#    '''
-#    reader = vtk.vtkXMLUnstructuredGridReader()
-#    reader.SetFileName(FILE)
-#    reader.Update()
-#    return reader.GetOutput()
-
-#def vtk_mask_points(polyData, max_points=1000):
-#    '''
-#    Randomly mask points.
-#    SetRandomModeType(2) uses stratified spatial sampling.
-#    '''
-#    ptMask = vtk.vtkMaskPoints()
-#    ptMask.SetInputData(polyData)
-#    ptMask.RandomModeOn()
-#    ptMask.SetRandomModeType(2)
-#    ptMask.SetMaximumNumberOfPoints(max_points)
-#    ptMask.Update()
-#    return ptMask.GetOutput()
-
-#def get_original_ids(masked_polydata, polyData):
-#    n = masked_polydata.GetPoints().GetNumberOfPoints()
-#    original_ids = np.zeros(n)
-#    pll = vtk.vtkPointLocator()
-#    pll.SetDataSet(polyData)
-#    for pt in range(n):
-#        location = masked_polydata.GetPoints().GetPoint(pt)
-#        original_ids[pt] = pll.FindClosestPoint(location)
-#    return original_ids
-
 def shift_bit_length(x):
     '''
+    Author: Dan MacDonald
     round up to nearest pwr of 2
     https://stackoverflow.com/questions/14267555/find-the-smallest-power-of-2-greater-than-n-in-python
     '''
@@ -433,6 +344,7 @@ def get_psd(dfNearest,fsamp,scaling="density"):
 
 def get_spectrogram(dfNearest,fsamp,nWindow,overlapFrac,window,start_t,end_t, scaling='spectrum', interpolate = False):
     ''' 
+    Author: Daniel Macdonald
     Calculates spectrogram
     input dfNearest is a pandas df of shape (num_points, num_timesteps)
     fsamp is sampling frequency
@@ -475,20 +387,8 @@ def get_spectrogram(dfNearest,fsamp,nWindow,overlapFrac,window,start_t,end_t, sc
     Pxx_mean[Pxx_mean<0] = 1e-16
     return Pxx_mean, freqs, bins
 
-def spectrogram_scaling(Pxx_mean,thresh_percent):
-    Pxx_scaled = np.log(Pxx_mean)
-    max_val = np.max(Pxx_scaled)
-    min_val = np.min(Pxx_scaled)
-    thresh = max_val-(max_val-min_val)*thresh_percent
-    print('Pxx_scaled max', max_val)
-    print('Pxx_scaled max', min_val)
-    print('Pxx threshold', thresh)
-
-    Pxx_threshold_indices = Pxx_scaled < thresh
-    Pxx_scaled[Pxx_threshold_indices] = thresh
-    return Pxx_scaled, max_val, min_val, thresh
-
-def spectrogram_scaling_old(Pxx_mean,lower_thresh):
+def spectrogram_scaling(Pxx_mean,lower_thresh):
+    #     Author: Daniel Macdonald
     Pxx_scaled = np.log(Pxx_mean)
     max_val = np.max(Pxx_scaled)
     min_val = np.min(Pxx_scaled)
@@ -523,25 +423,26 @@ def butter_bandpass(lowcut, highcut, fs, order=5, btype='band'):
     return b, a 
 
 def butter_bandpass_filter(data, lowcut=25.0, highcut=15000.0, fs=2500.0, order=5, btype='band'):
+    #     Author: Daniel Macdonald
     b, a = butter_bandpass(lowcut, highcut, fs, order=order,btype=btype)
     y = filtfilt(b, a, data)
     return y
 
 def filter_time_data(df,fs,lowcut=25.0,highcut=15000.0,order=6,btype='highpass'):
+    #     Author: Daniel Macdonald
     df_filtered = df.copy()
     for row in range(df.shape[0]):
         df_filtered.iloc[row] = butter_bandpass_filter(df.iloc[row],lowcut=lowcut,highcut=highcut,fs=fs,order=order,btype=btype)
     return df_filtered
 
 def compute_average_spectrogram(df, fs, nWindow,overlapFrac,window,start_t,end_t,thresh, scaling="spectrum", filter_data=False,thresh_method="new"):
+    #     Author: Daniel Macdonald
     if filter_data == True:
         df = filter_time_data(df,fs)
 
     Pxx_mean, freqs, bins = get_spectrogram(df,fs,nWindow,overlapFrac,window,start_t,end_t, scaling) # mode of the spectrogram
-    if thresh_method == "new":
+    if thresh_method == "old":
         Pxx_scaled, max_val, min_val, lower_thresh = spectrogram_scaling(Pxx_mean,thresh)
-    elif thresh_method == "old":
-        Pxx_scaled, max_val, min_val, lower_thresh = spectrogram_scaling_old(Pxx_mean,thresh)
     elif thresh_method == "log_only":
         Pxx_scaled = np.log(Pxx_mean)
         max_val = np.max(Pxx_scaled)
@@ -557,8 +458,6 @@ def compute_average_spectrogram(df, fs, nWindow,overlapFrac,window,start_t,end_t
     return bins, freqs, Pxx_scaled, max_val, min_val, lower_thresh
 
 def plot_spectrogram(fig1,ax1,bins,freqs,Pxx,ylim_,title=None,convert_a=0.0,convert_b=0.0,x_label=None,color_range=None):
-    #plt.figure(figsize=(14,7)) #fig size same as before
-
     
     if color_range == None:
         im = ax1.pcolormesh(bins, freqs, Pxx, shading = 'gouraud')#, vmin = -30, vmax = -4) # look up in matplotlib to add colorbar
@@ -586,37 +485,8 @@ def plot_spectrogram(fig1,ax1,bins,freqs,Pxx,ylim_,title=None,convert_a=0.0,conv
         ax2.set_xlabel(x_label)
 
 
-def plot_spectrogram_1ax(bins,freqs,Pxx,ylim_,title=None,path=None,convert_a=1.0,convert_b=0.0,x_label=None,color_range=None):
-    #plt.figure(figsize=(14,7)) #fig size same as before
-
-    bins = bins*convert_a+convert_b
-    fig1, ax1 = plt.subplots()
-    if color_range == None:
-        im = ax1.pcolormesh(bins, freqs, Pxx, shading = 'gouraud')#, vmin = -30, vmax = -4) # look up in matplotlib to add colorbar
-    else:
-        im = ax1.pcolormesh(bins, freqs, Pxx, shading = 'gouraud', vmin = color_range[0], vmax = color_range[1]) # look up in matplotlib to add colorbar
-
-
-    fig1.colorbar(im, ax=ax1)
-    #fig1.set_size_inches(8, 6) #fig1.set_size_inches(10, 7)
-
-    ax1.set_xlabel(x_label)
-    ax1.set_ylabel('Frequency [Hz]')
-
-    ax1.set_ylim([0,ylim_]) # new
-    ax1.set_title('{}'.format(title),y=1.08)
-
-    if path != None:
-        fig1.savefig(path)
-        path_csv = path.replace(".png",".csv")
-        #freqs_txt = np.array2string(freqs, precision=2, separator=',',)
-        data_csv = np.append(freqs[np.newaxis].T,Pxx, axis=1)
-        bins_txt =  "freq (Hz)/bins (s)," + np.array2string(bins, precision=2, separator=',',).replace("[","").replace("]","")
-        np.savetxt(path_csv, data_csv,header=bins_txt, delimiter=",")
-
-
 def chromagram_from_spectrogram(Pxx,fs,n_fft,n_chroma=24,norm=True):
-
+    #     Author: Daniel Macdonald
     # Calculate chroma filterbank
     chromafb = chroma_filterbank(
         sr=fs, 
@@ -639,6 +509,7 @@ def chromagram_from_spectrogram(Pxx,fs,n_fft,n_chroma=24,norm=True):
     return chroma
 
 def calc_chroma_entropy(chroma,n_chroma):
+    #     Author: Daniel Macdonald
     chroma_entropy = -np.sum(chroma * np.log(chroma), axis=0) / np.log(n_chroma)
     #print(np.sum(chroma,axis=0))
     #chroma_entropy = entropy(normed_power) / np.log(n_chroma)
@@ -672,6 +543,7 @@ def plot_chromagram(fig1,ax1,bins,chroma,title=None,path=None,convert_a=1.0,conv
 
 
 def get_sampling_constants(df,start_t,end_t):
+    #     Author: Daniel Macdonald
     '''
     T = period, in seconds, 
     nsamples = samples per cycle
@@ -682,23 +554,8 @@ def get_sampling_constants(df,start_t,end_t):
     fs = nsamples/T 
     return T, nsamples, fs 
 
-#def sample_polydata(df, polydata_geo, num_points=2000):
-#    polydata_masked = vtk_mask_points(polydata_geo, num_points)
-#    #print(polydata_masked)
-#    ''' 
-#    Find the indices of the df that we'll use, filter df
-#    '''
-#    sampled_points_og_ids = get_original_ids(polydata_masked, polydata_geo) 
-#    df_sampled = df.filter(sampled_points_og_ids.astype(int), axis = 0)
-#    '''
-#    Reset index here allows us to easily search the masked polydata
-#    '''
-#    df_sampled.reset_index(level=0, inplace=True)
-#    df_sampled.index.names = ['NewIds']
-#    df_sampled.drop('Ids', 1, inplace = True)
-#    return df_sampled, polydata_masked
 
-# The following functions are taken from librosa to generate chroma filterbank ############################################################
+# The remaining functions are taken from librosa to generate chroma filterbank
 
 def octs_to_hz(octs, tuning=0.0, bins_per_octave=12):
     """Convert octaves numbers to frequencies.
