@@ -1,12 +1,11 @@
 from pathlib import Path
 import pytest
 import subprocess
-
-from turtleFSI.problems import *
+import re
+import numpy as np
 
 from fsipy.automatedPreprocessing.automated_preprocessing import read_command_line, \
     run_pre_processing
-from fsipy.simulations.simulation_common import load_mesh_and_data
 
 # Define the list of input geometrical data paths
 input_data_paths = [
@@ -52,11 +51,32 @@ def temporary_hdf5_file(tmpdir, request):
 
 
 @pytest.mark.parametrize("temporary_hdf5_file", input_data_paths, indirect=True)
-def test_offset_stenosis_problem(temporary_hdf5_file):
+def test_offset_stenosis_problem(temporary_hdf5_file, tmpdir):
+    """
+    Test the offset stenosis problem.
+    """
+    cmd = ("turtleFSI -p offset_stenosis -dt 0.01 -T 0.05 --verbose True" +
+           " --theta 0.51 --folder {} --sub-folder 1 --new-arguments mesh_path={}")
+    result = subprocess.run(cmd.format(tmpdir, temporary_hdf5_file), shell=True, check=True, cwd="src/fsipy/simulations/")
 
-    # cmd = ("turtleFSI --problem src.fsipy.simulations.offset_stenosis -dt 0.01 -T 0.05 --verbose True" +
-    #        " --theta 0.51 --folder tmp --sub-folder 1 --mesh-path " + str(temporary_hdf5_file))
-    # subprocess.run(cmd, shell=True, check=True)
-    mesh, boundaries, domains = load_mesh_and_data(temporary_hdf5_file)
+    # Here we check the velocity and pressure at a specific probe point at a specific time step
+    target_time_step = 5
+    target_probe_point = 6
+    # TODO: pressusre does not need  () around it
+    output_regular_expression = (
+    r"Probe Point {}: Velocity: \((.*?), (.*?), (.*?)\) \| Pressure: (.*?)\n"
+    r"Solved for timestep {}, t = (\d+\.\d+) in (\d+\.\d+) s".format(target_probe_point, target_time_step))
 
-    assert mesh.num_vertices() > 0
+    output_match = re.search(output_regular_expression, str(result.stdout), re.MULTILINE)
+
+    expected_velocity = [2.651341658407568e-07,  1.7451668944612546e-07, 9.392417990920502e-08]
+    expected_pressure = -24871.223536973383
+    if output_match:
+        velocity = [float(output_match.group(5)), float(output_match.group(6)), float(output_match.group(7))]
+        pressure = float(output_match.group(8))
+
+        assert np.isclose(velocity, expected_velocity).all(), "Velocity does not match expected value."
+        assert np.isclose(pressure, expected_pressure), "Pressure does not match expected value."
+
+    else:
+        raise ValueError("Could not find velocity and pressure in output.")

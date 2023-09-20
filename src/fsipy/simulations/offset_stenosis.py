@@ -6,8 +6,10 @@ import numpy as np
 
 from vampy.simulation.Womersley import make_womersley_bcs, compute_boundary_geometry_acrn
 from turtleFSI.problems import *
-from dolfin import HDF5File, Mesh, MeshFunction, facets, cells, assemble, UserExpression, FacetNormal, ds, \
+from dolfin import HDF5File, Mesh, MeshFunction, facets, cells, UserExpression, FacetNormal, ds, \
     DirichletBC, Measure, inner, parameters
+
+from fsipy.simulations.simulation_common import load_probe_points, print_probe_points, calculate_and_print_flow_properties
 
 # set compiler arguments
 parameters["form_compiler"]["quadrature_degree"] = 6
@@ -155,6 +157,12 @@ class InnerP(UserExpression):
         return ()
 
 
+def initiate(mesh_path, **namespace):
+    probe_points = load_probe_points(mesh_path)
+
+    return dict(probe_points=probe_points)
+
+
 def create_bcs(t, DVP, mesh, boundaries, mu_f,
                fsi_id, inlet_id, inlet_outlet_s_id,
                rigid_id, psi, F_solid_linear, p_deg, FC_file,
@@ -216,8 +224,10 @@ def pre_solve(t, inlet, p_out_bc_val, **namespace):
     return dict(inlet=inlet, p_out_bc_val=p_out_bc_val)
 
 
-def post_solve(n, dsi, v_, **namespace):
-    # Compute flow rate at inlet
-    flow_rate_inlet = abs(assemble(inner(v_["n"], n) * dsi))
-    if MPI.rank(MPI.comm_world) == 0:
-        print(f"Inlet flow rate is: {flow_rate_inlet} m^3/s\n")
+def post_solve(probe_points, dvp_, **namespace):
+
+    v = dvp_["n"].sub(1, deepcopy=True)
+    p = dvp_["n"].sub(2, deepcopy=True)
+
+    print_probe_points(v, p, probe_points)
+    
