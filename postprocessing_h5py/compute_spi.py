@@ -84,6 +84,5 @@ def compute_spi(case_path, mesh_name, save_deg, stride, start_t, end_t, dvp, ban
 
 
 if __name__ == '__main__':
-    case_path, mesh_name, save_deg, stride, _, start_t, end_t, dvp, bands = postprocessing_common_h5py.read_command_line()
+    case_path, mesh_name, save_deg, stride, _, start_t, end_t, dvp, bands, _ = postprocessing_common_h5py.read_command_line()
     compute_spi(case_path, mesh_name, save_deg, stride, start_t, end_t, dvp, bands)
-
