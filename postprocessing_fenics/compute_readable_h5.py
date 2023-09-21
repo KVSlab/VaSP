@@ -48,6 +48,12 @@ def format_output_data(case_path, mesh_name, dt, stride, save_deg, start_t, end_
 
     d_path_in = str(os.path.join(visualization_separate_domain_path,"d.h5")) 
     v_path_in = str(os.path.join(visualization_separate_domain_path,"v.h5")) 
+
+    if os.path.exists(d_path_in):
+        os.remove(d_path_in)
+    if os.path.exists(v_path_in):
+        os.remove(v_path_in)        
+
     displacement_domains = "all"
 
     # get fluid+solid (FSI) mesh
