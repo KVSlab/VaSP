@@ -187,7 +187,7 @@ def test_mesh_model_with_variable_mesh_density(tmpdir):
     # Define test data paths
     original_model_path = Path("tests/test_data/artery/artery.stl")
     model_path = Path(tmpdir) / original_model_path.name
-    sphere_file_path = original_model_path.with_name("stored_" + model_path.stem + \
+    sphere_file_path = original_model_path.with_name("stored_" + model_path.stem +
                                                      "_variable_mesh_density_distance_to_sphere_spheres.vtp")
     copied_sphere_file_path = model_path.with_name(model_path.stem + "_distance_to_sphere_spheres.vtp")
 
@@ -272,8 +272,8 @@ def test_mesh_model_with_variable_solid_thickness(tmpdir):
     """
     # Define test data paths
     original_model_path = Path("tests/test_data/cylinder/cylinder.vtp")
-    model_path = Path(tmpdir) / original_model_path.name #.with_name(original_model_path.stem + "_variable_solid_thickness.vtp")
-    sphere_file_path = original_model_path.with_name("stored_" + model_path.stem + \
+    model_path = Path(tmpdir) / original_model_path.name
+    sphere_file_path = original_model_path.with_name("stored_" + model_path.stem +
                                                      "_variable_solid_thickness_distance_to_sphere_solid_thickness.vtp")
     copied_sphere_file_path = model_path.with_name(model_path.stem + "_distance_to_sphere_solid_thickness.vtp")
 
@@ -391,12 +391,3 @@ def test_xdmf_mesh_format(tmpdir):
         f"VTU mesh has {mesh_vtu.GetNumberOfPoints()} points, expected {expected_num_points}"
     assert mesh_xdmf.num_cells() == expected_num_cells, \
         f"XDMF mesh has {mesh_xdmf.num_cells()} cells, expected {expected_num_cells}"
-
-
-if __name__ == "__main__":
-    test_mesh_model_with_one_inlet()
-    test_mesh_model_with_one_inlet_and_one_outlet()
-    test_mesh_model_with_one_inlet_and_two_outlets()
-    test_mesh_model_with_variable_mesh_density()
-    test_mesh_model_with_variable_solid_thickness()
-    test_xdmf_mesh_format()
