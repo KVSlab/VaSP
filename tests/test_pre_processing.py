@@ -6,15 +6,19 @@ from fsipy.automatedPreprocessing.automated_preprocessing import read_command_li
     run_pre_processing
 
 
-def test_mesh_model_with_one_inlet():
+def test_mesh_model_with_one_inlet(tmpdir):
     """
     Test meshing procedure on a specific 3D model with only one inlet.
     """
     # Define test data paths
-    model_path = Path("tests/test_data/tube/tube.stl")
+    original_model_path = Path("tests/test_data/tube/tube.stl")
+    model_path = Path(tmpdir) / original_model_path.name
     mesh_path_vtu = model_path.with_suffix(".vtu")
     mesh_path_hdf5 = model_path.with_suffix(".h5")
     edge_length_mesh_path = model_path.with_name(model_path.stem + "_edge_length.xdmf")
+
+    # Copy the original model to tmpdir
+    model_path.write_text(original_model_path.read_text())
 
     # Define expected values
     expected_num_points = 3626
@@ -68,14 +72,18 @@ def test_mesh_model_with_one_inlet():
         "Edge length mesh has negative values"
 
 
-def test_mesh_model_with_one_inlet_and_one_outlet():
+def test_mesh_model_with_one_inlet_and_one_outlet(tmpdir):
     """
     Test meshing procedure on a specific 3D model with one inlet and one outlet.
     """
     # Define test data paths
-    model_path = Path("tests/test_data/cylinder/cylinder.vtp")
+    original_model_path = Path("tests/test_data/cylinder/cylinder.vtp")
+    model_path = Path(tmpdir) / original_model_path.name
     mesh_path_vtu = model_path.with_suffix(".vtu")
     mesh_path_hdf5 = model_path.with_suffix(".h5")
+
+    # Copy the original model to tmpdir
+    model_path.write_text(original_model_path.read_text())
 
     # Define expected values
     expected_num_points = 2153
@@ -118,14 +126,18 @@ def test_mesh_model_with_one_inlet_and_one_outlet():
         f"HDF5 mesh has {mesh_hdf5.num_cells()} cells, expected {expected_num_cells}"
 
 
-def test_mesh_model_with_one_inlet_and_two_outlets():
+def test_mesh_model_with_one_inlet_and_two_outlets(tmpdir):
     """
     Test meshing procedure on a specific 3D model with one inlet and two outlets.
     """
     # Define test data paths
-    model_path = Path("tests/test_data/artery/artery.stl")
+    original_model_path = Path("tests/test_data/artery/artery.stl")
+    model_path = Path(tmpdir) / original_model_path.name
     mesh_path_vtu = model_path.with_suffix(".vtu")
     mesh_path_hdf5 = model_path.with_suffix(".h5")
+
+    # Copy the original model to tmpdir
+    model_path.write_text(original_model_path.read_text())
 
     # Define expected values
     expected_num_points = 5860
@@ -168,20 +180,21 @@ def test_mesh_model_with_one_inlet_and_two_outlets():
         f"HDF5 mesh has {mesh_hdf5.num_cells()} cells, expected {expected_num_cells}"
 
 
-def test_mesh_model_with_variable_mesh_density():
+def test_mesh_model_with_variable_mesh_density(tmpdir):
     """
     Test meshing procedure on a specific 3D model with variable mesh density.
     """
     # Define test data paths
     original_model_path = Path("tests/test_data/artery/artery.stl")
-    model_path = original_model_path.with_name(original_model_path.stem + "_variable_mesh_density.stl")
-    sphere_file_path = model_path.with_name("stored_" + model_path.stem + "_distance_to_sphere_spheres.vtp")
-    copied_sphere_file_path = sphere_file_path.with_name(model_path.stem + "_distance_to_sphere_spheres.vtp")
+    model_path = Path(tmpdir) / original_model_path.name
+    sphere_file_path = original_model_path.with_name("stored_" + model_path.stem + \
+                                                     "_variable_mesh_density_distance_to_sphere_spheres.vtp")
+    copied_sphere_file_path = model_path.with_name(model_path.stem + "_distance_to_sphere_spheres.vtp")
 
     mesh_path_vtu = model_path.with_suffix(".vtu")
     mesh_path_hdf5 = model_path.with_suffix(".h5")
 
-    # Make copies of the original model and sphere files using pathlib
+    # Copy the original model and sphere file to tmpdir
     model_path.write_text(original_model_path.read_text())
     copied_sphere_file_path.write_text(sphere_file_path.read_text())
 
@@ -253,20 +266,21 @@ def compute_cylinder_diameter_at_cut(mesh, point_coords, plane_normal):
     return diameter
 
 
-def test_mesh_model_with_variable_solid_thickness():
+def test_mesh_model_with_variable_solid_thickness(tmpdir):
     """
     Test meshing procedure on a specific 3D model with variable solid thickness.
     """
     # Define test data paths
     original_model_path = Path("tests/test_data/cylinder/cylinder.vtp")
-    model_path = original_model_path.with_name(original_model_path.stem + "_variable_solid_thickness.vtp")
-    sphere_file_path = model_path.with_name("stored_" + model_path.stem + "_distance_to_sphere_solid_thickness.vtp")
-    copied_sphere_file_path = sphere_file_path.with_name(model_path.stem + "_distance_to_sphere_solid_thickness.vtp")
+    model_path = Path(tmpdir) / original_model_path.name #.with_name(original_model_path.stem + "_variable_solid_thickness.vtp")
+    sphere_file_path = original_model_path.with_name("stored_" + model_path.stem + \
+                                                     "_variable_solid_thickness_distance_to_sphere_solid_thickness.vtp")
+    copied_sphere_file_path = model_path.with_name(model_path.stem + "_distance_to_sphere_solid_thickness.vtp")
 
     mesh_path_vtu = model_path.with_suffix(".vtu")
     mesh_path_hdf5 = model_path.with_suffix(".h5")
 
-    # Make copies of the original model and sphere files using pathlib
+    # Copy the original model and sphere file to tmpdir
     model_path.write_text(original_model_path.read_text())
     copied_sphere_file_path.write_text(sphere_file_path.read_text())
 
@@ -324,17 +338,17 @@ def test_mesh_model_with_variable_solid_thickness():
         f"VTU mesh has diameter {diameter_at_outlet} at outlet, expected {expected_diameter_at_outlet}"
 
 
-def test_xdmf_mesh_format():
+def test_xdmf_mesh_format(tmpdir):
     """
     Test meshing procedure with generated mesh in XDMF format.
     """
     # Define test data paths
     original_model_path = Path("tests/test_data/cylinder/cylinder.vtp")
-    model_path = original_model_path.with_name(original_model_path.stem + "_xdmf_mesh_format.vtp")
+    model_path = Path(tmpdir) / original_model_path.name
     mesh_path_vtu = model_path.with_suffix(".vtu")
     mesh_path_xdmf = model_path.with_suffix(".xdmf")
 
-    # Make copies of the original model
+    # Copy the original model to tmpdir
     model_path.write_text(original_model_path.read_text())
 
     # Define expected values
