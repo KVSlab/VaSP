@@ -15,6 +15,7 @@ fsipy-log-plotter simulation.log --plot-all --save --output-directory Results --
 """
 
 import re
+import json
 import argparse
 import logging
 from pathlib import Path
@@ -195,17 +196,22 @@ def parse_dictionary_from_log(log_file: str) -> dict:
 
                 # Check if the line ends the current dictionary entry
                 if line.endswith('}'):
-                    # Combine the lines and evaluate as a dictionary
+                    # Combine the lines and modify for JSON compatibility
                     entry_str = '\n'.join(entry_lines)
+                    entry_str = entry_str.replace("'", '"').replace("None", "null").replace("True", "true").replace("False", "false")
+
+                    # Handle PosixPath objects by converting them to strings
+                    entry_str = re.sub(r'"(restart_folder)":\s+PosixPath\("([^"]+)"\)', r'"\1": "\2"', entry_str)
+
                     try:
-                        entry_dict = eval(entry_str)
+                        entry_dict = json.loads(entry_str)
                         if isinstance(entry_dict, dict):
                             parsed_dict.update(entry_dict)
                             break  # Exit the loop since there is only one dictionary
                         else:
                             logging.warning(f"WARNING: Entry is not a valid dictionary: {entry_str}")
-                    except SyntaxError:
-                        logging.warning(f"WARNING: SyntaxError while parsing entry: {entry_str}")
+                    except json.JSONDecodeError as e:
+                        logging.warning(f"WARNING: JSONDecodeError while parsing entry: {e}")
 
     return parsed_dict
 
