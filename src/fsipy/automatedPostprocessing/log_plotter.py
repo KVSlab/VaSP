@@ -763,7 +763,14 @@ def main() -> None:
         start = 0
         end = len(cpu_time)
 
-    if args.plot_all or args.plot_cpu_time:
+    def check_and_warn_empty(variable_name, variable_data, condition):
+        """Check if a variable's data is empty, print a warning, and set the condition to False if it's empty."""
+        if len(variable_data) == 0:
+            logging.warning(f"WARNING: No information about '{variable_name}' found in the log file. Skipping.")
+            condition = False  # Set the condition to False if the array is empty
+        return condition
+
+    if check_and_warn_empty("CPU Time", cpu_time, args.plot_all or args.plot_cpu_time):
         if args.compare_cycles:
             # Call the plot function to plot CPU time comparison across multiple cycles
             plot_variable_comparison(cpu_time, "CPU Time", time_steps_per_cycle, save_to_file=args.save,
@@ -775,7 +782,7 @@ def main() -> None:
                                   output_directory=args.output_directory, figure_size=args.figure_size,
                                   start=start, end=end)
 
-    if args.plot_all or args.plot_ramp_factor:
+    if check_and_warn_empty("Ramp Factor", ramp_factor, args.plot_all or args.plot_ramp_factor):
         if args.compare_cycles:
             # Call the plot function to plot ramp factor comparison across multiple cycles
             plot_variable_comparison(ramp_factor, "Ramp Factor", time_steps_per_cycle, save_to_file=args.save,
@@ -787,7 +794,7 @@ def main() -> None:
                                   output_directory=args.output_directory, figure_size=args.figure_size,
                                   start=start, end=end)
 
-    if args.plot_all or args.plot_pressure:
+    if check_and_warn_empty("Pressure", pressure, args.plot_all or args.plot_pressure):
         if args.compare_cycles:
             # Call the plot function to plot pressure comparison across multiple cycles
             plot_variable_comparison(pressure, "Pressure", time_steps_per_cycle, save_to_file=args.save,
@@ -799,17 +806,19 @@ def main() -> None:
                                   output_directory=args.output_directory, figure_size=args.figure_size,
                                   start=start, end=end)
 
-    if args.plot_all or args.plot_newton_iteration_atol:
+    if check_and_warn_empty("Newton iteration (atol)", newton_iteration_atol,
+                            args.plot_all or args.plot_newton_iteration_atol):
         # Call the plot function to plot Newton iteration (atol)
         plot_newton_iteration(newton_iteration_atol, "Newton iteration (atol)", save_to_file=args.save,
                               output_directory=args.output_directory, figure_size=args.figure_size)
 
-    if args.plot_all or args.plot_newton_iteration_rtol:
+    if check_and_warn_empty("Newton iteration (atol)", newton_iteration_rtol,
+                            args.plot_all or args.plot_newton_iteration_rtol):
         # Call the plot function to plot Newton iteration (rtol)
         plot_newton_iteration(newton_iteration_rtol, "Newton iteration (rtol)", save_to_file=args.save,
                               output_directory=args.output_directory, figure_size=args.figure_size)
 
-    if args.plot_all or args.plot_flow_rate:
+    if check_and_warn_empty("Flow Rate", flow_rate, args.plot_all or args.plot_flow_rate):
         if args.compare_cycles:
             # Call the plot function to plot flow rate comparison across multiple cycles
             plot_variable_comparison(flow_rate, "Flow Rate", time_steps_per_cycle, save_to_file=args.save,
@@ -821,7 +830,7 @@ def main() -> None:
                                   output_directory=args.output_directory, figure_size=args.figure_size,
                                   start=start, end=end)
 
-    if args.plot_all or args.plot_velocity:
+    if check_and_warn_empty("Velocity", velocity_mean, args.plot_all or args.plot_velocity):
         if args.compare_cycles:
             # Call the plot function to plot velocity comparison across multiple cycles
             plot_multiple_variables_comparison(velocity_mean, velocity_min, velocity_max, "Velocity",
@@ -834,7 +843,7 @@ def main() -> None:
                                             save_to_file=args.save, output_directory=args.output_directory,
                                             figure_size=args.figure_size, start=start, end=end)
 
-    if args.plot_all or args.plot_cfl:
+    if check_and_warn_empty("CFL", cfl_mean, args.plot_all or args.plot_cfl):
         if args.compare_cycles:
             # Call the plot function to plot velocity comparison across multiple cycles
             plot_multiple_variables_comparison(cfl_mean, cfl_min, cfl_max, "CFL",
@@ -847,7 +856,7 @@ def main() -> None:
                                             output_directory=args.output_directory, figure_size=args.figure_size,
                                             start=start, end=end)
 
-    if args.plot_all or args.plot_reynolds:
+    if check_and_warn_empty("Reynolds Numbers", reynolds_mean, args.plot_all or args.plot_reynolds):
         if args.compare_cycles:
             # Call the plot function to plot velocity comparison across multiple cycles
             plot_multiple_variables_comparison(reynolds_mean, reynolds_min, reynolds_max, "Reynolds Numbers",
@@ -860,7 +869,7 @@ def main() -> None:
                                             save_to_file=args.save, output_directory=args.output_directory,
                                             figure_size=args.figure_size, start=start, end=end)
 
-    if args.plot_all or args.plot_probe_points:
+    if check_and_warn_empty("Probe Points", probe_points, args.plot_all or args.plot_probe_points):
         if args.compare_cycles:
             # Call the plot function to plot probe points comparison across multiple cycles
             plot_probe_points_comparison(probe_points, time_steps_per_cycle, selected_probe_points=args.probe_points,
