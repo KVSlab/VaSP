@@ -198,7 +198,12 @@ def parse_dictionary_from_log(log_file: str) -> dict:
                 if line.endswith('}'):
                     # Combine the lines and modify for JSON compatibility
                     entry_str = '\n'.join(entry_lines)
-                    entry_str = entry_str.replace("'", '"').replace("None", "null").replace("True", "true").replace("False", "false")
+                    entry_str = (
+                        entry_str.replace("'", '"')
+                        .replace("None", "null")
+                        .replace("True", "true")
+                        .replace("False", "false")
+                    )
 
                     # Handle PosixPath objects by converting them to strings
                     entry_str = re.sub(r'"(restart_folder)":\s+PosixPath\("([^"]+)"\)', r'"\1": "\2"', entry_str)
