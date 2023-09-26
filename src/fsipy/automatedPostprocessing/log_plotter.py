@@ -425,7 +425,7 @@ def plot_newton_iteration(variable: np.ndarray, variable_name: str, save_to_file
     logging.info(f"--- Creating plot for {variable_name}")
 
     plt.figure(figsize=figure_size)
-    plt.plot(variable, label=variable_name, linestyle='-', color='b')
+    plt.plot(variable, label=variable_name, linestyle='--', marker='o', color='b')
     plt.ylabel(variable_name)
     plt.title(f"{variable_name}")
     plt.grid(True)
