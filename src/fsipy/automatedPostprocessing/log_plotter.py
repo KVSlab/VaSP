@@ -704,7 +704,7 @@ def main() -> None:
 
     # Extract end time, cycle length and time step size from the parsed dictionary
     end_time = parsed_dict.get("T", 0.951)
-    cycle_length = parsed_dict.get("T_cycle", 0.951)
+    cycle_length = parsed_dict.get("cardiac_cycle", 0.951)
     dt = parsed_dict.get("dt", 0.001)
 
     # Calculate the number of cycles and the number of time steps per cycle
