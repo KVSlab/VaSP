@@ -739,27 +739,44 @@ def main() -> None:
     # Compute average over cycles for all data (except Newton iteration) if enabled
     if args.compute_average:
         logging.info(f"--- Computing average over cycles (cycle {start_cycle}-{end_cycle})")
-        cpu_time = compute_average_over_cycles(cpu_time[start:end], time_steps_per_cycle)
-        ramp_factor = compute_average_over_cycles(ramp_factor[start:end], time_steps_per_cycle)
-        pressure = compute_average_over_cycles(pressure[start:end], time_steps_per_cycle)
-        flow_rate = compute_average_over_cycles(flow_rate[start:end], time_steps_per_cycle)
-        velocity_mean = compute_average_over_cycles(velocity_mean[start:end], time_steps_per_cycle)
-        velocity_min = compute_average_over_cycles(velocity_min[start:end], time_steps_per_cycle)
-        velocity_max = compute_average_over_cycles(velocity_max[start:end], time_steps_per_cycle)
-        cfl_mean = compute_average_over_cycles(cfl_mean[start:end], time_steps_per_cycle)
-        cfl_min = compute_average_over_cycles(cfl_min[start:end], time_steps_per_cycle)
-        cfl_max = compute_average_over_cycles(cfl_max[start:end], time_steps_per_cycle)
-        reynolds_mean = compute_average_over_cycles(reynolds_mean[start:end], time_steps_per_cycle)
-        reynolds_min = compute_average_over_cycles(reynolds_min[start:end], time_steps_per_cycle)
-        reynolds_max = compute_average_over_cycles(reynolds_max[start:end], time_steps_per_cycle)
+        cpu_time = compute_average_over_cycles(cpu_time[start:end], time_steps_per_cycle) \
+            if len(cpu_time) > 0 else cpu_time
+        ramp_factor = compute_average_over_cycles(ramp_factor[start:end], time_steps_per_cycle) \
+            if len(ramp_factor) > 0 else ramp_factor
+        pressure = compute_average_over_cycles(pressure[start:end], time_steps_per_cycle) \
+            if len(pressure) > 0 else pressure
+        flow_rate = compute_average_over_cycles(flow_rate[start:end], time_steps_per_cycle) \
+            if len(flow_rate) > 0 else flow_rate
+        velocity_mean = compute_average_over_cycles(velocity_mean[start:end], time_steps_per_cycle) \
+            if len(velocity_mean) > 0 else velocity_mean
+        velocity_min = compute_average_over_cycles(velocity_min[start:end], time_steps_per_cycle) \
+            if len(velocity_min) > 0 else velocity_min
+        velocity_max = compute_average_over_cycles(velocity_max[start:end], time_steps_per_cycle) \
+            if len(velocity_max) > 0 else velocity_max
+        cfl_mean = compute_average_over_cycles(cfl_mean[start:end], time_steps_per_cycle) \
+            if len(cfl_mean) > 0 else cfl_mean
+        cfl_min = compute_average_over_cycles(cfl_min[start:end], time_steps_per_cycle) \
+            if len(cfl_min) > 0 else cfl_min
+        cfl_max = compute_average_over_cycles(cfl_max[start:end], time_steps_per_cycle) \
+            if len(cfl_max) > 0 else cfl_max
+        reynolds_mean = compute_average_over_cycles(reynolds_mean[start:end], time_steps_per_cycle) \
+            if len(reynolds_mean) > 0 else reynolds_mean
+        reynolds_min = compute_average_over_cycles(reynolds_min[start:end], time_steps_per_cycle) \
+            if len(reynolds_min) > 0 else reynolds_min
+        reynolds_max = compute_average_over_cycles(reynolds_max[start:end], time_steps_per_cycle) \
+            if len(reynolds_max) > 0 else reynolds_max
 
         for probe_point, probe_data in probe_points.items():
             probe_points[probe_point]["magnitude"] = \
-                compute_average_over_cycles(probe_data["magnitude"][start:end], time_steps_per_cycle)
+                compute_average_over_cycles(probe_data["magnitude"][start:end], time_steps_per_cycle) \
+                if len(probe_data["magnitude"]) > 0 else probe_data["magnitude"]
             probe_points[probe_point]["pressure"] = \
-                compute_average_over_cycles(probe_data["pressure"][start:end], time_steps_per_cycle)
+                compute_average_over_cycles(probe_data["pressure"][start:end], time_steps_per_cycle) \
+                if len(probe_data["pressure"]) > 0 else probe_data["pressure"]
 
         time = time[start:start + len(cpu_time)]
+
+        # Update start and end range for data
         start = 0
         end = len(cpu_time)
 
