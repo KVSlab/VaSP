@@ -709,7 +709,7 @@ def main() -> None:
 
     # Calculate the number of cycles and the number of time steps per cycle
     num_cycles = int(end_time / cycle_length)
-    time_steps_per_cycle = round(cycle_length / dt) + 1
+    time_steps_per_cycle = round(cycle_length / dt)
 
     # Determine start and end range for data
     start_cycle = args.start_cycle
