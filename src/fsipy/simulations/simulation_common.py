@@ -158,9 +158,10 @@ def load_probe_points(mesh_path: Union[str, Path]) -> np.ndarray:
         np.ndarray: An array containing the loaded probe points.
     """
     mesh_path = Path(mesh_path)
-    rel_path = mesh_path.stem + "_probe_point"
+    rel_path = mesh_path.stem + "_probe_point.json"
     probe_points_path = mesh_path.parent / rel_path
-    probe_points = np.load(probe_points_path, encoding='latin1', fix_imports=True, allow_pickle=True)
+    with open(probe_points_path) as f:
+        probe_points = np.array(json.load(f))
 
     return probe_points
 
