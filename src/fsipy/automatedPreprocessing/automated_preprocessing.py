@@ -80,7 +80,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
     file_name_distance_to_sphere_curv = base_path + "_distance_to_sphere_curv.vtp"
     file_name_distance_to_sphere_spheres = base_path + "_distance_to_sphere_spheres.vtp"
     file_name_distance_to_sphere_solid_thickness = base_path + "_distance_to_sphere_solid_thickness.vtp"
-    file_name_probe_points = base_path + "_probe_point"
+    file_name_probe_points = base_path + "_probe_point.json"
     file_name_voronoi = base_path + "_voronoi.vtp"
     file_name_voronoi_smooth = base_path + "_voronoi_smooth.vtp"
     file_name_voronoi_surface = base_path + "_voronoi_surface.vtp"
