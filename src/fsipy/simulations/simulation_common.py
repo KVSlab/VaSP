@@ -1,5 +1,5 @@
 import json
-from typing import List, Union, Tuple
+from typing import List, Union, Tuple, NamedTuple
 from pathlib import Path
 
 import numpy as np
@@ -107,7 +107,37 @@ def print_mesh_summary(mesh: Mesh) -> None:
         print(f"Number of cells per volume: {combined_info['num_cells'] / volume}\n")
 
 
-def load_mesh_info(mesh_path: Union[str, Path]) -> Tuple[List[int], List[int], int, float, List[float], List[float]]:
+class MeshInfo(NamedTuple):
+    """
+    Represents mesh information.
+
+    Attributes:
+        id_in (List[int]): List of inlet IDs.
+        id_out (List[int]): List of outlet IDs.
+        id_wall (int): Computed wall ID.
+        Q_mean (float): Mean flow rate.
+        area_ratio (List[float]): List of area ratios.
+        area_inlet (List[float]): List of inlet areas.
+        solid_side_wall_id (int): ID for solid side wall.
+        interface_fsi_id (int): ID for the FSI interface.
+        interface_outer_id (int): ID for the outer interface.
+        volume_id_fluid (int): ID for the fluid volume.
+        volume_id_solid (int): ID for the solid volume.
+    """
+    id_in: List[int]
+    id_out: List[int]
+    id_wall: int
+    Q_mean: float
+    area_ratio: List[float]
+    area_inlet: List[float]
+    solid_side_wall_id: int
+    interface_fsi_id: int
+    interface_outer_id: int
+    volume_id_fluid: int
+    volume_id_solid: int
+
+
+def load_mesh_info(mesh_path: Union[str, Path]) -> MeshInfo:
     """
     Load and process mesh information from a JSON file.
 
@@ -115,15 +145,7 @@ def load_mesh_info(mesh_path: Union[str, Path]) -> Tuple[List[int], List[int], i
         mesh_path (str or Path): The path to the mesh file.
 
     Returns:
-        Tuple[List[int], List[int], int, float, List[float], List[float]]:
-            A tuple containing:
-            - id_in (List[int]): List of inlet IDs.
-            - id_out (List[int]): List of outlet IDs.
-            - id_wall (int): Computed wall ID.
-            - Q_mean (float): Mean flow rate.
-            - area_ratio (List[float]): List of area ratios.
-            - area_inlet (List[float]): List of inlet areas.
-
+        MeshInfo: A named tuple containing mesh information.
     Raises:
         FileNotFoundError: If the info file is not found.
     """
@@ -143,8 +165,15 @@ def load_mesh_info(mesh_path: Union[str, Path]) -> Tuple[List[int], List[int], i
     Q_mean = info['mean_flow_rate']
     area_ratio = info['area_ratio']
     area_inlet = info['inlet_area']
+    solid_side_wall_id = info["solid_side_wall_id"]
+    interface_fsi_id = info["interface_fsi_id"]
+    interface_outer_id = info["interface_outer_id"]
+    volume_id_fluid = info["volume_id_fluid"]
+    volume_id_solid = info["volume_id_solid"]
 
-    return id_in, id_out, id_wall, Q_mean, area_ratio, area_inlet
+    return MeshInfo(id_in, id_out, id_wall, Q_mean, area_ratio, area_inlet,
+                    solid_side_wall_id, interface_fsi_id, interface_outer_id,
+                    volume_id_fluid, volume_id_solid)
 
 
 def load_probe_points(mesh_path: Union[str, Path]) -> np.ndarray:

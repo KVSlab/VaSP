@@ -102,16 +102,23 @@ def dist_sphere_spheres(surface: vtkPolyData, save_path: str,
 
 
 def generate_mesh(surface: vtkPolyData, number_of_sublayers_fluid: int, number_of_sublayers_solid: int,
-                  solid_thickness: str, solid_thickness_parameters: list) -> tuple:
+                  solid_thickness: str, solid_thickness_parameters: list,
+                  solid_side_wall_id: int = 11, interface_fsi_id: int = 22, interface_outer_id: int = 33,
+                  volume_id_fluid: int = 0, volume_id_solid: int = 1) -> tuple:
     """
     Generates a mesh suitable for FSI from an input surface model.
 
     Args:
         surface (vtkPolyData): Surface model to be meshed.
         number_of_sublayers_fluid (int): Number of sublayers for fluid.
-        number_of_sublayers_solud (int): Number of sublayers for solid.
+        number_of_sublayers_solid (int): Number of sublayers for solid.
         solid_thickness (str): Type of solid thickness ('variable' or 'constant').
         solid_thickness_parameters (list): List of parameters for solid thickness.
+        solid_side_wall_id (int, optional): ID for solid side wall. Default is 11.
+        interface_fsi_id (int, optional): ID for the FSI interface. Default is 22.
+        interface_outer_id (int, optional): ID for the outer interface. Default is 33.
+        volume_id_fluid (int, optional): ID for the fluid volume. Default is 0.
+        volume_id_solid (int, optional): ID for the solid volume. Default is 1.
 
     Returns:
         tuple: A tuple containing the generated mesh (vtkUnstructuredGrid) and the remeshed surface (vtkPolyData).
@@ -145,11 +152,11 @@ def generate_mesh(surface: vtkPolyData, number_of_sublayers_fluid: int, number_o
         meshGenerator.SolidThickness = solid_thickness_parameters[0]
 
     # IDs
-    meshGenerator.SolidSideWallId = 11
-    meshGenerator.InterfaceId_fsi = 22
-    meshGenerator.InterfaceId_outer = 33
-    meshGenerator.VolumeId_fluid = 0  # (keep to 0)
-    meshGenerator.VolumeId_solid = 1
+    meshGenerator.SolidSideWallId = solid_side_wall_id
+    meshGenerator.InterfaceFsiId = interface_fsi_id
+    meshGenerator.InterfaceOuterId = interface_outer_id
+    meshGenerator.VolumeIdFluid = volume_id_fluid
+    meshGenerator.VolumeIdSolid = volume_id_solid
 
     # Generate mesh
     meshGenerator.Execute()
