@@ -193,7 +193,7 @@ def filter_SPI(U, W_low_cut, tag):
 
 
 def filter_SPI_print(U, W_low_cut, tag):
-   """
+    """
     Author: Mehdi Najafi
 
     """

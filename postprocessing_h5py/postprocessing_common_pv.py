@@ -21,6 +21,36 @@ import pyvista as pv
 """
 This script contains a number of helper functions to create visualizations outsside of fenics.
 """
+
+def read_command_line_region():
+    """Read arguments from commandline"""
+    parser = ArgumentParser()
+
+    parser.add_argument('--case', type=str, default="cyl_test", help="Path to simulation results",
+                        metavar="PATH")
+    parser.add_argument('--mesh', type=str, default="artery_coarse_rescaled", help="Mesh File Name",
+                        metavar="PATH")
+    parser.add_argument('--save_deg', type=int, default=2, help="Input save_deg of simulation, i.e whether the intermediate P2 nodes were saved. Entering save_deg = 1 when the simulation was run with save_deg = 2 will result in only the corner nodes being used in postprocessing")
+    parser.add_argument('--stride', type=int, default=1, help="Desired frequency of output data (i.e to output every second step, stride = 2)")    
+
+    parser.add_argument('--dt', type=float, default=0.001, help="Time step of simulation (s)")
+
+    parser.add_argument('--start_t', type=float, default=0.0, help="Start time of simulation (s)")
+    parser.add_argument('--end_t', type=float, default=0.05, help="End time of simulation (s)")
+    parser.add_argument('--dvp', type=str, default="v", help="Quantity to postprocess, input v for velocity, d for sisplacement, p for pressure, or wss for wall shear stress")
+    parser.add_argument('--bands', default="25,100000", help="input lower then upper band for Band-pass filtered displacement, in a list of pairs. for example: --bands '100 150 175 200' gives you band-pass filtered visualization for the band between 100 and 150, and another visualization for the band between 175 and 200")
+    parser.add_argument('--sampling_region', type=str, default="sphere", help="sample within -sphere, or within specific -domain") 
+    parser.add_argument('--fluid_sampling_domain_ID', type=int, default=1, help="Domain ID for fluid region to be sampled (need to input a labelled mesh with this ID)")   
+    parser.add_argument('--solid_sampling_domain_ID', type=int, default=2, help="Domain ID for solid region to be sampled (need to input a labelled mesh with this ID)")    
+    parser.add_argument('--r_sphere', type=float, default=1000000, help="Sphere in which to include points for spectrogram, this is the sphere radius")
+    parser.add_argument('--x_sphere', type=float, default=0.0, help="Sphere in which to include points for spectrogram, this is the x coordinate of the center of the sphere (in m)")
+    parser.add_argument('--y_sphere', type=float, default=0.0, help="Sphere in which to include points for spectrogram, this is the y coordinate of the center of the sphere (in m)")
+    parser.add_argument('--z_sphere', type=float, default=0.0, help="Sphere in which to include points for spectrogram, this is the z coordinate of the center of the sphere (in m)")
+    args = parser.parse_args()
+
+    return args.case, args.mesh, args.save_deg, args.stride, args.dt, args.start_t, args.end_t, args.dvp, args.bands, args.sampling_region, args.fluid_sampling_domain_ID, args.solid_sampling_domain_ID, args.r_sphere, args.x_sphere, args.y_sphere, args.z_sphere
+
+
 def vtk_taubin_smooth(mesh, pass_band=0.1, feature_angle=60.0, iterations=20):
     """ Smooth mesh using Taubin method. """
     smoother = vtk.vtkWindowedSincPolyDataFilter()
@@ -87,10 +117,64 @@ def assemble_mesh(mesh_file):
         celltypes[:] = vtk.VTK_TETRA
         cell_type = np.ones((cells.shape[0], 1), dtype=int) * 4
         cells = np.concatenate([cell_type, cells], axis = 1)
+        print(cells)
+
         mesh = pv.UnstructuredGrid(cells.ravel(), celltypes, points)
         surf = mesh.extract_surface()
 
     return mesh, surf
+
+
+def assemble_mesh_domains(mesh_file):
+    """ Create UnstructuredGrid from h5 mesh file. """
+   
+    with h5py.File(mesh_file, 'r') as hf:
+        points = np.array(hf['mesh/coordinates'][:,:])
+        cells = np.array(hf['domains/topology'][:,:])
+        try:
+            domains = hf['domains/values'][:] # Open domain array
+        except:
+            print("No domain markers found")
+
+        celltypes = np.empty(cells.shape[0], dtype=np.uint8)
+        celltypes[:] = vtk.VTK_TETRA
+        cell_type = np.ones((cells.shape[0], 1), dtype=int) * 4
+        cells = np.concatenate([cell_type, cells], axis = 1)
+        print(cells)
+
+        mesh = pv.UnstructuredGrid(cells.ravel(), celltypes, points)
+        surf = mesh.extract_surface()
+
+    return mesh, surf, domains
+
+def assemble_mesh_arrays(points, cells):
+    """ Create UnstructuredGrid from h5 mesh file. """
+   
+    celltypes = np.empty(cells.shape[0], dtype=np.uint8)
+    celltypes[:] = vtk.VTK_TETRA
+    cell_type = np.ones((cells.shape[0], 1), dtype=int) * 4
+    cells = np.concatenate([cell_type, cells], axis = 1)
+    print(cells)
+    mesh = pv.UnstructuredGrid(cells.ravel(), celltypes, points)
+    surf = mesh.extract_surface()
+
+    return mesh, surf
+
+def assemble_tri_mesh_arrays(points, cells):
+    n_elem = cells.shape[0]
+
+    padding = np.ones((n_elem, 1), dtype=np.int64)*3
+    cells = np.hstack((padding, cells)).ravel()
+    
+    cell_type = np.empty(n_elem, np.uint8)
+    cell_type[:] = vtk.VTK_TRIANGLE
+    
+    mesh = pv.UnstructuredGrid(cells, cell_type, points)
+    surf = mesh.extract_surface()
+
+    return mesh, surf
+
+
 
 def get_data_at_idx(out_file, idx):
     vectorData = h5py.File(out_file) 
