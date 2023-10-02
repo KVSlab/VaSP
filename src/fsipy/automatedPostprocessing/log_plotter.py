@@ -106,11 +106,13 @@ def parse_log_file(log_file: str) -> Dict[str, Any]:
                 probe_point = int(match.group(1))
                 if probe_point not in data["probe_points"]:
                     data["probe_points"][probe_point] = {
+                        "velocity": [],
                         "magnitude": [],
                         "pressure": []
                     }
-                velocity_magnitude = \
-                    np.sqrt(float(match.group(2))**2 + float(match.group(3))**2 + float(match.group(4))**2)
+                velocity_components = [float(match.group(2)), float(match.group(3)), float(match.group(4))]
+                velocity_magnitude = np.sqrt(np.sum(np.array(velocity_components) ** 2))
+                data["probe_points"][probe_point]["velocity"].append(velocity_components)
                 data["probe_points"][probe_point]["magnitude"].append(velocity_magnitude)
                 data["probe_points"][probe_point]["pressure"].append(float(match.group(5)))
                 continue
@@ -150,6 +152,7 @@ def parse_log_file(log_file: str) -> Dict[str, Any]:
     data["newton_iteration"]["rtol"] = np.array(data["newton_iteration"]["rtol"])
 
     for probe_point in data["probe_points"]:
+        data["probe_points"][probe_point]["velocity"] = np.array(data["probe_points"][probe_point]["velocity"])
         data["probe_points"][probe_point]["magnitude"] = np.array(data["probe_points"][probe_point]["magnitude"])
         data["probe_points"][probe_point]["pressure"] = np.array(data["probe_points"][probe_point]["pressure"])
 
@@ -505,6 +508,11 @@ def plot_probe_points(time: np.ndarray, probe_points: Dict[int, Dict[str, np.nda
         ax2.legend([l1, l2], ["Velocity Magnitude", "Pressure"], loc="upper right")
         ax2.tick_params(axis='y', which='major', labelcolor='r')
 
+    # Remove any empty subplots if the number of probe points doesn't fill the entire grid
+    for i in range(num_selected_probe_points, num_rows * num_cols):
+        print(i)
+        fig.delaxes(axs[i])
+
     # Adjust spacing between subplots
     plt.tight_layout()
 
@@ -639,6 +647,180 @@ def compute_average_over_cycles(data: np.ndarray, time_steps_per_cycle: int) -> 
     return average_over_cycles
 
 
+def compute_tke(probe_points: Dict[int, Dict[str, Any]], time_steps_per_cycle: int, start_cycle: Optional[int] = None,
+                end_cycle: Optional[int] = None) -> Dict[int, Tuple[np.ndarray, np.ndarray, np.ndarray]]:
+    """
+    Compute the mean velocity, fluctuating velocity, and turbulent kinetic energy for each point within the specified
+    cycle range in the probe points data.
+
+    Args:
+        probe_points (dict): Probe points data as returned by parse_log_file.
+        time_steps_per_cycle (int): Number of time steps per cycle.
+        start_cycle (int, optional): The cycle to start computing from (inclusive). Default is the first cycle.
+        end_cycle (int, optional): The cycle to end computing at (inclusive). Default is the last cycle.
+
+    Returns:
+        dict: A dictionary containing the mean velocity, fluctuating velocity, and TKE for each point within the
+            specified cycle range. Each entry is a tuple of (mean_velocity, fluctuating_velocity, tke_array).
+    """
+    velocity_data = {}
+
+    # Calculate the number of cycles
+    num_cycles = len(probe_points[0]["velocity"]) // time_steps_per_cycle
+
+    # If start_cycle is None, start at first cycle
+    first_cycle = 1 if start_cycle is None else int(start_cycle)
+
+    # If end_cycle is not provided, end at last cycle
+    last_cycle = num_cycles if end_cycle is None else int(end_cycle)
+
+    logging.info(f"--- Computing TKE for probe points from cycle {first_cycle} to cycle {last_cycle}")
+
+    for probe_point, data in probe_points.items():
+        # Extract velocity data for the current probe point
+        velocities = data["velocity"]
+
+        # Calculate the number of time steps to process
+        num_time_steps = (last_cycle - first_cycle + 1) * time_steps_per_cycle
+
+        # Initialize arrays to store mean velocity, fluctuating velocity, and TKE for each point
+        mean_velocities = np.zeros((num_time_steps, 3))
+        fluctuating_velocities = np.zeros((num_time_steps, 3))
+        tke_values = np.zeros(num_time_steps)
+
+        # Calculate start and end indices for slicing
+        start_index = (first_cycle - 1) * time_steps_per_cycle
+        end_index = start_index + num_time_steps
+
+        # Extract velocities for the entire range
+        all_point_velocities = velocities[start_index:end_index]
+
+        # Reshape velocities for easier calculations
+        all_point_velocities = all_point_velocities.reshape((last_cycle - first_cycle + 1, time_steps_per_cycle, -1))
+
+        # Compute the mean velocity, fluctuating velocity, and TKE for each point within the specified cycle range
+        mean_velocities = np.mean(all_point_velocities, axis=1)
+        fluctuating_velocities = all_point_velocities - mean_velocities[:, np.newaxis, :]
+        tke_values = 0.5 * np.sum(fluctuating_velocities**2, axis=2).flatten()
+
+        # Store the mean velocity, fluctuating velocity, and TKE for this probe point
+        velocity_data[probe_point] = (mean_velocities, fluctuating_velocities, tke_values)
+
+    return velocity_data
+
+
+def plot_probe_points_tke(tke_data: Dict[int, Tuple[np.ndarray, np.ndarray, np.ndarray]],
+                          selected_probe_points: Optional[List[int]] = None, save_to_file: bool = False,
+                          output_directory: Optional[str] = None, figure_size: Tuple[int, int] = (12, 6)):
+    """
+    Plot the turbulent kinetic energy (TKE) for each probe point in separate subplots.
+
+    Args:
+        tke_data (dict): A dictionary containing TKE data for each probe point.
+            This should be in the format returned by compute_mean_fluctuating_and_tke_velocity.
+        save_to_file (bool, optional): Whether to save the figures to files (default is False).
+        output_directory (str, optional): The directory where the figure will be saved when save_to_file is True.
+        figure_size (tuple, optional): Figure size in inches (width, height). Default is (12, 8).
+    """
+    logging.info("--- Creating plot for TKE for probe points")
+
+    # If selected_probe_points is not provided, plot all probe points
+    if selected_probe_points is None:
+        selected_probe_points = list(tke_data.keys())
+
+    # Filter tke_data dictionary to select only the specified probe points
+    selected_tke_data = \
+        {probe_point: data for probe_point, data in tke_data.items() if probe_point in selected_probe_points}
+
+    num_selected_probe_points = len(selected_tke_data)
+
+    # Calculate the number of rows and columns for subplots
+    num_rows = int(np.ceil(num_selected_probe_points / 2))
+    num_cols = min(2, num_selected_probe_points)
+
+    for probe_point in selected_probe_points:
+        if probe_point not in tke_data:
+            # Log a warning for probe points not found in the dictionary
+            logging.warning(f"WARNING: Probe point {probe_point} not found. Skipping.")
+
+    # Create subplots for each probe point
+    if num_rows == 1 and num_cols == 1:
+        # If only one probe point is selected, create a single figure
+        fig, axes = plt.subplots(figsize=figure_size)
+        axes = [axes]
+    else:
+        fig, axes = plt.subplots(num_rows, num_cols, figsize=figure_size)
+
+        # Flatten the axes array for easier iteration
+        axes = axes.flatten()
+
+    # Add common title
+    fig.suptitle("Turbulent Kinetic Energy (TKE) for Probe Points", fontsize=16)
+
+    for i, (probe_point, (_, _, tke_values)) in enumerate(selected_tke_data.items()):
+        ax = axes[i]
+        ax.plot(tke_values, label=f"Probe Point {probe_point}")
+        ax.set_title(f"Probe Point {probe_point}")
+        ax.set_xlabel("Time Step")
+        ax.set_ylabel("TKE")
+        ax.legend()
+
+    # Remove any empty subplots if the number of probe points doesn't fill the entire grid
+    for i in range(num_selected_probe_points, num_rows * num_cols):
+        fig.delaxes(axes[i])
+
+    # Adjust spacing between subplots
+    plt.tight_layout()
+
+    if save_to_file:
+        save_plot_to_file("Probe Points TKE", output_directory)
+
+
+def plot_probe_points_tke_comparison(tke_data: Dict[int, Tuple[np.ndarray, np.ndarray, np.ndarray]],
+                                     time_steps_per_cycle: int, selected_probe_points: Optional[List[int]] = None,
+                                     save_to_file: bool = False, output_directory: Optional[str] = None,
+                                     figure_size: Tuple[int, int] = (12, 6)):
+    """
+    Plot the turbulent kinetic energy (TKE) per cycle for selected probe points in separate figures.
+
+    Args:
+        tke_data (dict): A dictionary containing TKE data for each probe point.
+            This should be in the format returned by compute_tke.
+        time_steps_per_cycle (int): Number of time steps per cycle.
+        selected_probe_points (list, optional): List of probe points to plot.
+            If not provided, all probe points will be plotted.
+        save_to_file (bool, optional): Whether to save the figures to files (default is False).
+        output_directory (str, optional): The directory where the figure will be saved when save_to_file is True.
+        figure_size (tuple, optional): Figure size in inches (width, height). Default is (12, 8).
+    """
+    logging.info("--- Creating TKE per cycle plots for selected probe points")
+
+    if selected_probe_points is None:
+        selected_probe_points = list(tke_data.keys())
+
+    for probe_point in selected_probe_points:
+        if probe_point not in tke_data:
+            logging.warning(f"WARNING: Probe point {probe_point} not found in the TKE data. Skipping.")
+            continue
+
+        _, _, tke_values = tke_data[probe_point]
+
+        num_cycles = len(tke_values) // time_steps_per_cycle
+
+        fig, ax = plt.subplots(figsize=figure_size)
+        for cycle in range(num_cycles):
+            cycle_tke_values = tke_values[cycle * time_steps_per_cycle:(cycle + 1) * time_steps_per_cycle]
+            ax.plot(cycle_tke_values, label=f"Cycle {cycle + 1}")
+
+        ax.set_title(f"Turbulent Kinetic Energy (TKE) per Cycle - Probe Point {probe_point}")
+        ax.set_xlabel("Time Step")
+        ax.set_ylabel("TKE")
+        ax.legend()
+
+        if save_to_file:
+            save_plot_to_file(f"Probe Points TKE Comparison {probe_point}", output_directory)
+
+
 def parse_command_line_args() -> argparse.Namespace:
     """
     Parse command-line arguments.
@@ -656,6 +838,7 @@ def parse_command_line_args() -> argparse.Namespace:
     parser.add_argument("--plot-newton-iteration-atol", action="store_true", help="Plot Newton iteration (atol)")
     parser.add_argument("--plot-newton-iteration-rtol", action="store_true", help="Plot Newton iteration (rtol)")
     parser.add_argument("--plot-probe-points", action="store_true", help="Plot probe points")
+    parser.add_argument("--plot-probe-points-tke", action="store_true", help="Plot TKE for probe points")
     parser.add_argument("--plot-flow-rate", action="store_true", help="Plot flow rate")
     parser.add_argument("--plot-velocity", action="store_true", help="Plot velocity (mean, min and max)")
     parser.add_argument("--plot-cfl", action="store_true", help="Plot CFL numbers (mean, min and max)")
@@ -687,7 +870,7 @@ def main() -> None:
 
     # Enable --plot-all by default if no specific --plot options are provided
     plot_types = ['cpu_time', 'ramp_factor', 'pressure', 'newton_iteration_atol', 'newton_iteration_rtol',
-                  'probe_points', 'flow_rate', 'velocity', 'cfl', 'reynolds']
+                  'probe_points', 'flow_rate', 'velocity', 'cfl', 'reynolds', 'probe_points_tke']
     args.plot_all = args.plot_all or all(not getattr(args, f'plot_{plot_type}') for plot_type in plot_types)
 
     # Create logger and set log level
@@ -898,6 +1081,27 @@ def main() -> None:
             plot_probe_points(time, probe_points, selected_probe_points=args.probe_points, save_to_file=args.save,
                               figure_size=args.figure_size, output_directory=args.output_directory, start=start,
                               end=end)
+
+    if check_and_warn_empty("Probe Points", probe_points, args.plot_all or args.plot_probe_points_tke):
+        # Compute TKE data for probe points
+        tke_data = compute_tke(probe_points, time_steps_per_cycle, start_cycle=start_cycle, end_cycle=end_cycle)
+
+        if args.compute_average:
+            for i, (probe_point, (mean_velocities, fluctuating_velocities, tke_values)) in enumerate(tke_data.items()):
+                tke_data[probe_point] = \
+                    (mean_velocities, fluctuating_velocities,
+                     compute_average_over_cycles(tke_values, time_steps_per_cycle)) \
+                    if len(tke_values) > 0 else (mean_velocities, fluctuating_velocities, tke_values)
+
+        if args.compare_cycles:
+            # Call the plot function to plot probe points comparison across multiple cycles
+            plot_probe_points_tke_comparison(tke_data, time_steps_per_cycle, selected_probe_points=args.probe_points,
+                                             save_to_file=args.save, figure_size=args.figure_size,
+                                             output_directory=args.output_directory)
+        else:
+            # Call the plot function to plot probe points
+            plot_probe_points_tke(tke_data, selected_probe_points=args.probe_points, save_to_file=args.save,
+                                  figure_size=args.figure_size, output_directory=args.output_directory)
 
     if not args.save:
         logging.info("--- Showing plot(s)")
