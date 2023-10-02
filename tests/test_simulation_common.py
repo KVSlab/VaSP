@@ -118,9 +118,9 @@ def test_load_mesh_info(temporary_hdf5_file):
     expected_area_inlet = 8.00556922943794
     expected_solid_side_wall_id = 11
     expected_interface_fsi_id = 22
-    expected_interface_outer_id = 33
-    expected_volume_id_fluid = 0
-    expected_volume_id_solid = 1
+    expected_solid_outer_wall_id = 33
+    expected_fluid_volume_id = 0
+    expected_solid_volume_id = 1
 
     # Test the load_mesh_info function with the temporary JSON info file
     mesh_info = load_mesh_info(temporary_hdf5_file)
@@ -143,13 +143,13 @@ def test_load_mesh_info(temporary_hdf5_file):
         f"Expected solid_side_wall_id: {expected_solid_side_wall_id}"
     assert mesh_info.interface_fsi_id == expected_interface_fsi_id, \
         f"Actual interface_fsi_id: {mesh_info.interface_fsi_id}, Expected interface_fsi_id: {expected_interface_fsi_id}"
-    assert mesh_info.interface_outer_id == expected_interface_outer_id, \
-        f"Actual interface_outer_id: {mesh_info.interface_outer_id}, " \
-        f"Expected interface_outer_id: {expected_interface_outer_id}"
-    assert mesh_info.volume_id_fluid == expected_volume_id_fluid, \
-        f"Actual volume_id_fluid: {mesh_info.volume_id_fluid}, Expected volume_id_fluid: {expected_volume_id_fluid}"
-    assert mesh_info.volume_id_solid == expected_volume_id_solid, \
-        f"Actual volume_id_solid: {mesh_info.volume_id_solid}, Expected volume_id_solid: {expected_volume_id_solid}"
+    assert mesh_info.solid_outer_wall_id == expected_solid_outer_wall_id, \
+        f"Actual solid_outer_wall_id: {mesh_info.solid_outer_wall_id}, " \
+        f"Expected solid_outer_wall_id: {expected_solid_outer_wall_id}"
+    assert mesh_info.fluid_volume_id == expected_fluid_volume_id, \
+        f"Actual fluid_volume_id: {mesh_info.fluid_volume_id}, Expected fluid_volume_id: {expected_fluid_volume_id}"
+    assert mesh_info.solid_volume_id == expected_solid_volume_id, \
+        f"Actual solid_volume_id: {mesh_info.solid_volume_id}, Expected solid_volume_id: {expected_solid_volume_id}"
 
 
 def test_print_mesh_summary(temporary_hdf5_file):

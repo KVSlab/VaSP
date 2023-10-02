@@ -132,9 +132,9 @@ class MeshInfo(NamedTuple):
     area_inlet: List[float]
     solid_side_wall_id: int
     interface_fsi_id: int
-    interface_outer_id: int
-    volume_id_fluid: int
-    volume_id_solid: int
+    solid_outer_wall_id: int
+    fluid_volume_id: int
+    solid_volume_id: int
 
 
 def load_mesh_info(mesh_path: Union[str, Path]) -> MeshInfo:
@@ -167,13 +167,12 @@ def load_mesh_info(mesh_path: Union[str, Path]) -> MeshInfo:
     area_inlet = info['inlet_area']
     solid_side_wall_id = info["solid_side_wall_id"]
     interface_fsi_id = info["interface_fsi_id"]
-    interface_outer_id = info["interface_outer_id"]
-    volume_id_fluid = info["volume_id_fluid"]
-    volume_id_solid = info["volume_id_solid"]
+    solid_outer_wall_id = info["solid_outer_wall_id"]
+    fluid_volume_id = info["fluid_volume_id"]
+    solid_volume_id = info["solid_volume_id"]
 
-    return MeshInfo(id_in, id_out, id_wall, Q_mean, area_ratio, area_inlet,
-                    solid_side_wall_id, interface_fsi_id, interface_outer_id,
-                    volume_id_fluid, volume_id_solid)
+    return MeshInfo(id_in, id_out, id_wall, Q_mean, area_ratio, area_inlet, solid_side_wall_id, interface_fsi_id,
+                    solid_outer_wall_id, fluid_volume_id, solid_volume_id)
 
 
 def load_probe_points(mesh_path: Union[str, Path]) -> np.ndarray:
