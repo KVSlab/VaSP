@@ -69,10 +69,10 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
         self.SizingFunctionArrayName = 'VolumeSizingFunction'
 
         self.SolidSideWallId = 11
-        self.InterfaceId_fsi = 22
-        self.InterfaceId_outer = 33
-        self.VolumeId_fluid = 0  # (keep to 0)
-        self.VolumeId_solid = 1
+        self.InterfaceFsiId = 22
+        self.SolidOuterWallId = 33
+        self.FluidVolumeId = 0  # (keep to 0)
+        self.SolidVolumeId = 1
 
         self.isAVF = False
         self.VeinIdsOffset = 1000
@@ -212,7 +212,7 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
             if not self.BoundaryLayerOnCaps:
                 boundaryLayer.SidewallCellEntityId = placeholderCellEntityId
                 boundaryLayer.InnerSurfaceCellEntityId = wallEntityOffset
-                boundaryLayer.VolumeCellEntityId = self.VolumeId_fluid
+                boundaryLayer.VolumeCellEntityId = self.FluidVolumeId
             boundaryLayer.Execute()
 
             self.PrintLog("Generating boundary layer solid")
@@ -234,10 +234,10 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
             boundaryLayer2.Thickness = self.SolidThickness
             boundaryLayer2.ThicknessRatio = 1
             if not self.BoundaryLayerOnCaps:
-                boundaryLayer2.SidewallCellEntityId = self.SolidSideWallId  # placeholderCellEntityId
-                boundaryLayer2.InnerSurfaceCellEntityId = self.InterfaceId_fsi  # wallEntityOffset
-                boundaryLayer2.OuterSurfaceCellEntityId = self.InterfaceId_outer  # wallEntityOffset
-                boundaryLayer2.VolumeCellEntityId = self.VolumeId_solid
+                boundaryLayer2.SidewallCellEntityId = self.SolidSideWallId
+                boundaryLayer2.InnerSurfaceCellEntityId = self.InterfaceFsiId
+                boundaryLayer2.OuterSurfaceCellEntityId = self.SolidOuterWallId
+                boundaryLayer2.VolumeCellEntityId = self.SolidVolumeId
             boundaryLayer2.Execute()
 
             meshToSurface = vmtkscripts.vmtkMeshToSurface()
@@ -336,7 +336,7 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
                 remeshing.TargetEdgeLengthArrayName = self.TargetEdgeLengthArrayName
                 remeshing.TriangleSplitFactor = self.TriangleSplitFactor
                 remeshing.ElementSizeMode = self.ElementSizeMode
-                remeshing.ExcludeEntityIds = [wallEntityOffset]  # [wallEntityOffset, InterfaceId] #[wallEntityOffset]
+                remeshing.ExcludeEntityIds = [wallEntityOffset]
                 remeshing.Execute()
 
                 innerSurface = remeshing.Surface

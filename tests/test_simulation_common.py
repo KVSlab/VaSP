@@ -116,23 +116,40 @@ def test_load_mesh_info(temporary_hdf5_file):
     expected_Q_mean = 2.4817264611257612
     expected_area_ratio = [0.4124865453872114, 0.5875134546127886]
     expected_area_inlet = 8.00556922943794
+    expected_solid_side_wall_id = 11
+    expected_interface_fsi_id = 22
+    expected_solid_outer_wall_id = 33
+    expected_fluid_volume_id = 0
+    expected_solid_volume_id = 1
 
     # Test the load_mesh_info function with the temporary JSON info file
-    id_in, id_out, id_wall, Q_mean, area_ratio, area_inlet = load_mesh_info(temporary_hdf5_file)
+    mesh_info = load_mesh_info(temporary_hdf5_file)
 
-    # Print the actual and expected values in assert calls
-    assert id_in == expected_id_in, \
-        f"Actual id_in: {id_in}, Expected id_in: {expected_id_in}"
-    assert id_out == expected_id_out, \
-        f"Actual id_out: {id_out}, Expected id_out: {expected_id_out}"
-    assert id_wall == expected_id_wall, \
-        f"Actual id_wall: {id_wall}, Expected id_wall: {expected_id_wall}"
-    assert Q_mean == expected_Q_mean, \
-        f"Actual Q_mean: {Q_mean}, Expected Q_mean: {expected_Q_mean}"
-    assert area_ratio == expected_area_ratio, \
-        f"Actual area_ratio: {area_ratio}, Expected area_ratio: {expected_area_ratio}"
-    assert area_inlet == expected_area_inlet, \
-        f"Actual area_inlet: {area_inlet}, Expected area_inlet: {expected_area_inlet}"
+    # Assertions using named tuple components
+    assert mesh_info.id_in == expected_id_in, \
+        f"Actual id_in: {mesh_info.id_in}, Expected id_in: {expected_id_in}"
+    assert mesh_info.id_out == expected_id_out, \
+        f"Actual id_out: {mesh_info.id_out}, Expected id_out: {expected_id_out}"
+    assert mesh_info.id_wall == expected_id_wall, \
+        f"Actual id_wall: {mesh_info.id_wall}, Expected id_wall: {expected_id_wall}"
+    assert mesh_info.Q_mean == expected_Q_mean, \
+        f"Actual Q_mean: {mesh_info.Q_mean}, Expected Q_mean: {expected_Q_mean}"
+    assert mesh_info.area_ratio == expected_area_ratio, \
+        f"Actual area_ratio: {mesh_info.area_ratio}, Expected area_ratio: {expected_area_ratio}"
+    assert mesh_info.area_inlet == expected_area_inlet, \
+        f"Actual area_inlet: {mesh_info.area_inlet}, Expected area_inlet: {expected_area_inlet}"
+    assert mesh_info.solid_side_wall_id == expected_solid_side_wall_id, \
+        f"Actual solid_side_wall_id: {mesh_info.solid_side_wall_id}, " \
+        f"Expected solid_side_wall_id: {expected_solid_side_wall_id}"
+    assert mesh_info.interface_fsi_id == expected_interface_fsi_id, \
+        f"Actual interface_fsi_id: {mesh_info.interface_fsi_id}, Expected interface_fsi_id: {expected_interface_fsi_id}"
+    assert mesh_info.solid_outer_wall_id == expected_solid_outer_wall_id, \
+        f"Actual solid_outer_wall_id: {mesh_info.solid_outer_wall_id}, " \
+        f"Expected solid_outer_wall_id: {expected_solid_outer_wall_id}"
+    assert mesh_info.fluid_volume_id == expected_fluid_volume_id, \
+        f"Actual fluid_volume_id: {mesh_info.fluid_volume_id}, Expected fluid_volume_id: {expected_fluid_volume_id}"
+    assert mesh_info.solid_volume_id == expected_solid_volume_id, \
+        f"Actual solid_volume_id: {mesh_info.solid_volume_id}, Expected solid_volume_id: {expected_solid_volume_id}"
 
 
 def test_print_mesh_summary(temporary_hdf5_file):

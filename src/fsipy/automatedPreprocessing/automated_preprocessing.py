@@ -28,8 +28,8 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
                        coarsening_factor, inlet_flow_extension_length, outlet_flow_extension_length,
                        number_of_sublayers_fluid, number_of_sublayers_solid, edge_length,
                        region_points, compress_mesh, scale_factor, resampling_step, meshing_parameters,
-                       remove_all, solid_thickness, solid_thickness_parameters, mesh_format,
-                       flow_rate_factor):
+                       remove_all, solid_thickness, solid_thickness_parameters, mesh_format, flow_rate_factor,
+                       solid_side_wall_id, interface_fsi_id, solid_outer_wall_id, fluid_volume_id, solid_volume_id):
     """
     Automatically generate mesh of surface model in .vtu and .xml format, including prescribed
     flow rates at inlet and outlet based on flow network model.
@@ -64,6 +64,11 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
         solid_thickness_parameters (list): Specify parameters for solid thickness
         mesh_format (str): Specify the format for the generated mesh
         flow_rate_factor (float): Flow rate factor
+        solid_side_wall_id (int): ID for solid side wall
+        interface_fsi_id (int): ID for the FSI interface
+        solid_outer_wall_id (int): ID for the solid outer wall
+        fluid_volume_id (int): ID for the fluid volume
+        solid_volume_id (int): ID for the solid volume
     """
     # Get paths
     case_name = input_model.rsplit(path.sep, 1)[-1].rsplit('.')[0]
@@ -440,6 +445,14 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
             # Write mesh in VTU format
             write_polydata(remeshed_surface, file_name_surface_name)
             write_polydata(mesh, file_name_vtu_mesh)
+
+        # Write the mesh ID's to parameter file
+        parameters["solid_side_wall_id"] = solid_side_wall_id
+        parameters["interface_fsi_id"] = interface_fsi_id
+        parameters["solid_outer_wall_id"] = solid_outer_wall_id
+        parameters["fluid_volume_id"] = fluid_volume_id
+        parameters["solid_volume_id"] = solid_volume_id
+        write_parameters(parameters, base_path)
     else:
         mesh = read_polydata(file_name_vtu_mesh)
 
@@ -683,6 +696,12 @@ def read_command_line(input_path=None):
                         type=float,
                         help="Flow rate factor.")
 
+    parser.add_argument("--solid-side-wall-id", type=int, default=11, help="ID for solid side wall")
+    parser.add_argument("--interface-fsi-id", type=int, default=22, help="ID for the FSI interface")
+    parser.add_argument("--solid-outer-wall-id", type=int, default=33, help="ID for the solid outer wall")
+    parser.add_argument("--fluid-volume-id", type=int, default=0, help="ID for the fluid volume")
+    parser.add_argument("--solid-volume-id", type=int, default=1, help="ID for the solid volume")
+
     # Parse path to get default values
     if required:
         args = parser.parse_args()
@@ -722,7 +741,10 @@ def read_command_line(input_path=None):
                 scale_factor=args.scale_factor, resampling_step=args.resampling_step,
                 meshing_parameters=args.meshing_parameters, remove_all=args.remove_all,
                 solid_thickness=args.solid_thickness, solid_thickness_parameters=args.solid_thickness_parameters,
-                mesh_format=args.mesh_format, flow_rate_factor=args.flow_rate_factor)
+                mesh_format=args.mesh_format, flow_rate_factor=args.flow_rate_factor,
+                solid_side_wall_id=args.solid_side_wall_id, interface_fsi_id=args.interface_fsi_id,
+                solid_outer_wall_id=args.solid_outer_wall_id, fluid_volume_id=args.fluid_volume_id,
+                solid_volume_id=args.solid_volume_id)
 
 
 def main_meshing():
