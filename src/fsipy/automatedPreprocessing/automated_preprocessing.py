@@ -80,6 +80,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
     file_name_distance_to_sphere_curv = base_path + "_distance_to_sphere_curv.vtp"
     file_name_distance_to_sphere_spheres = base_path + "_distance_to_sphere_spheres.vtp"
     file_name_distance_to_sphere_solid_thickness = base_path + "_distance_to_sphere_solid_thickness.vtp"
+    file_name_parameters = base_path + "_info.json"
     file_name_probe_points = base_path + "_probe_point.json"
     file_name_voronoi = base_path + "_voronoi.vtp"
     file_name_voronoi_smooth = base_path + "_voronoi_smooth.vtp"
@@ -101,7 +102,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
             file_name_centerlines, file_name_refine_region_centerlines, file_name_region_centerlines,
             file_name_distance_to_sphere_diam, file_name_distance_to_sphere_const, file_name_distance_to_sphere_curv,
             file_name_distance_to_sphere_spheres, file_name_distance_to_sphere_solid_thickness,
-            file_name_probe_points,
+            file_name_parameters, file_name_probe_points,
             file_name_voronoi, file_name_voronoi_smooth, file_name_voronoi_surface, file_name_surface_smooth,
             file_name_model_flow_ext, file_name_clipped_model, file_name_flow_centerlines, file_name_surface_name,
             file_name_xml_mesh, file_name_vtu_mesh, file_name_xdmf_mesh,
