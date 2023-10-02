@@ -70,9 +70,9 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
 
         self.SolidSideWallId = 11
         self.InterfaceFsiId = 22
-        self.InterfaceOuterId = 33
-        self.VolumeIdFluid = 0  # (keep to 0)
-        self.VolumeIdSolid = 1
+        self.SolidOuterWallId = 33
+        self.FluidVolumeId = 0  # (keep to 0)
+        self.SolidVolumeId = 1
 
         self.isAVF = False
         self.VeinIdsOffset = 1000
@@ -212,7 +212,7 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
             if not self.BoundaryLayerOnCaps:
                 boundaryLayer.SidewallCellEntityId = placeholderCellEntityId
                 boundaryLayer.InnerSurfaceCellEntityId = wallEntityOffset
-                boundaryLayer.VolumeCellEntityId = self.VolumeIdFluid
+                boundaryLayer.VolumeCellEntityId = self.FluidVolumeId
             boundaryLayer.Execute()
 
             self.PrintLog("Generating boundary layer solid")
@@ -236,8 +236,8 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
             if not self.BoundaryLayerOnCaps:
                 boundaryLayer2.SidewallCellEntityId = self.SolidSideWallId
                 boundaryLayer2.InnerSurfaceCellEntityId = self.InterfaceFsiId
-                boundaryLayer2.OuterSurfaceCellEntityId = self.InterfaceOuterId
-                boundaryLayer2.VolumeCellEntityId = self.VolumeIdSolid
+                boundaryLayer2.OuterSurfaceCellEntityId = self.SolidOuterWallId
+                boundaryLayer2.VolumeCellEntityId = self.SolidVolumeId
             boundaryLayer2.Execute()
 
             meshToSurface = vmtkscripts.vmtkMeshToSurface()
