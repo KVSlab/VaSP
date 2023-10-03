@@ -26,7 +26,7 @@ def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--folder', type=str, required=True, help="Path to simulation results")
     parser.add_argument('--mesh-path', type=str, default=None,
-                        help="Path to the mesh file (default: <folder_path>/Checkpoint/mesh.h5)")
+                        help="Path to the mesh file (default: <folder_path>/Mesh/mesh.h5)")
     parser.add_argument('--scale-factor', type=float, default=-1,
                         help="Scale factor for mesh deformation (default: -1)")
     return parser.parse_args()
