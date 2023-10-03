@@ -16,7 +16,7 @@ dependencies = [
 
 [project.scripts]
 fsipy-mesh = "fsipy.automatedPreprocessing.automated_preprocessing:main_meshing"
-fsipy-predeform-mesh = "fsipy.automatedPreprocessing.predeform_mesh:main"
+fsipy-predeform-mesh = "fsipy.automatedPostprocessing.predeform_mesh:main"
 fsipy-refine-mesh = "fsipy.automatedPostprocessing.postprocessing_mesh.create_refined_mesh:main"
 fsipy-separate-mesh = "fsipy.automatedPostprocessing.postprocessing_mesh.separate_mesh:main"
 fsipy-log-plotter = "fsipy.automatedPostprocessing.log_plotter:main"
