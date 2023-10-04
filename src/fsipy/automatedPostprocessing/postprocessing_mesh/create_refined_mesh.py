@@ -126,16 +126,12 @@ def create_refined_mesh(folder_path: Path, mesh_path: Path) -> None:
 
         # this loop replaces the node numbers in the boundaries topology array one by one
         print('--- Correcting node numbering of the boundary topology array in the refined mesh \n')
-        for row in range(wrongNumberBdTopology.shape[0]):
-            for column in range(wrongNumberBdTopology.shape[1]):
-                wrongNumberBdTopology[row, column] = np.rint(orderedIndexMap[wrongNumberBdTopology[row, column], 1])
+        wrongNumberBdTopology = np.rint(orderedIndexMap[wrongNumberBdTopology, 1])
 
         # Fix boundary values (set any spurious boundary numbers to 0)
         print('--- Correcting boundary values in the refined mesh \n')
         wrongNumberBdValues = wrongNumberMesh['boundaries/values'][:]
-        for row in range(wrongNumberBdValues.shape[0]):
-            if wrongNumberBdValues[row] > 33:
-                wrongNumberBdValues[row] = 0
+        wrongNumberBdValues[wrongNumberBdValues > 33] = 0
 
         # Copy mesh file to new "fixed" file
         output_path = mesh_path.with_name(mesh_path.stem + "_refined_fixed.h5")
