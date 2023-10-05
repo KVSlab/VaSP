@@ -2,7 +2,7 @@
 # Modified by Kei Yamamoto 2023
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import pickle
+import json
 import numpy as np
 import h5py
 from pathlib import Path
@@ -113,9 +113,9 @@ def main() -> None:
     else:
         print(" --- Separating fluid and solid domains using domain IDs \n")
 
-        parameter_path = folder_path / "Checkpoint" / "default_variables.pickle"
-        with open(parameter_path, "rb") as f:
-            parameters = pickle.load(f)
+        parameter_path = folder_path / "Checkpoint" / "default_variables.json"
+        with open(parameter_path, "r") as f:
+            parameters = json.load(f)
             fluid_domain_id = parameters["dx_f_id"]
             solid_domain_id = parameters["dx_s_id"]
 
