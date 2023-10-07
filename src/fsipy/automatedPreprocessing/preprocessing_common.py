@@ -166,13 +166,15 @@ def generate_mesh(surface: vtkPolyData, number_of_sublayers_fluid: int, number_o
     return generated_mesh, remeshed_surface
 
 
-def convert_xml_mesh_to_hdf5(file_name_xml_mesh: str, scaling_factor: float = 0.001) -> None:
+def convert_xml_mesh_to_hdf5(file_name_xml_mesh: str, scaling_factor: float = 1) -> None:
     """Converts an XML mesh to an HDF5 mesh.
 
     Args:
         file_name_xml_mesh (str): The name of the XML mesh file.
         scaling_factor (float, optional): A scaling factor to apply to the mesh coordinates.
-                                          The default value is 0.001, which converts from millimeters to meters.
+                                          The default value is 1 (no scaling). Note that probes
+                                          and parameters inside _info.json file will not be scaled
+                                          if you only scale HDF5 file.
 
     Returns:
         None

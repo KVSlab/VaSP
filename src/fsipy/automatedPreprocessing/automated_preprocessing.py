@@ -123,6 +123,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
     # Scale surface
     if scale_factor is not None:
         surface = scale_surface(surface, scale_factor)
+        resampling_step *= scale_factor
 
     # Check if surface is closed and uncapps model if True
     is_capped = check_if_closed_surface(surface)
