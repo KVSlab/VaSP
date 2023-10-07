@@ -171,7 +171,7 @@ def test_print_mesh_summary(temporary_hdf5_file):
 
     # Get the captured output as a string
     printed_summary = captured_output.getvalue()
-    print(printed_summary)
+
     # Define expected summary strings
     expected_strings = [
         "=== Mesh Information Summary ===",
