@@ -122,8 +122,10 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
 
     # Scale surface
     if scale_factor is not None:
+        print(f"--- Scale model by factor {scale_factor}\n")
         surface = scale_surface(surface, scale_factor)
         resampling_step *= scale_factor
+        solid_thickness_parameters = [scale_factor * i for i in solid_thickness_parameters]
 
     # Check if surface is closed and uncapps model if True
     is_capped = check_if_closed_surface(surface)
@@ -674,10 +676,11 @@ def read_command_line(input_path=None):
                         type=float,
                         nargs="+",
                         default=[0.3],
-                        help="Parameters for solid thickness. For constant solid thickness, this should be " +
+                        help="Parameters for solid thickness [m]. For constant solid thickness, this should be " +
                              "given as a single float. For 'variable' solid thickness, this should be given as " +
                              "four floats for the distancetosphere scaling function: 'offset', 'scale', 'min' " +
-                             "and 'max'. For example --solid-thickness-parameters 0 0.1 0.25 0.3")
+                             "and 'max'. For example --solid-thickness-parameters 0 0.1 0.25 0.3 " +
+                             "Note: If --scale-factor is used, solid thickness will be adjusted accordingly.")
 
     parser.add_argument('-mf', '--mesh-format',
                         type=str,
