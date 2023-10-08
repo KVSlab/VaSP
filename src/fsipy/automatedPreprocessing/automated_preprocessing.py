@@ -645,7 +645,8 @@ def read_command_line(input_path=None):
     parser.add_argument('-rs', '--resampling-step',
                         default=0.1,
                         type=float,
-                        help="Resampling step used to resample centerline in [m].")
+                        help="Resampling step used to resample centerline in [m]." +
+                             "Note: If --scale-factor is used, this step will be adjusted accordingly.")
 
     parser.add_argument('-mp', '--meshing-parameters',
                         type=float,
