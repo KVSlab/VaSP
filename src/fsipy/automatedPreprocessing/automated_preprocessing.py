@@ -27,7 +27,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
                        meshing_method, refine_region, is_atrium, add_flow_extensions, visualize, config_path,
                        coarsening_factor, inlet_flow_extension_length, outlet_flow_extension_length,
                        number_of_sublayers_fluid, number_of_sublayers_solid, edge_length,
-                       region_points, compress_mesh, scale_factor, resampling_step, meshing_parameters,
+                       region_points, compress_mesh, scale_factor, scale_factor_h5, resampling_step, meshing_parameters,
                        remove_all, solid_thickness, solid_thickness_parameters, mesh_format, flow_rate_factor,
                        solid_side_wall_id, interface_fsi_id, solid_outer_wall_id, fluid_volume_id, solid_volume_id):
     """
@@ -453,7 +453,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
 
     if mesh_format == "hdf5":
         print("--- Converting XML mesh to HDF5\n")
-        convert_xml_mesh_to_hdf5(file_name_xml_mesh)
+        convert_xml_mesh_to_hdf5(file_name_xml_mesh, scale_factor_h5)
         # Evaluate edge length for inspection
         edge_length_evaluator(file_name_xml_mesh, file_name_edge_length_xdmf)
     elif mesh_format == "xdmf":
@@ -644,6 +644,12 @@ def read_command_line(input_path=None):
 
                         help="Scale input model by this factor. Used to scale model to [mm].")
 
+    parser.add_argument("-sch5", "--scale-factor-h5",
+                        default=1.0,
+                        type=float,
+                        help="Scaling factor for HDF5 mesh. Used to scale model to [mm]." +
+                             "Note that probes and other parameters are not scaled.")
+
     parser.add_argument('-rs', '--resampling-step',
                         default=0.1,
                         type=float,
@@ -734,8 +740,8 @@ def read_command_line(input_path=None):
                 number_of_sublayers_fluid=args.number_of_sublayers_fluid,
                 number_of_sublayers_solid=args.number_of_sublayers_solid, visualize=args.visualize,
                 region_points=args.region_points, compress_mesh=args.compress_mesh,
-                outlet_flow_extension_length=args.outlet_flowextension,
-                scale_factor=args.scale_factor, resampling_step=args.resampling_step,
+                outlet_flow_extension_length=args.outlet_flowextension, scale_factor=args.scale_factor,
+                scale_factor_h5=args.scale_factor_h5, resampling_step=args.resampling_step,
                 meshing_parameters=args.meshing_parameters, remove_all=args.remove_all,
                 solid_thickness=args.solid_thickness, solid_thickness_parameters=args.solid_thickness_parameters,
                 mesh_format=args.mesh_format, flow_rate_factor=args.flow_rate_factor,
