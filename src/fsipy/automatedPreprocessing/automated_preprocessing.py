@@ -682,7 +682,9 @@ def read_command_line(input_path=None):
                         default=[0, 0.1, 0.4, 0.6],
                         help="Parameters for meshing method 'distancetospheres'. This should be given as " +
                              "four numbers for the distancetosphere scaling function: 'offset', 'scale', 'min' " +
-                             "and 'max'. For example --meshing-parameters 0 0.1 0.3 0.4")
+                             "and 'max'. For example --meshing-parameters 0 0.1 0.3 0.4" +
+                             "Note: If --scale-factor is used, 'offset', 'min', and 'max' parameters will be " +
+                             "adjusted accordingly.")
 
     remove_all = parser.add_mutually_exclusive_group(required=False)
     remove_all.add_argument('-ra', '--remove-all',
@@ -709,7 +711,7 @@ def read_command_line(input_path=None):
                              "Note: If --scale-factor is used, 'offset', 'min', and 'max' parameters will be " +
                              "adjusted accordingly for 'variable' solid thickness, and the constant value will also " +
                              "be scaled for 'constant' solid thickness.")
- 
+
     parser.add_argument('-mf', '--mesh-format',
                         type=str,
                         choices=["xml", "hdf5", "xdmf"],
