@@ -440,6 +440,14 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
         assert mesh.GetNumberOfPoints() > 0, "No points in mesh, try to remesh."
         assert remeshed_surface.GetNumberOfPoints() > 0, "No points in surface mesh, try to remesh."
 
+        if mesh.GetNumberOfPoints() < remeshed_surface.GetNumberOfPoints():
+            print("--- An error occurred during meshing. Will attempt to re-mesh \n")
+            mesh, remeshed_surface = generate_mesh(distance_to_sphere,
+                                                   number_of_sublayers_fluid,
+                                                   number_of_sublayers_solid,
+                                                   solid_thickness,
+                                                   solid_thickness_parameters)
+
         if mesh_format in ("xml", "hdf5"):
             write_mesh(compress_mesh, file_name_surface_name, file_name_vtu_mesh, file_name_xml_mesh,
                        mesh, remeshed_surface)
