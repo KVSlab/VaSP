@@ -376,6 +376,10 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
     elif meshing_method == "distancetospheres":
         if not path.isfile(file_name_distance_to_sphere_spheres):
             if len(meshing_parameters) == 4:
+                if scale_factor is not None:
+                    meshing_parameters[0] *= scale_factor
+                    meshing_parameters[2] *= scale_factor
+                    meshing_parameters[3] *= scale_factor
                 distance_to_sphere = dist_sphere_spheres(surface_extended, file_name_distance_to_sphere_spheres,
                                                          *meshing_parameters)
             else:
@@ -389,11 +393,14 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
     if solid_thickness == 'variable':
         if not path.isfile(file_name_distance_to_sphere_solid_thickness):
             if len(solid_thickness_parameters) == 4:
-                distance_offset, distance_scale, min_distance, max_distance = solid_thickness_parameters
+                # Apply scale factor to offset, min distance, and max distance
+                if scale_factor is not None:
+                    solid_thickness_parameters[0] *= scale_factor  # Offset
+                    solid_thickness_parameters[2] *= scale_factor  # Min distance
+                    solid_thickness_parameters[3] *= scale_factor  # Max distance
                 distance_to_sphere = distance_to_spheres_solid_thickness(distance_to_sphere,
                                                                          file_name_distance_to_sphere_solid_thickness,
-                                                                         distance_offset, distance_scale,
-                                                                         min_distance, max_distance)
+                                                                         *solid_thickness_parameters)
             elif len(solid_thickness_parameters) == 0:
                 distance_to_sphere = distance_to_spheres_solid_thickness(distance_to_sphere,
                                                                          file_name_distance_to_sphere_solid_thickness)
@@ -408,6 +415,10 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
             print("ERROR: Invalid parameter for constant solid thickness. This should be a " +
                   "single number greater than zero.")
             sys.exit(-1)
+        else:
+            # Apply scale factor to the constant thickness value
+            if scale_factor is not None:
+                solid_thickness_parameters[0] *= scale_factor
 
     # Compute mesh
     if not path.isfile(file_name_vtu_mesh):
@@ -648,7 +659,8 @@ def read_command_line(input_path=None):
                         default=1.0,
                         type=float,
                         help="Scaling factor for HDF5 mesh. Used to scale model to [mm]." +
-                             "Note that probes and other parameters are not scaled.")
+                             "Note that probes and other parameters are not scaled." +
+                             "Do not use in combination with --scale-factor.")
 
     parser.add_argument('-rs', '--resampling-step',
                         default=0.1,
@@ -682,12 +694,14 @@ def read_command_line(input_path=None):
                         type=float,
                         nargs="+",
                         default=[0.3],
-                        help="Parameters for solid thickness [m]. For constant solid thickness, this should be " +
-                             "given as a single float. For 'variable' solid thickness, this should be given as " +
-                             "four floats for the distancetosphere scaling function: 'offset', 'scale', 'min' " +
-                             "and 'max'. For example --solid-thickness-parameters 0 0.1 0.25 0.3 " +
-                             "Note: If --scale-factor is used, solid thickness will be adjusted accordingly.")
-
+                        help="Parameters for solid thickness [m]. For 'constant' solid thickness, provide a single " +
+                             "float. For 'variable' solid thickness, provide four floats for the distancetosphere " +
+                             "scaling function: 'offset', 'scale', 'min' and 'max'. " +
+                             "For example --solid-thickness-parameters 0 0.1 0.25 0.3. " +
+                             "Note: If --scale-factor is used, 'offset', 'min', and 'max' parameters will be " +
+                             "adjusted accordingly for 'variable' solid thickness, and the constant value will also " +
+                             "be scaled for 'constant' solid thickness.")
+ 
     parser.add_argument('-mf', '--mesh-format',
                         type=str,
                         choices=["xml", "hdf5", "xdmf"],
