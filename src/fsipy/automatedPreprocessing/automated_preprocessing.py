@@ -430,6 +430,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
                                                    solid_thickness,
                                                    solid_thickness_parameters)
         except Exception:
+            print("ERROR: Mesh generation failed. Try to remesh with alternative method.")
             distance_to_sphere = mesh_alternative(distance_to_sphere)
             mesh, remeshed_surface = generate_mesh(distance_to_sphere,
                                                    number_of_sublayers_fluid,
