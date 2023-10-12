@@ -430,7 +430,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
                                                    solid_thickness,
                                                    solid_thickness_parameters)
         except Exception:
-            print("ERROR: Mesh generation failed. Try to remesh with alternative method.")
+            print("Trying to remesh with alternative method.")
             distance_to_sphere = mesh_alternative(distance_to_sphere)
             mesh, remeshed_surface = generate_mesh(distance_to_sphere,
                                                    number_of_sublayers_fluid,
@@ -764,7 +764,7 @@ def read_command_line(input_path=None):
                 mesh_format=args.mesh_format, flow_rate_factor=args.flow_rate_factor,
                 solid_side_wall_id=args.solid_side_wall_id, interface_fsi_id=args.interface_fsi_id,
                 solid_outer_wall_id=args.solid_outer_wall_id, fluid_volume_id=args.fluid_volume_id,
-                solid_volume_id=args.solid_volume_id)
+                solid_volume_id=args.solid_volume_id, verbosity=args.verbosity)
 
 
 def main_meshing():

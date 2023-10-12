@@ -367,7 +367,6 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
             tetgen.OutputSurfaceElements = 1
             tetgen.OutputVolumeElements = 1
             tetgen.RegionAttrib = 0
-            tetgen.Verbose = 1
             tetgen.Execute()
 
             if tetgen.Mesh.GetNumberOfCells() == 0 and surfaceToMesh.Mesh.GetNumberOfCells() > 0:
