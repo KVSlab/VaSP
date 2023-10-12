@@ -27,7 +27,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
                        meshing_method, refine_region, is_atrium, add_flow_extensions, visualize, config_path,
                        coarsening_factor, inlet_flow_extension_length, outlet_flow_extension_length,
                        number_of_sublayers_fluid, number_of_sublayers_solid, edge_length,
-                       region_points, compress_mesh, scale_factor, resampling_step, meshing_parameters,
+                       region_points, compress_mesh, scale_factor, scale_factor_h5, resampling_step, meshing_parameters,
                        remove_all, solid_thickness, solid_thickness_parameters, mesh_format, flow_rate_factor,
                        solid_side_wall_id, interface_fsi_id, solid_outer_wall_id, fluid_volume_id, solid_volume_id):
     """
@@ -122,7 +122,10 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
 
     # Scale surface
     if scale_factor is not None:
+        print(f"--- Scale model by factor {scale_factor}\n")
         surface = scale_surface(surface, scale_factor)
+        resampling_step *= scale_factor
+        solid_thickness_parameters = [scale_factor * i for i in solid_thickness_parameters]
 
     # Check if surface is closed and uncapps model if True
     is_capped = check_if_closed_surface(surface)
@@ -373,6 +376,10 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
     elif meshing_method == "distancetospheres":
         if not path.isfile(file_name_distance_to_sphere_spheres):
             if len(meshing_parameters) == 4:
+                if scale_factor is not None:
+                    meshing_parameters[0] *= scale_factor
+                    meshing_parameters[2] *= scale_factor
+                    meshing_parameters[3] *= scale_factor
                 distance_to_sphere = dist_sphere_spheres(surface_extended, file_name_distance_to_sphere_spheres,
                                                          *meshing_parameters)
             else:
@@ -386,11 +393,14 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
     if solid_thickness == 'variable':
         if not path.isfile(file_name_distance_to_sphere_solid_thickness):
             if len(solid_thickness_parameters) == 4:
-                distance_offset, distance_scale, min_distance, max_distance = solid_thickness_parameters
+                # Apply scale factor to offset, min distance, and max distance
+                if scale_factor is not None:
+                    solid_thickness_parameters[0] *= scale_factor  # Offset
+                    solid_thickness_parameters[2] *= scale_factor  # Min distance
+                    solid_thickness_parameters[3] *= scale_factor  # Max distance
                 distance_to_sphere = distance_to_spheres_solid_thickness(distance_to_sphere,
                                                                          file_name_distance_to_sphere_solid_thickness,
-                                                                         distance_offset, distance_scale,
-                                                                         min_distance, max_distance)
+                                                                         *solid_thickness_parameters)
             elif len(solid_thickness_parameters) == 0:
                 distance_to_sphere = distance_to_spheres_solid_thickness(distance_to_sphere,
                                                                          file_name_distance_to_sphere_solid_thickness)
@@ -405,6 +415,10 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
             print("ERROR: Invalid parameter for constant solid thickness. This should be a " +
                   "single number greater than zero.")
             sys.exit(-1)
+        else:
+            # Apply scale factor to the constant thickness value
+            if scale_factor is not None:
+                solid_thickness_parameters[0] *= scale_factor
 
     # Compute mesh
     if not path.isfile(file_name_vtu_mesh):
@@ -416,6 +430,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
                                                    solid_thickness,
                                                    solid_thickness_parameters)
         except Exception:
+            print("ERROR: Mesh generation failed. Trying to remesh with alternative method.")
             distance_to_sphere = mesh_alternative(distance_to_sphere)
             mesh, remeshed_surface = generate_mesh(distance_to_sphere,
                                                    number_of_sublayers_fluid,
@@ -450,7 +465,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
 
     if mesh_format == "hdf5":
         print("--- Converting XML mesh to HDF5\n")
-        convert_xml_mesh_to_hdf5(file_name_xml_mesh)
+        convert_xml_mesh_to_hdf5(file_name_xml_mesh, scale_factor_h5)
         # Evaluate edge length for inspection
         edge_length_evaluator(file_name_xml_mesh, file_name_edge_length_xdmf)
     elif mesh_format == "xdmf":
@@ -641,10 +656,18 @@ def read_command_line(input_path=None):
 
                         help="Scale input model by this factor. Used to scale model to [mm].")
 
+    parser.add_argument("-sch5", "--scale-factor-h5",
+                        default=1.0,
+                        type=float,
+                        help="Scaling factor for HDF5 mesh. Used to scale model to [mm]." +
+                             "Note that probes and other parameters are not scaled." +
+                             "Do not use in combination with --scale-factor.")
+
     parser.add_argument('-rs', '--resampling-step',
                         default=0.1,
                         type=float,
-                        help="Resampling step used to resample centerline in [m].")
+                        help="Resampling step used to resample centerline in [m]." +
+                             "Note: If --scale-factor is used, this step will be adjusted accordingly.")
 
     parser.add_argument('-mp', '--meshing-parameters',
                         type=float,
@@ -652,7 +675,9 @@ def read_command_line(input_path=None):
                         default=[0, 0.1, 0.4, 0.6],
                         help="Parameters for meshing method 'distancetospheres'. This should be given as " +
                              "four numbers for the distancetosphere scaling function: 'offset', 'scale', 'min' " +
-                             "and 'max'. For example --meshing-parameters 0 0.1 0.3 0.4")
+                             "and 'max'. For example --meshing-parameters 0 0.1 0.3 0.4" +
+                             "Note: If --scale-factor is used, 'offset', 'min', and 'max' parameters will be " +
+                             "adjusted accordingly.")
 
     remove_all = parser.add_mutually_exclusive_group(required=False)
     remove_all.add_argument('-ra', '--remove-all',
@@ -672,10 +697,13 @@ def read_command_line(input_path=None):
                         type=float,
                         nargs="+",
                         default=[0.3],
-                        help="Parameters for solid thickness. For constant solid thickness, this should be " +
-                             "given as a single float. For 'variable' solid thickness, this should be given as " +
-                             "four floats for the distancetosphere scaling function: 'offset', 'scale', 'min' " +
-                             "and 'max'. For example --solid-thickness-parameters 0 0.1 0.25 0.3")
+                        help="Parameters for solid thickness [m]. For 'constant' solid thickness, provide a single " +
+                             "float. For 'variable' solid thickness, provide four floats for the distancetosphere " +
+                             "scaling function: 'offset', 'scale', 'min' and 'max'. " +
+                             "For example --solid-thickness-parameters 0 0.1 0.25 0.3. " +
+                             "Note: If --scale-factor is used, 'offset', 'min', and 'max' parameters will be " +
+                             "adjusted accordingly for 'variable' solid thickness, and the constant value will also " +
+                             "be scaled for 'constant' solid thickness.")
 
     parser.add_argument('-mf', '--mesh-format',
                         type=str,
@@ -729,8 +757,8 @@ def read_command_line(input_path=None):
                 number_of_sublayers_fluid=args.number_of_sublayers_fluid,
                 number_of_sublayers_solid=args.number_of_sublayers_solid, visualize=args.visualize,
                 region_points=args.region_points, compress_mesh=args.compress_mesh,
-                outlet_flow_extension_length=args.outlet_flowextension,
-                scale_factor=args.scale_factor, resampling_step=args.resampling_step,
+                outlet_flow_extension_length=args.outlet_flowextension, scale_factor=args.scale_factor,
+                scale_factor_h5=args.scale_factor_h5, resampling_step=args.resampling_step,
                 meshing_parameters=args.meshing_parameters, remove_all=args.remove_all,
                 solid_thickness=args.solid_thickness, solid_thickness_parameters=args.solid_thickness_parameters,
                 mesh_format=args.mesh_format, flow_rate_factor=args.flow_rate_factor,

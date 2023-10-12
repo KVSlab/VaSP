@@ -175,17 +175,17 @@ def test_print_mesh_summary(temporary_hdf5_file):
     # Define expected summary strings
     expected_strings = [
         "=== Mesh Information Summary ===",
-        "X range: 0.029932 to 0.0368581 (delta: 0.0069)",
-        "Y range: 0.0287532 to 0.034399700000000005 (delta: 0.0056)",
-        "Z range: 0.0381364 to 0.0447481 (delta: 0.0066)",
+        "X range: 29.932 to 36.8581 (delta: 6.9261)",
+        "Y range: 28.7532 to 34.3997 (delta: 5.6465)",
+        "Z range: 38.1364 to 44.7481 (delta: 6.6117)",
         "Number of cells: 32283",
         "Number of cells per processor: 32283",
         "Number of edges: 0",
         "Number of faces: 65699",
         "Number of facets: 65699",
         "Number of vertices: 5860",
-        "Volume: 6.956489929680826e-08",
-        "Number of cells per volume: 464070247011.501",
+        "Volume: 69.56489929680801",
+        "Number of cells per volume: 464.07024701150266",
     ]
 
     # Check if each expected summary string is present in the printed output
