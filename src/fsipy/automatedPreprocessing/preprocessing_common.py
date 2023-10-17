@@ -123,8 +123,6 @@ def generate_mesh(surface: vtkPolyData, number_of_sublayers_fluid: int, number_o
     Returns:
         tuple: A tuple containing the generated mesh (vtkUnstructuredGrid) and the remeshed surface (vtkPolyData).
     """
-    print("--- Creating FSI mesh")
-
     meshGenerator = vmtkMeshGeneratorFsi()
     meshGenerator.Surface = surface
 
@@ -226,8 +224,6 @@ def convert_vtu_mesh_to_xdmf(file_name_vtu_mesh: str, file_name_xdmf_mesh: str) 
         file_name_vtu_mesh (str): Path to the input VTU mesh file.
         file_name_xdmf_mesh (str): Path to the output XDMF file.
     """
-    print("--- Converting VTU mesh to XDMF")
-
     # Load the VTU mesh
     vtu_mesh = meshio.read(file_name_vtu_mesh)
 
@@ -270,7 +266,6 @@ def edge_length_evaluator(file_name_mesh: str, file_name_edge_length_xdmf: str) 
         file_name_mesh (str): Path to the XML mesh file.
         file_name_edge_length_xdmf (str): Path to the output XDMF file.
     """
-    print("--- Evaluating edge length")
     # Check if the XML mesh file exists
     mesh_path = Path(file_name_mesh)
     if not mesh_path.is_file():

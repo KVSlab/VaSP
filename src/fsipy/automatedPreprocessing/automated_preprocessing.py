@@ -317,6 +317,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
         else:
             surface_extended = read_polydata(file_name_model_flow_ext)
     else:
+        print("--- Not adding flow extensions\n")
         surface_extended = surface
 
     # Capp surface with flow extensions
@@ -422,7 +423,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
 
     # Compute mesh
     if not path.isfile(file_name_vtu_mesh):
-        print("--- Computing mesh\n")
+        print("--- Generating FSI mesh\n")
         try:
             mesh, remeshed_surface = generate_mesh(distance_to_sphere,
                                                    number_of_sublayers_fluid,
@@ -466,11 +467,16 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
     if mesh_format == "hdf5":
         print("--- Converting XML mesh to HDF5\n")
         convert_xml_mesh_to_hdf5(file_name_xml_mesh, scale_factor_h5)
+
         # Evaluate edge length for inspection
+        print("--- Evaluating edge length\n")
         edge_length_evaluator(file_name_xml_mesh, file_name_edge_length_xdmf)
     elif mesh_format == "xdmf":
+        print("--- Converting VTU mesh to XDMF\n")
         convert_vtu_mesh_to_xdmf(file_name_vtu_mesh, file_name_xdmf_mesh)
+
         # Evaluate edge length for inspection
+        print("--- Evaluating edge length\n")
         edge_length_evaluator(file_name_xdmf_mesh, file_name_edge_length_xdmf)
 
     network, probe_points = setup_model_network(centerlines, file_name_probe_points, region_center, verbose_print)
