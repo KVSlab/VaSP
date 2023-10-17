@@ -651,11 +651,6 @@ def read_command_line(input_path=None):
                         help='Path to configuration file for remote simulation. ' +
                              'See ssh_config.json for details')
 
-    parser.add_argument('-bl', '--add-boundary-layer',
-                        default=True,
-                        type=str2bool,
-                        help="Adds boundary layers along geometry wall if true.")
-
     parser.add_argument('-sc', '--scale-factor',
                         default=None,
                         type=float,
