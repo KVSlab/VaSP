@@ -660,14 +660,14 @@ def read_command_line(input_path=None):
     parser.add_argument("-sch5", "--scale-factor-h5",
                         default=1.0,
                         type=float,
-                        help="Scaling factor for HDF5 mesh. Used to scale model to [mm]." +
+                        help="Scaling factor for HDF5 mesh. Used to scale model to [mm]. " +
                              "Note that probes and other parameters are not scaled." +
                              "Do not use in combination with --scale-factor.")
 
     parser.add_argument('-rs', '--resampling-step',
                         default=0.1,
                         type=float,
-                        help="Resampling step used to resample centerline in [m]." +
+                        help="Resampling step used to resample centerline in [m]. " +
                              "Note: If --scale-factor is used, this step will be adjusted accordingly.")
 
     parser.add_argument('-mp', '--meshing-parameters',
