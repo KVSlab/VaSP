@@ -480,16 +480,16 @@ def plot_probe_points(time: np.ndarray, probe_points: Dict[int, Dict[str, np.nda
     # Create subplots based on the number of selected probe points
     if num_rows == 1 and num_cols == 1:
         # If only one probe point is selected, create a single figure
-        fig = plt.figure(figsize=figure_size)
-        axs = [fig.gca()]  # Get the current axis as a list
+        fig, axes = plt.subplots(figsize=figure_size)
+        axes = [fig.gca()]  # Get the current axis as a list
     else:
-        fig, axs = plt.subplots(num_rows, num_cols, figsize=figure_size)
+        fig, axes = plt.subplots(num_rows, num_cols, figsize=figure_size)
 
         # Flatten the axes array for easier iteration
-        axs = axs.flatten()
+        axes = axes.flatten()
 
     for i, (probe_point, data) in enumerate(selected_probe_data.items()):
-        ax = axs[i]
+        ax = axes[i]
 
         # Extract the data within the specified range (start:end)
         magnitude_data = data["magnitude"][start:end]
@@ -510,7 +510,7 @@ def plot_probe_points(time: np.ndarray, probe_points: Dict[int, Dict[str, np.nda
 
     # Remove any empty subplots if the number of probe points doesn't fill the entire grid
     for i in range(num_selected_probe_points, num_rows * num_cols):
-        fig.delaxes(axs[i])
+        fig.delaxes(axes[i])
 
     # Adjust spacing between subplots
     plt.tight_layout()
