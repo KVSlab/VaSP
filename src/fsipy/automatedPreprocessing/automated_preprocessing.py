@@ -265,7 +265,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
                        "manually clipp the branch which still is capped. " +
                        "Overwrite the current {} and restart the script.").format(
                     file_name_surface_smooth, file_name_surface_smooth))
-                sys.exit(0)
+                sys.exit(-1)
 
             surface = surface_uncapped
 
