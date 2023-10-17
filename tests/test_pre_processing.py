@@ -1,3 +1,5 @@
+import subprocess
+import pytest
 from pathlib import Path
 
 import vtk
@@ -6,6 +8,49 @@ from vampy.automatedPreprocessing.preprocessing_common import read_polydata
 
 from fsipy.automatedPreprocessing.automated_preprocessing import read_command_line, \
     run_pre_processing
+
+# Define test cases for testing command line options for fsipy-mesh script
+command_line_test_cases = [
+    (["-i", "tests/test_data/cylinder/cylinder.vtp", "-ra"], "--- Removing mesh and all pre-processing files"),
+    (["-i", "tests/test_data/cylinder/cylinder.vtp", "-f", "True"], "--- Adding flow extensions"),
+    (["-i", "tests/test_data/cylinder/cylinder.vtp", "-f", "False"], "--- Not adding flow extensions"),
+    (["-i", "tests/test_data/cylinder/cylinder.vtp", "-sm", "laplace"], "--- Smooth surface: Laplace smoothing"),
+    (["-i", "tests/test_data/cylinder/cylinder.vtp", "-sm", "taubin"], "--- Smooth surface: Taubin smoothing"),
+    (["-i", "tests/test_data/cylinder/cylinder.vtp", "-sm", "no_smooth"], "--- No smoothing of surface"),
+    (["-i", "tests/test_data/cylinder/cylinder.vtp", "-mf", "xml"], "--- Writing Dolfin file"),
+    (["-i", "tests/test_data/cylinder/cylinder.vtp", "-mf", "hdf5"], "--- Converting XML mesh to HDF5"),
+    (["-i", "tests/test_data/cylinder/cylinder.vtp", "-mf", "xdmf"], "--- Converting VTU mesh to XDMF"),
+    (["-i", "tests/test_data/tube/tube.stl", "-sc", "0.001", "-c", "1"], "--- Scale model by factor 0.001"),
+    (["-i", "tests/test_data/artery/artery.stl", "-m", "curvature", "-c", "1.6"], "Number of cells: 135660"),
+    (["-i", "tests/test_data/tube/tube.stl", "-m", "diameter"], "Number of cells: 14223"),
+    (["-i", "tests/test_data/tube/tube.stl", "-m", "constant", "-el", "0.4"], "Number of cells: 39886"),
+    (["-i", "tests/test_data/cylinder/cylinder.vtp", "-fli", "3", "-flo", "7"], "Number of cells: 11552"),
+    (["-i", "tests/test_data/cylinder/cylinder.vtp", "-nbf", "1", "-nbs", "3"], "Number of cells: 11550"),
+    # Add more test cases as needed
+]
+
+
+@pytest.mark.parametrize("args, description", command_line_test_cases)
+def test_fsipy_mesh(args, description, tmpdir):
+    # Define test data paths
+    original_model_path = Path(args[1])
+
+    # Copy the original model to tmpdir
+    model_path = copy_original_model_to_tmpdir(original_model_path, tmpdir)
+
+    # Replace the original model path in args with the model in tmpdir
+    args[1] = str(model_path)
+
+    command = ["fsipy-mesh", "-viz", "False", "-c", "2"] + args
+
+    # Run the script and capture the output and return code
+    result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+    # Check if the return code is 0 (indicating success)
+    assert result.returncode == 0, f"Test failed: {description}\nCaptured output:\n{result.stdout}"
+
+    # Check if the expected description is present in the output
+    assert description in result.stdout, f"Test failed: {description}\nCaptured output:\n{result.stdout}"
 
 
 def copy_original_model_to_tmpdir(original_model_path, tmpdir):
