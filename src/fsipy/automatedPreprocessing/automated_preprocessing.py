@@ -21,6 +21,7 @@ from vampy.automatedPreprocessing.visualize import visualize_model
 
 from fsipy.automatedPreprocessing.preprocessing_common import generate_mesh, distance_to_spheres_solid_thickness, \
     dist_sphere_spheres, convert_xml_mesh_to_hdf5, convert_vtu_mesh_to_xdmf, edge_length_evaluator
+from fsipy.simulations.simulation_common import load_mesh_and_data, print_mesh_summary
 
 
 def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_factor, smoothing_iterations,
@@ -97,6 +98,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
     file_name_surface_name = base_path + "_remeshed_surface.vtp"
     file_name_xml_mesh = base_path + ".xml"
     file_name_vtu_mesh = base_path + ".vtu"
+    file_name_hdf5_mesh = base_path + ".h5"
     file_name_xdmf_mesh = base_path + ".xdmf"
     file_name_edge_length_xdmf = base_path + "_edge_length.xdmf"
     region_centerlines = None
@@ -110,7 +112,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
             file_name_parameters, file_name_probe_points,
             file_name_voronoi, file_name_voronoi_smooth, file_name_voronoi_surface, file_name_surface_smooth,
             file_name_model_flow_ext, file_name_clipped_model, file_name_flow_centerlines, file_name_surface_name,
-            file_name_xml_mesh, file_name_vtu_mesh, file_name_xdmf_mesh,
+            file_name_xml_mesh, file_name_vtu_mesh, file_name_hdf5_mesh, file_name_xdmf_mesh,
         ]
         for file in files_to_remove:
             if path.exists(file):
@@ -168,7 +170,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
     inlet, outlets = get_centers_for_meshing(surface, is_atrium, base_path)
     has_outlet = len(outlets) != 0
 
-    # Get point the furthest away inlet when only one boundary
+    # Get point the furthest away from the inlet when only one boundary
     if not has_outlet:
         outlets = get_furtest_surface_point(inlet, surface)
 
@@ -265,7 +267,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
                        "manually clipp the branch which still is capped. " +
                        "Overwrite the current {} and restart the script.").format(
                     file_name_surface_smooth, file_name_surface_smooth))
-                sys.exit(0)
+                sys.exit(-1)
 
             surface = surface_uncapped
 
@@ -317,6 +319,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
         else:
             surface_extended = read_polydata(file_name_model_flow_ext)
     else:
+        print("--- Not adding flow extensions\n")
         surface_extended = surface
 
     # Capp surface with flow extensions
@@ -422,7 +425,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
 
     # Compute mesh
     if not path.isfile(file_name_vtu_mesh):
-        print("--- Computing mesh\n")
+        print("--- Generating FSI mesh\n")
         try:
             mesh, remeshed_surface = generate_mesh(distance_to_sphere,
                                                    number_of_sublayers_fluid,
@@ -466,11 +469,20 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
     if mesh_format == "hdf5":
         print("--- Converting XML mesh to HDF5\n")
         convert_xml_mesh_to_hdf5(file_name_xml_mesh, scale_factor_h5)
+
         # Evaluate edge length for inspection
+        print("--- Evaluating edge length\n")
         edge_length_evaluator(file_name_xml_mesh, file_name_edge_length_xdmf)
+
+        # Print mesh information
+        dolfin_mesh, _, _ = load_mesh_and_data(file_name_hdf5_mesh)
+        print_mesh_summary(dolfin_mesh)
     elif mesh_format == "xdmf":
+        print("--- Converting VTU mesh to XDMF\n")
         convert_vtu_mesh_to_xdmf(file_name_vtu_mesh, file_name_xdmf_mesh)
+
         # Evaluate edge length for inspection
+        print("--- Evaluating edge length\n")
         edge_length_evaluator(file_name_xdmf_mesh, file_name_edge_length_xdmf)
 
     network, probe_points = setup_model_network(centerlines, file_name_probe_points, region_center, verbose_print)
@@ -645,11 +657,6 @@ def read_command_line(input_path=None):
                         help='Path to configuration file for remote simulation. ' +
                              'See ssh_config.json for details')
 
-    parser.add_argument('-bl', '--add-boundary-layer',
-                        default=True,
-                        type=str2bool,
-                        help="Adds boundary layers along geometry wall if true.")
-
     parser.add_argument('-sc', '--scale-factor',
                         default=None,
                         type=float,
@@ -659,14 +666,14 @@ def read_command_line(input_path=None):
     parser.add_argument("-sch5", "--scale-factor-h5",
                         default=1.0,
                         type=float,
-                        help="Scaling factor for HDF5 mesh. Used to scale model to [mm]." +
+                        help="Scaling factor for HDF5 mesh. Used to scale model to [mm]. " +
                              "Note that probes and other parameters are not scaled." +
                              "Do not use in combination with --scale-factor.")
 
     parser.add_argument('-rs', '--resampling-step',
                         default=0.1,
                         type=float,
-                        help="Resampling step used to resample centerline in [m]." +
+                        help="Resampling step used to resample centerline in [m]. " +
                              "Note: If --scale-factor is used, this step will be adjusted accordingly.")
 
     parser.add_argument('-mp', '--meshing-parameters',
