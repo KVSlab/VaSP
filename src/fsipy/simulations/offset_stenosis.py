@@ -6,8 +6,11 @@ import numpy as np
 
 from vampy.simulation.Womersley import make_womersley_bcs, compute_boundary_geometry_acrn
 from turtleFSI.problems import *
-from dolfin import HDF5File, Mesh, MeshFunction, facets, cells, assemble, UserExpression, FacetNormal, ds, \
-    DirichletBC, Measure, inner, parameters
+from dolfin import HDF5File, Mesh, MeshFunction, facets, cells, UserExpression, FacetNormal, ds, \
+    DirichletBC, Measure, inner, parameters, assemble
+
+from fsipy.simulations.simulation_common import load_probe_points, print_probe_points, print_mesh_summary, \
+    calculate_and_print_flow_properties
 
 # set compiler arguments
 parameters["form_compiler"]["quadrature_degree"] = 6
@@ -42,7 +45,7 @@ def set_problem_parameters(default_variables, **namespace):
         recompute=20,  # Recompute the Jacobian matix within time steps
         recompute_tstep=20,  # Recompute the Jacobian matix over time steps
         # boundary condition parameters
-        inlet_id=3,  # inlet id for the fluid
+        inlet_id=2,  # inlet id for the fluid
         inlet_outlet_s_id=11,  # inlet and outlet id for solid
         fsi_id=22,  # id for fsi surface
         rigid_id=11,  # "rigid wall" id for the fluid
@@ -87,6 +90,8 @@ def get_mesh_domain_and_boundaries(mesh_path, fsi_x_range, dx_f_id, fsi_id, rigi
     hdf.read(boundaries, "/boundaries")
     domains = MeshFunction("size_t", mesh, 3)
     hdf.read(domains, "/domains")
+
+    print_mesh_summary(mesh)
 
     # Only consider FSI in domain within fsi_x_range
     fsi_x_min = fsi_x_range[0]
@@ -155,6 +160,13 @@ class InnerP(UserExpression):
         return ()
 
 
+def initiate(mesh_path, **namespace):
+
+    probe_points = load_probe_points(mesh_path)
+
+    return dict(probe_points=probe_points)
+
+
 def create_bcs(t, DVP, mesh, boundaries, mu_f,
                fsi_id, inlet_id, inlet_outlet_s_id,
                rigid_id, psi, F_solid_linear, p_deg, FC_file,
@@ -196,7 +208,9 @@ def create_bcs(t, DVP, mesh, boundaries, mu_f,
 
     # Create inlet subdomain for computing the flow rate inside post_solve
     dsi = ds(inlet_id, domain=mesh, subdomain_data=boundaries)
-    return dict(bcs=bcs, inlet=inlet, p_out_bc_val=p_out_bc_val, F_solid_linear=F_solid_linear, n=n, dsi=dsi)
+    inlet_area = assemble(1.0 * dsi)
+    return dict(bcs=bcs, inlet=inlet, p_out_bc_val=p_out_bc_val, F_solid_linear=F_solid_linear, n=n, dsi=dsi,
+                inlet_area=inlet_area)
 
 
 def pre_solve(t, inlet, p_out_bc_val, **namespace):
@@ -216,8 +230,10 @@ def pre_solve(t, inlet, p_out_bc_val, **namespace):
     return dict(inlet=inlet, p_out_bc_val=p_out_bc_val)
 
 
-def post_solve(n, dsi, v_, **namespace):
-    # Compute flow rate at inlet
-    flow_rate_inlet = abs(assemble(inner(v_["n"], n) * dsi))
-    if MPI.rank(MPI.comm_world) == 0:
-        print(f"Inlet flow rate is: {flow_rate_inlet} m^3/s\n")
+def post_solve(probe_points, dvp_, dt, mesh, inlet_area, dsi, mu_f, rho_f, n, **namespace):
+
+    v = dvp_["n"].sub(1, deepcopy=True)
+    p = dvp_["n"].sub(2, deepcopy=True)
+
+    print_probe_points(v, p, probe_points)
+    calculate_and_print_flow_properties(dt, mesh, v, inlet_area, mu_f[0], rho_f[0], n, dsi)
