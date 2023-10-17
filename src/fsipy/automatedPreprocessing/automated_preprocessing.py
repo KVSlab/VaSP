@@ -168,7 +168,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
     inlet, outlets = get_centers_for_meshing(surface, is_atrium, base_path)
     has_outlet = len(outlets) != 0
 
-    # Get point the furthest away inlet when only one boundary
+    # Get point the furthest away from the inlet when only one boundary
     if not has_outlet:
         outlets = get_furtest_surface_point(inlet, surface)
 
