@@ -21,6 +21,7 @@ from vampy.automatedPreprocessing.visualize import visualize_model
 
 from fsipy.automatedPreprocessing.preprocessing_common import generate_mesh, distance_to_spheres_solid_thickness, \
     dist_sphere_spheres, convert_xml_mesh_to_hdf5, convert_vtu_mesh_to_xdmf, edge_length_evaluator
+from fsipy.simulations.simulation_common import load_mesh_and_data, print_mesh_summary
 
 
 def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_factor, smoothing_iterations,
@@ -97,6 +98,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
     file_name_surface_name = base_path + "_remeshed_surface.vtp"
     file_name_xml_mesh = base_path + ".xml"
     file_name_vtu_mesh = base_path + ".vtu"
+    file_name_hdf5_mesh = base_path + ".h5"
     file_name_xdmf_mesh = base_path + ".xdmf"
     file_name_edge_length_xdmf = base_path + "_edge_length.xdmf"
     region_centerlines = None
@@ -110,7 +112,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
             file_name_parameters, file_name_probe_points,
             file_name_voronoi, file_name_voronoi_smooth, file_name_voronoi_surface, file_name_surface_smooth,
             file_name_model_flow_ext, file_name_clipped_model, file_name_flow_centerlines, file_name_surface_name,
-            file_name_xml_mesh, file_name_vtu_mesh, file_name_xdmf_mesh,
+            file_name_xml_mesh, file_name_vtu_mesh, file_name_hdf5_mesh, file_name_xdmf_mesh,
         ]
         for file in files_to_remove:
             if path.exists(file):
@@ -471,6 +473,10 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
         # Evaluate edge length for inspection
         print("--- Evaluating edge length\n")
         edge_length_evaluator(file_name_xml_mesh, file_name_edge_length_xdmf)
+
+        # Print mesh information
+        dolfin_mesh, _, _ = load_mesh_and_data(file_name_hdf5_mesh)
+        print_mesh_summary(dolfin_mesh)
     elif mesh_format == "xdmf":
         print("--- Converting VTU mesh to XDMF\n")
         convert_vtu_mesh_to_xdmf(file_name_vtu_mesh, file_name_xdmf_mesh)
