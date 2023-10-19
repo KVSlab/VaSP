@@ -127,7 +127,6 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
         print(f"--- Scale model by factor {scale_factor}\n")
         surface = scale_surface(surface, scale_factor)
         resampling_step *= scale_factor
-        solid_thickness_parameters = [scale_factor * i for i in solid_thickness_parameters]
 
     # Check if surface is closed and uncapps model if True
     is_capped = check_if_closed_surface(surface)
