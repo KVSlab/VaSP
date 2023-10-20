@@ -650,7 +650,7 @@ def compute_tke(probe_points: Dict[int, Dict[str, Any]], time_steps_per_cycle: i
                 end_cycle: Optional[int] = None) -> Dict[int, Tuple[np.ndarray, np.ndarray, np.ndarray]]:
     """
     Compute the mean velocity, fluctuating velocity, and turbulent kinetic energy for each point within the specified
-    cycle range in the probe points data.
+    cycle range in the probe points data using phase-averaging.
 
     Args:
         probe_points (dict): Probe points data as returned by parse_log_file.
@@ -673,34 +673,39 @@ def compute_tke(probe_points: Dict[int, Dict[str, Any]], time_steps_per_cycle: i
     # If end_cycle is not provided, end at last cycle
     last_cycle = num_cycles if end_cycle is None else int(end_cycle)
 
-    logging.info(f"--- Computing TKE for probe points from cycle {first_cycle} to cycle {last_cycle}")
+    logging.info(f"--- Computing TKE for probe points from cycle {first_cycle} to cycle {last_cycle} (Phase-Averaged)")
 
     for probe_point, data in probe_points.items():
         # Extract velocity data for the current probe point
         velocities = data["velocity"]
 
-        # Calculate the number of time steps to process
-        num_time_steps = (last_cycle - first_cycle + 1) * time_steps_per_cycle
-
         # Initialize arrays to store mean velocity, fluctuating velocity, and TKE for each point
-        mean_velocities = np.zeros((num_time_steps, 3))
-        fluctuating_velocities = np.zeros((num_time_steps, 3))
-        tke_values = np.zeros(num_time_steps)
+        mean_velocities = np.zeros(velocities.shape)
+        fluctuating_velocities = np.zeros(velocities.shape)
+        tke_values = np.zeros(velocities.shape[0])
 
-        # Calculate start and end indices for slicing
-        start_index = (first_cycle - 1) * time_steps_per_cycle
-        end_index = start_index + num_time_steps
+        for cycle in range(first_cycle, last_cycle + 1):
+            # Extract velocities for the current cycle
+            cycle_start = (cycle - 1) * velocities.shape[0]
+            cycle_end = cycle * velocities.shape[0]
+            cycle_velocities = velocities[cycle_start:cycle_end]
 
-        # Extract velocities for the entire range
-        all_point_velocities = velocities[start_index:end_index]
+            # Check if cycle_velocities is empty, and skip if it is
+            if not np.any(cycle_velocities):
+                continue
 
-        # Reshape velocities for easier calculations
-        all_point_velocities = all_point_velocities.reshape((last_cycle - first_cycle + 1, time_steps_per_cycle, -1))
+            # Accumulate velocities for phase-averaging
+            mean_velocities += cycle_velocities
 
-        # Compute the mean velocity, fluctuating velocity, and TKE for each point within the specified cycle range
-        mean_velocities = np.mean(all_point_velocities, axis=1)
-        fluctuating_velocities = all_point_velocities - mean_velocities[:, np.newaxis, :]
-        tke_values = 0.5 * np.sum(fluctuating_velocities**2, axis=2).flatten()
+        # Compute the mean velocity by dividing the accumulated data by the number of non-empty cycles
+        num_non_empty_cycles = max(1, last_cycle - first_cycle + 1)  # Ensure at least 1 cycle is counted
+        mean_velocities /= num_non_empty_cycles
+
+        # Compute fluctuating velocities
+        fluctuating_velocities = velocities - mean_velocities
+
+        # Compute TKE based on phase-averaged mean velocity and fluctuating velocities
+        tke_values = 0.5 * np.sum(fluctuating_velocities**2, axis=1)
 
         # Store the mean velocity, fluctuating velocity, and TKE for this probe point
         velocity_data[probe_point] = (mean_velocities, fluctuating_velocities, tke_values)
@@ -710,7 +715,8 @@ def compute_tke(probe_points: Dict[int, Dict[str, Any]], time_steps_per_cycle: i
 
 def plot_probe_points_tke(tke_data: Dict[int, Tuple[np.ndarray, np.ndarray, np.ndarray]],
                           selected_probe_points: Optional[List[int]] = None, save_to_file: bool = False,
-                          output_directory: Optional[str] = None, figure_size: Tuple[int, int] = (12, 6)):
+                          output_directory: Optional[str] = None, figure_size: Tuple[int, int] = (12, 6),
+                          start: Optional[int] = None, end: Optional[int] = None):
     """
     Plot the turbulent kinetic energy (TKE) for each probe point in separate subplots.
 
@@ -720,6 +726,8 @@ def plot_probe_points_tke(tke_data: Dict[int, Tuple[np.ndarray, np.ndarray, np.n
         save_to_file (bool, optional): Whether to save the figures to files (default is False).
         output_directory (str, optional): The directory where the figure will be saved when save_to_file is True.
         figure_size (tuple, optional): Figure size in inches (width, height). Default is (12, 8).
+        start (int, optional): Index to start plotting data from. Default is None (start from the beginning).
+        end (int, optional): Index to end plotting data at. Default is None (end at the last data point).
     """
     logging.info("--- Creating plot for TKE for probe points")
 
@@ -758,7 +766,7 @@ def plot_probe_points_tke(tke_data: Dict[int, Tuple[np.ndarray, np.ndarray, np.n
 
     for i, (probe_point, (_, _, tke_values)) in enumerate(selected_tke_data.items()):
         ax = axes[i]
-        ax.plot(tke_values, label=f"Probe Point {probe_point}")
+        ax.plot(tke_values[start:end], label=f"Probe Point {probe_point}")
         ax.set_title(f"Probe Point {probe_point}")
         ax.set_xlabel("Time Step")
         ax.set_ylabel("TKE")
@@ -1100,7 +1108,8 @@ def main() -> None:
         else:
             # Call the plot function to plot probe points
             plot_probe_points_tke(tke_data, selected_probe_points=args.probe_points, save_to_file=args.save,
-                                  figure_size=args.figure_size, output_directory=args.output_directory)
+                                  figure_size=args.figure_size, output_directory=args.output_directory,
+                                  start=start, end=end)
 
     if not args.save:
         logging.info("--- Showing plot(s)")
