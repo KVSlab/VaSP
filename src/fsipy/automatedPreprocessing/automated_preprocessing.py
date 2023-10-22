@@ -25,7 +25,7 @@ from fsipy.simulations.simulation_common import load_mesh_and_data, print_mesh_s
 
 
 def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_factor, smoothing_iterations,
-                       meshing_method, refine_region, is_atrium, add_flow_extensions, visualize, config_path,
+                       meshing_method, refine_region, has_multiple_inlets, add_flow_extensions, visualize, config_path,
                        coarsening_factor, inlet_flow_extension_length, outlet_flow_extension_length,
                        number_of_sublayers_fluid, number_of_sublayers_solid, edge_length,
                        region_points, compress_mesh, scale_factor, scale_factor_h5, resampling_step, meshing_parameters,
@@ -45,7 +45,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
         smoothing_iterations (int): Number of smoothing iterations for Taubin and Laplace smoothing
         meshing_method (str): Determines what the density of the volumetric mesh depends upon
         refine_region (bool): Refines selected region of input if True
-        is_atrium (bool): Determines whether this is an atrium case
+        has_multiple_inlets (bool): Specifies whether the input model has multiple inlets
         add_flow_extensions (bool): Adds flow extensions to mesh if True
         visualize (bool): Visualize resulting surface model with flow rates
         config_path (str): Path to configuration file for remote simulation
@@ -166,15 +166,15 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
 
     # Get centerlines
     print("--- Get centerlines\n")
-    inlet, outlets = get_centers_for_meshing(surface, is_atrium, base_path)
+    inlet, outlets = get_centers_for_meshing(surface, has_multiple_inlets, base_path)
     has_outlet = len(outlets) != 0
 
     # Get point the furthest away from the inlet when only one boundary
     if not has_outlet:
         outlets = get_furtest_surface_point(inlet, surface)
 
-    source = outlets if is_atrium else inlet
-    target = inlet if is_atrium else outlets
+    source = outlets if has_multiple_inlets else inlet
+    target = inlet if has_multiple_inlets else outlets
 
     centerlines, voronoi, _ = compute_centerlines(source, target, file_name_centerlines, capped_surface,
                                                   resampling=resampling_step)
@@ -224,7 +224,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
         region_centerlines = vtk_merge_polydata(refine_region_centerline)
 
         for region in refine_region_centerline:
-            region_factor = 0.9 if is_atrium else 0.5
+            region_factor = 0.9 if has_multiple_inlets else 0.5
             region_center.append(region.GetPoints().GetPoint(int(region.GetNumberOfPoints() * region_factor)))
             tmp_misr = get_point_data_array(radiusArrayName, region)
             misr_max.append(tmp_misr.max())
@@ -297,10 +297,10 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
     if add_flow_extensions:
         if not path.isfile(file_name_model_flow_ext):
             print("--- Adding flow extensions\n")
-            # Add extension normal on boundary for atrium models
-            extension = "centerlinedirection" if is_atrium else "boundarynormal"
-            if is_atrium:
-                # Flip lengths if model is atrium
+            # Add extension normal on boundary for models with multiple inlets
+            extension = "centerlinedirection" if has_multiple_inlets else "boundarynormal"
+            if has_multiple_inlets:
+                # Flip lengths if model has multiple inlets
                 inlet_flow_extension_length, outlet_flow_extension_length = \
                     outlet_flow_extension_length, inlet_flow_extension_length
 
@@ -330,13 +330,13 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
             print("--- Compute the model centerlines with flow extension.\n")
             # Compute the centerlines.
             if has_outlet:
-                inlet, outlets = get_centers_for_meshing(surface_extended, is_atrium, base_path,
+                inlet, outlets = get_centers_for_meshing(surface_extended, has_multiple_inlets, base_path,
                                                          use_flow_extensions=True)
             else:
-                inlet, _ = get_centers_for_meshing(surface_extended, is_atrium, base_path, use_flow_extensions=True)
-            # Flip outlets and inlets for atrium models
-            source = outlets if is_atrium else inlet
-            target = inlet if is_atrium else outlets
+                inlet, _ = get_centers_for_meshing(surface_extended, has_multiple_inlets, base_path, use_flow_extensions=True)
+            # Flip outlets and inlets for models with multiple inlets
+            source = outlets if has_multiple_inlets else inlet
+            target = inlet if has_multiple_inlets else outlets
             centerlines, _, _ = compute_centerlines(source, target, file_name_flow_centerlines, capped_surface,
                                                     resampling=resampling_step)
 
@@ -490,9 +490,9 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
     parameters = get_parameters(base_path)
 
     print("--- Computing flow rates and flow split, and setting boundary IDs\n")
-    mean_inflow_rate = compute_flow_rate(is_atrium, inlet, parameters, flow_rate_factor)
+    mean_inflow_rate = compute_flow_rate(has_multiple_inlets, inlet, parameters, flow_rate_factor)
 
-    find_boundaries(base_path, mean_inflow_rate, network, mesh, verbose_print, is_atrium)
+    find_boundaries(base_path, mean_inflow_rate, network, mesh, verbose_print, has_multiple_inlets)
 
     # Display the flow split at the outlets, inlet flow rate, and probes.
     if visualize:
@@ -614,11 +614,12 @@ def read_command_line(input_path=None):
                              "Example providing the points (0.1, 5.0, -1) and (1, -5.2, 3.21):" +
                              " --region-points 0.1 5 -1 1 5.24 3.21")
 
-    atrium = parser.add_mutually_exclusive_group(required=False)
-    atrium.add_argument('-at', '--is-atrium',
-                        action="store_true",
-                        default=False,
-                        help="Determine whether or not the model is an atrium model.")
+    multiple_inlets = parser.add_mutually_exclusive_group(required=False)
+    multiple_inlets.add_argument('-hmi', '--has-multiple-inlets',
+                                 action="store_true",
+                                 default=False,
+                                 help="Specifies whether the input model has multiple inlets. When set to True, it " +
+                                      "indicates a configuration with multiple inlets and one outlet.")
 
     parser.add_argument('-f', '--add-flowextensions',
                         default=True,
@@ -757,8 +758,9 @@ def read_command_line(input_path=None):
 
     return dict(input_model=args.input_model, verbose_print=verbose_print, smoothing_method=args.smoothing_method,
                 smoothing_factor=args.smoothing_factor, smoothing_iterations=args.smoothing_iterations,
-                meshing_method=args.meshing_method, refine_region=args.refine_region, is_atrium=args.is_atrium,
-                add_flow_extensions=args.add_flowextensions, config_path=args.config_path, edge_length=args.edge_length,
+                meshing_method=args.meshing_method, refine_region=args.refine_region,
+                has_multiple_inlets=args.has_multiple_inlets, add_flow_extensions=args.add_flowextensions,
+                config_path=args.config_path, edge_length=args.edge_length,
                 coarsening_factor=args.coarsening_factor, inlet_flow_extension_length=args.inlet_flowextension,
                 number_of_sublayers_fluid=args.number_of_sublayers_fluid,
                 number_of_sublayers_solid=args.number_of_sublayers_solid, visualize=args.visualize,
