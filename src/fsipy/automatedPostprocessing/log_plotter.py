@@ -680,29 +680,26 @@ def compute_tke(probe_points: Dict[int, Dict[str, Any]], time_steps_per_cycle: i
         velocities = data["velocity"]
 
         # Initialize arrays to store mean velocity, fluctuating velocity, and TKE for each point
-        mean_velocities = np.zeros(velocities.shape)
+        mean_velocities = np.zeros((time_steps_per_cycle, 3))
         fluctuating_velocities = np.zeros(velocities.shape)
-        tke_values = np.zeros(velocities.shape[0])
 
         for cycle in range(first_cycle, last_cycle + 1):
             # Extract velocities for the current cycle
-            cycle_start = (cycle - 1) * velocities.shape[0]
-            cycle_end = cycle * velocities.shape[0]
+            cycle_start = (cycle - 1) * time_steps_per_cycle
+            cycle_end = cycle * time_steps_per_cycle
             cycle_velocities = velocities[cycle_start:cycle_end]
-
-            # Check if cycle_velocities is empty, and skip if it is
-            if not np.any(cycle_velocities):
-                continue
 
             # Accumulate velocities for phase-averaging
             mean_velocities += cycle_velocities
 
-        # Compute the mean velocity by dividing the accumulated data by the number of non-empty cycles
-        num_non_empty_cycles = max(1, last_cycle - first_cycle + 1)  # Ensure at least 1 cycle is counted
-        mean_velocities /= num_non_empty_cycles
+        # Compute the mean velocity by dividing the accumulated velocity data by the number of cycles
+        mean_velocities /= max(1, last_cycle - first_cycle + 1)
 
-        # Compute fluctuating velocities
-        fluctuating_velocities = velocities - mean_velocities
+        # Compute fluctuating velocities for all cycles
+        for cycle in range(first_cycle, last_cycle + 1):
+            cycle_start = (cycle - 1) * time_steps_per_cycle
+            cycle_end = cycle * time_steps_per_cycle
+            fluctuating_velocities[cycle_start:cycle_end] = velocities[cycle_start:cycle_end] - mean_velocities
 
         # Compute TKE based on phase-averaged mean velocity and fluctuating velocities
         tke_values = 0.5 * np.sum(fluctuating_velocities**2, axis=1)
