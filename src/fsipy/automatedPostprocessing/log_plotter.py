@@ -302,7 +302,7 @@ def plot_variable_comparison(variable: np.ndarray, variable_name: str, time_step
     plt.legend()
 
     if save_to_file:
-        save_plot_to_file(variable_name + "Comparison", output_directory)
+        save_plot_to_file(variable_name + " Comparison", output_directory)
 
 
 def plot_multiple_variables_vs_time(time: np.ndarray, variable_mean: np.ndarray, variable_min: np.ndarray,
@@ -410,7 +410,7 @@ def plot_multiple_variables_comparison(variable_mean: np.ndarray, variable_min: 
     plt.tight_layout()
 
     if save_to_file:
-        save_plot_to_file(variable_name + "Comparison", output_directory)
+        save_plot_to_file(variable_name + " Comparison", output_directory)
 
 
 def plot_newton_iteration(variable: np.ndarray, variable_name: str, save_to_file: bool = False,
