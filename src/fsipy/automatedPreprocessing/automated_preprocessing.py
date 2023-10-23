@@ -333,7 +333,8 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
                 inlet, outlets = get_centers_for_meshing(surface_extended, has_multiple_inlets, base_path,
                                                          use_flow_extensions=True)
             else:
-                inlet, _ = get_centers_for_meshing(surface_extended, has_multiple_inlets, base_path, use_flow_extensions=True)
+                inlet, _ = get_centers_for_meshing(surface_extended, has_multiple_inlets, base_path,
+                                                   use_flow_extensions=True)
             # Flip outlets and inlets for models with multiple inlets
             source = outlets if has_multiple_inlets else inlet
             target = inlet if has_multiple_inlets else outlets
