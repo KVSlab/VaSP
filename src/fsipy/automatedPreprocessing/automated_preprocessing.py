@@ -30,7 +30,8 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
                        number_of_sublayers_fluid, number_of_sublayers_solid, edge_length,
                        region_points, compress_mesh, scale_factor, scale_factor_h5, resampling_step, meshing_parameters,
                        remove_all, solid_thickness, solid_thickness_parameters, mesh_format, flow_rate_factor,
-                       solid_side_wall_id, interface_fsi_id, solid_outer_wall_id, fluid_volume_id, solid_volume_id):
+                       solid_side_wall_id, interface_fsi_id, solid_outer_wall_id, fluid_volume_id, solid_volume_id,
+                       mesh_generation_retries):
     """
     Automatically generate mesh of surface model in .vtu and .xml format, including prescribed
     flow rates at inlet and outlet based on flow network model.
@@ -70,6 +71,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
         solid_outer_wall_id (int): ID for the solid outer wall
         fluid_volume_id (int): ID for the fluid volume
         solid_volume_id (int): ID for the solid volume
+        mesh_generation_retries (int): Number of mesh generation retries before trying alternative method
     """
     # Get paths
     case_name = input_model.rsplit(path.sep, 1)[-1].rsplit('.')[0]
@@ -426,20 +428,36 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
     # Compute mesh
     if not path.isfile(file_name_vtu_mesh):
         print("--- Generating FSI mesh\n")
-        try:
-            mesh, remeshed_surface = generate_mesh(distance_to_sphere,
-                                                   number_of_sublayers_fluid,
-                                                   number_of_sublayers_solid,
-                                                   solid_thickness,
-                                                   solid_thickness_parameters)
-        except Exception:
-            print("ERROR: Mesh generation failed. Trying to remesh with alternative method.")
+
+        def try_generate_mesh(distance_to_sphere, number_of_sublayers_fluid,
+                              number_of_sublayers_solid, solid_thickness, solid_thickness_parameters):
+            try:
+                return generate_mesh(distance_to_sphere, number_of_sublayers_fluid,
+                                     number_of_sublayers_solid, solid_thickness, solid_thickness_parameters)
+            except RuntimeError:
+                return None
+
+        mesh_generation_failed = True
+
+        for i in range(mesh_generation_retries + 1):
+            mesh_and_surface = try_generate_mesh(distance_to_sphere, number_of_sublayers_fluid,
+                                                 number_of_sublayers_solid, solid_thickness, solid_thickness_parameters)
+            if mesh_and_surface:
+                mesh, remeshed_surface = mesh_and_surface
+                mesh_generation_failed = False
+                break
+
+        if mesh_generation_failed:
+            print(f"ERROR: Mesh generation failed after {mesh_generation_retries} retries. "
+                  "Trying to remesh with an alternative method.")
             distance_to_sphere = mesh_alternative(distance_to_sphere)
-            mesh, remeshed_surface = generate_mesh(distance_to_sphere,
-                                                   number_of_sublayers_fluid,
-                                                   number_of_sublayers_solid,
-                                                   solid_thickness,
-                                                   solid_thickness_parameters)
+            mesh_and_surface = try_generate_mesh(distance_to_sphere, number_of_sublayers_fluid,
+                                                 number_of_sublayers_solid, solid_thickness, solid_thickness_parameters)
+            if mesh_and_surface:
+                mesh, remeshed_surface = mesh_and_surface
+            else:
+                print("ERROR: Mesh generation failed with an alternative method.")
+                sys.exit(-1)
 
         assert mesh.GetNumberOfPoints() > 0, "No points in mesh, try to remesh."
         assert remeshed_surface.GetNumberOfPoints() > 0, "No points in surface mesh, try to remesh."
@@ -510,7 +528,6 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
     files_to_remove = [
         file_name_centerlines, file_name_refine_region_centerlines, file_name_region_centerlines,
         file_name_distance_to_sphere_diam, file_name_distance_to_sphere_const, file_name_distance_to_sphere_curv,
-        file_name_distance_to_sphere_spheres, file_name_distance_to_sphere_solid_thickness,
         file_name_voronoi, file_name_voronoi_smooth, file_name_voronoi_surface, file_name_surface_smooth,
         file_name_model_flow_ext, file_name_clipped_model, file_name_flow_centerlines, file_name_surface_name
     ]
@@ -730,6 +747,12 @@ def read_command_line(input_path=None):
     parser.add_argument("--fluid-volume-id", type=int, default=0, help="ID for the fluid volume")
     parser.add_argument("--solid-volume-id", type=int, default=1, help="ID for the solid volume")
 
+    parser.add_argument("-mgr", "--mesh-generation-retries",
+                        type=int,
+                        default=2,
+                        help="Number of mesh generation retries before trying to subdivide and smooth the " +
+                             "input model (default: 2)")
+
     # Parse path to get default values
     if required:
         args = parser.parse_args()
@@ -773,7 +796,7 @@ def read_command_line(input_path=None):
                 mesh_format=args.mesh_format, flow_rate_factor=args.flow_rate_factor,
                 solid_side_wall_id=args.solid_side_wall_id, interface_fsi_id=args.interface_fsi_id,
                 solid_outer_wall_id=args.solid_outer_wall_id, fluid_volume_id=args.fluid_volume_id,
-                solid_volume_id=args.solid_volume_id)
+                solid_volume_id=args.solid_volume_id, mesh_generation_retries=args.mesh_generation_retries)
 
 
 def main_meshing():
