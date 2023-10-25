@@ -7,7 +7,6 @@
 *.pvd
 
 # Results files
-*.png
 *.csv
 
 # OS generated files
