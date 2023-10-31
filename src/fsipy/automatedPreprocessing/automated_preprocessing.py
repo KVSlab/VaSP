@@ -505,7 +505,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
         edge_length_evaluator(file_name_xdmf_mesh, file_name_edge_length_xdmf)
 
     network, probe_points = setup_model_network(centerlines, file_name_probe_points, region_center, verbose_print,
-                                                has_outlet, has_multiple_inlets)
+                                                has_multiple_inlets)
 
     # Load updated parameters following meshing
     parameters = get_parameters(base_path)

@@ -370,7 +370,7 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
             tetgen.Execute()
 
             if tetgen.Mesh.GetNumberOfCells() == 0 and surfaceToMesh.Mesh.GetNumberOfCells() > 0:
-                self.PrintError('Running TetGen failed. Try to remesh.')
+                self.PrintError('Running TetGen failed. Try to re-mesh.')
 
             self.PrintLog("Assembling fluid mesh")
             appendFilter = vtkvmtk.vtkvmtkAppendFilter()
