@@ -370,8 +370,7 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
             tetgen.Execute()
 
             if tetgen.Mesh.GetNumberOfCells() == 0 and surfaceToMesh.Mesh.GetNumberOfCells() > 0:
-                raise Exception('An error occurred during tetrahedralization. Will only output ' +
-                                'surface mesh and boundary layer.')
+                self.PrintError('Running TetGen failed. Try to re-mesh.')
 
             self.PrintLog("Assembling fluid mesh")
             appendFilter = vtkvmtk.vtkvmtkAppendFilter()
