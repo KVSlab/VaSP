@@ -130,6 +130,7 @@ def generate_mesh(surface: vtkPolyData, number_of_sublayers_fluid: int, number_o
     meshGenerator.ElementSizeMode = "edgelengtharray"  # Variable size mesh
     meshGenerator.TargetEdgeLengthArrayName = "Size"  # Variable size mesh
     meshGenerator.LogOn = 1
+    meshGenerator.ExitOnError = 0
     meshGenerator.BoundaryLayer = 1
     meshGenerator.NumberOfSubLayersSolid = number_of_sublayers_solid
     meshGenerator.NumberOfSubLayersFluid = number_of_sublayers_fluid
