@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""common functions for postprocessing-fenics scripts"""
 import argparse
 from pathlib import Path
 

@@ -1,3 +1,7 @@
+# Copyright (c) 2023 David Bruneau
+# Modified by Kei Yamamoto 2023
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 import numpy as np
 import h5py
 import re
