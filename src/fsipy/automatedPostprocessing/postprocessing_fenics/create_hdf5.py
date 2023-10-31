@@ -5,7 +5,7 @@ from pathlib import Path
 import json
 import logging
 
-from postprocessing_common import read_command_line
+from fsipy.automatedPostprocessing.postprocessing_fenics import postprocessing_fenics_common
 from dolfin import Mesh, HDF5File, VectorFunctionSpace, Function, MPI, parameters
 
 
@@ -243,7 +243,7 @@ def main() -> None:
 
     assert MPI.size(MPI.comm_world) == 1, "This script only runs in serial."
 
-    args = read_command_line()
+    args = postprocessing_fenics_common.parse_arguments()
 
     logging.basicConfig(level=20, format="%(message)s")
 

@@ -1,9 +1,14 @@
-from argparse import ArgumentParser
+import argparse
 from pathlib import Path
 
-def read_command_line():
-    """Read arguments from commandline"""
-    parser = ArgumentParser()
+def parse_arguments() -> argparse.Namespace:
+    """
+    Parse command line arguments.
+
+    Returns:
+        argparse.Namespace: Parsed command-line arguments.
+    """
+    parser = argparse.ArgumentParser()
 
     parser.add_argument('--folder', type=Path, help="Path to simulation results")
 
