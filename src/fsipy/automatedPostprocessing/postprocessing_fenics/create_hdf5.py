@@ -177,7 +177,7 @@ def get_domain_ids(mesh_path, fluid_domain_id=1, solid_domain_id=2):
         mesh_path (Path): Path to the mesh file that contains the fluid and solid domains
         fluid_domain_id (int): ID of the fluid domain
         solid_domain_id (int): ID of the solid domain
-    
+
     Returns:
         fluidIDs (list): List of IDs of the fluid domain
         solidIDs (list): List of IDs of the solid domain
@@ -186,7 +186,7 @@ def get_domain_ids(mesh_path, fluid_domain_id=1, solid_domain_id=2):
     with h5py.File(mesh_path) as vectorData:
         domains = vectorData['domains/values'][:]
         topology = vectorData['domains/topology'][:, :]
-    
+
         id_solid = (domains == solid_domain_id).nonzero()
         id_fluid = (domains == fluid_domain_id).nonzero()
 
