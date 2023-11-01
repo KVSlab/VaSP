@@ -52,14 +52,14 @@ def create_hdf5(visualization_path, mesh_path, save_time_step, stride, start_t, 
     with HDF5File(MPI.comm_world, str(fluid_domain_path), "r") as mesh_file:
         mesh_file.read(mesh_fluid, "mesh", False)
 
-    messh_solid = Mesh()
+    mesh_solid = Mesh()
     with HDF5File(MPI.comm_world, str(solid_domain_path), "r") as mesh_file:
-        mesh_file.read(messh_solid, "mesh", False)
+        mesh_file.read(mesh_solid, "mesh", False)
 
     # Define function spaces and functions
     logging.info("--- Defining function spaces and functions \n")
     Vf = VectorFunctionSpace(mesh_fluid, "CG", 1)
-    Vs = VectorFunctionSpace(messh_solid, "CG", 1)
+    Vs = VectorFunctionSpace(mesh_solid, "CG", 1)
     u = Function(Vf)
     d = Function(Vs)
 
@@ -72,25 +72,25 @@ def create_hdf5(visualization_path, mesh_path, save_time_step, stride, start_t, 
     h5file_name_list, timevalue_list, index_list = output_file_lists(xdmf_file_v)
     h5file_name_list_d, _, index_list_d = output_file_lists(xdmf_file_d)
 
-    fluidIDs, solidIDs, allIDs = get_domain_ids(mesh_path, fluid_domain_id, solid_domain_id)
+    fluid_ids, solid_ids, all_ids = get_domain_ids(mesh_path, fluid_domain_id, solid_domain_id)
 
     # Remove this if statement since it can be done when we are using d_ids
     if extract_solid_only:
         logging.info("--- Extracting solid domain only \n")
-        d_ids = solidIDs
+        d_ids = solid_ids
     else:
         logging.info("--- Extracting both fluid and solid domains for displacement \n")
-        d_ids = allIDs
+        d_ids = all_ids
 
     # Open up the first velocity.h5 file to get the number of timesteps and nodes for the output data
     file = visualization_path / h5file_name_list[0]
-    vectorData = h5py.File(str(file))
-    vectorArray = vectorData['VisualisationVector/0'][fluidIDs, :]
+    vector_data = h5py.File(str(file))
+    vector_array = vector_data['VisualisationVector/0'][fluid_ids, :]
 
     # Open up the first displacement.h5 file to get the number of timesteps and nodes for the output data
     file_d = visualization_path / h5file_name_list_d[0]
-    vectorData_d = h5py.File(str(file_d))
-    vectorArray_d = vectorData['VisualisationVector/0'][d_ids, :]
+    vector_data_d = h5py.File(str(file_d))
+    vector_array_d = vector_data['VisualisationVector/0'][d_ids, :]
 
     # Deinfe path to the output files
     u_output_path = visualization_path / "u.h5"
@@ -107,46 +107,46 @@ def create_hdf5(visualization_path, mesh_path, save_time_step, stride, start_t, 
         try:
 
             time = timevalue_list[file_counter]
-            print("=" * 10, "Timestep: {}".format(time), "=" * 10)
+            logging.info("=" * 10, "Timestep: {}".format(time), "=" * 10)
 
             if file_counter > 0:
                 if np.abs(time - timevalue_list[file_counter - 1] - save_time_step) > 1e-8:
-                    print("WARNING : Uenven temporal spacing detected")
+                    logging.info("WARNING : Uenven temporal spacing detected")
 
             if start_t <= time <= end_t:
 
                 # Open input velocity h5 file
                 h5_file = visualization_path / h5file_name_list[file_counter]
                 if h5_file != h5_file_prev:
-                    vectorData.close()
-                    vectorData = h5py.File(str(h5_file))
+                    vector_data.close()
+                    vector_data = h5py.File(str(h5_file))
                 h5_file_prev = h5_file
 
                 # Open input displacement h5 file
                 h5_file_d = visualization_path / h5file_name_list_d[file_counter]
                 if h5_file_d != h5_file_prev_d:
-                    vectorData_d.close()
-                    vectorData_d = h5py.File(str(h5_file_d))
+                    vector_data_d.close()
+                    vector_data_d = h5py.File(str(h5_file_d))
                 h5_file_prev_d = h5_file_d
 
                 # Open up Vector Arrays from h5 file
                 ArrayName = 'VisualisationVector/' + str((index_list[file_counter]))
-                vectorArrayFull = vectorData[ArrayName][:, :]
+                vector_arrayFull = vector_data[ArrayName][:, :]
                 ArrayName_d = 'VisualisationVector/' + str((index_list_d[file_counter]))
-                vectorArrayFull_d = vectorData_d[ArrayName_d][:, :]
+                vector_arrayFull_d = vector_data_d[ArrayName_d][:, :]
 
-                vectorArray = vectorArrayFull[fluidIDs, :]
-                vectorArray_d = vectorArrayFull_d[d_ids, :]
+                vector_array = vector_arrayFull[fluid_ids, :]
+                vector_array_d = vector_arrayFull_d[d_ids, :]
 
                 # Flatten the vector array and insert into the function
-                vector_np_flat = vectorArray.flatten('F')
+                vector_np_flat = vector_array.flatten('F')
                 u.vector().set_local(vector_np_flat)
-                print("Saved data in u.h5")
+                logging.info("Saved data in u.h5")
 
                 # Flatten the vector array and insert into the function
-                vector_np_flat_d = vectorArray_d.flatten('F')
+                vector_np_flat_d = vector_array_d.flatten('F')
                 d.vector().set_local(vector_np_flat_d)
-                print("Saved data in d.h5")
+                logging.info("Saved data in d.h5")
 
                 file_mode = "a" if file_counter > 0 else "w"
 
@@ -161,8 +161,8 @@ def create_hdf5(visualization_path, mesh_path, save_time_step, stride, start_t, 
                 viz_d_file.close()
 
         except Exception as error:
-            print("An exception occurred:", error)
-            print("=" * 10, "Finished reading solutions", "=" * 10)
+            logging.info("An exception occurred:", error)
+            logging.info("=" * 10, "Finished reading solutions", "=" * 10)
             break
 
         # Update file_counter
@@ -179,26 +179,26 @@ def get_domain_ids(mesh_path, fluid_domain_id=1, solid_domain_id=2):
         solid_domain_id (int): ID of the solid domain
 
     Returns:
-        fluidIDs (list): List of IDs of the fluid domain
-        solidIDs (list): List of IDs of the solid domain
-        allIDs (list): List of IDs of the whole mesh
+        fluid_ids (list): List of IDs of the fluid domain
+        solid_ids (list): List of IDs of the solid domain
+        all_ids (list): List of IDs of the whole mesh
     """
-    with h5py.File(mesh_path) as vectorData:
-        domains = vectorData['domains/values'][:]
-        topology = vectorData['domains/topology'][:, :]
+    with h5py.File(mesh_path) as vector_data:
+        domains = vector_data['domains/values'][:]
+        topology = vector_data['domains/topology'][:, :]
 
         id_solid = (domains == solid_domain_id).nonzero()
         id_fluid = (domains == fluid_domain_id).nonzero()
 
-        wallTopology = topology[id_solid, :]
-        fluidTopology = topology[id_fluid, :]
+        wall_topology = topology[id_solid, :]
+        fluid_topology = topology[id_fluid, :]
 
         # Get topology of fluid, solid and whole mesh
-        solidIDs = np.unique(wallTopology)
-        fluidIDs = np.unique(fluidTopology)
-        allIDs = np.unique(topology)
+        solid_ids = np.unique(wall_topology)
+        fluid_ids = np.unique(fluid_topology)
+        all_ids = np.unique(topology)
 
-    return fluidIDs, solidIDs, allIDs
+    return fluid_ids, solid_ids, all_ids
 
 
 def output_file_lists(xdmf_file):
@@ -263,18 +263,18 @@ def main() -> None:
         dt = parameters["dt"]
         save_step = parameters["save_step"]
         save_time_step = dt * save_step
-        print(f"save_time_step: {save_time_step} \n")
+        logging.info(f"save_time_step: {save_time_step} \n")
         fluid_domain_id = parameters["dx_f_id"]
         solid_domain_id = parameters["dx_s_id"]
 
-        if type(fluid_domain_id) is not int:
+        if type(fluid_domain_id) is list:
             fluid_domain_id = fluid_domain_id[0]
-            print("fluid_domain_id is not int, using first element of list \n")
-        if type(solid_domain_id) is not int:
+            logging.info("fluid_domain_id is not int, using first element of list \n")
+        if type(solid_domain_id) is list:
             solid_domain_id = solid_domain_id[0]
-            print("solid_domain_id is not int, using first element of list \n")
+            logging.info("solid_domain_id is not int, using first element of list \n")
 
-        print(f"--- Fluid domain ID: {fluid_domain_id} and Solid domain ID: {solid_domain_id} \n")
+        logging.info(f"--- Fluid domain ID: {fluid_domain_id} and Solid domain ID: {solid_domain_id} \n")
 
     if save_deg == 2:
         mesh_path = folder_path / "Mesh" / "mesh_refined.h5"
