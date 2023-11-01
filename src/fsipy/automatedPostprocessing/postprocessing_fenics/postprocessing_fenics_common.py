@@ -13,15 +13,10 @@ def parse_arguments() -> argparse.Namespace:
         argparse.Namespace: Parsed command-line arguments.
     """
     parser = argparse.ArgumentParser()
-
-    parser.add_argument('--folder', type=Path, help="Path to simulation results")
-
-    parser.add_argument('--stride', type=int, default=1, help="Save frequency of simulation")
-
-    parser.add_argument('--start_t', type=float, default=0.0, help="Desired start time for postprocessing")
-
-    parser.add_argument('--end_t', type=float, default=0.951, help="Desired end time for postprocessing")
-
+    parser.add_argument("--folder", type=Path, help="Path to simulation results")
+    parser.add_argument("--stride", type=int, default=1, help="Save frequency of simulation")
+    parser.add_argument("-st", "--start_time", type=float, default=0.0, help="Desired start time for postprocessing")
+    parser.add_argument("-et", "--end_time", type=float, default=0.951, help="Desired end time for postprocessing")
     parser.add_argument("--extract-solid-only", action="store_true", help="Extract solid displacement only")
 
     return parser.parse_args()
