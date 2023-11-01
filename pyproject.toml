@@ -20,7 +20,7 @@ fsipy-predeform-mesh = "fsipy.automatedPostprocessing.predeform_mesh:main"
 fsipy-refine-mesh = "fsipy.automatedPostprocessing.postprocessing_mesh.create_refined_mesh:main"
 fsipy-separate-mesh = "fsipy.automatedPostprocessing.postprocessing_mesh.separate_mesh:main"
 fsipy-log-plotter = "fsipy.automatedPostprocessing.log_plotter:main"
-fsipy-createhdf5 = "fsipy.automatedPostprocessing.postprocessing_fenics.create_hdf5:main"
+fsipy-create-hdf5 = "fsipy.automatedPostprocessing.postprocessing_fenics.create_hdf5:main"
 
 [project.optional-dependencies]
 test = [
