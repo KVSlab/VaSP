@@ -1,3 +1,4 @@
+# Copyright (c) 2023 Simula Research Laboratory
 # SPDX-License-Identifier: GPL-3.0-or-later
 """common functions for postprocessing-fenics scripts"""
 import argparse
