@@ -131,13 +131,13 @@ def create_hdf5(visualization_path, mesh_path, save_time_step, stride, start_tim
         h5_file_prev_d = h5_file_d
 
         # Open up Vector Arrays from h5 file
-        ArrayName = 'VisualisationVector/' + str((index_list[file_counter]))
-        vector_arrayFull = vector_data[ArrayName][:, :]
-        ArrayName_d = 'VisualisationVector/' + str((index_list_d[file_counter]))
-        vector_arrayFull_d = vector_data_d[ArrayName_d][:, :]
+        array_name = 'VisualisationVector/' + str((index_list[file_counter]))
+        vector_array_all = vector_data[array_name][:, :]
+        array_name_d = 'VisualisationVector/' + str((index_list_d[file_counter]))
+        vector_array_all_d = vector_data_d[array_name_d][:, :]
 
-        vector_array = vector_arrayFull[fluid_ids, :]
-        vector_array_d = vector_arrayFull_d[d_ids, :]
+        vector_array = vector_array_all[fluid_ids, :]
+        vector_array_d = vector_array_all_d[d_ids, :]
 
         # Flatten the vector array and insert into the function
         vector_np_flat = vector_array.flatten('F')
