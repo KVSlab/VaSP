@@ -6,8 +6,8 @@ import os
 from turtleFSI.problems import *
 from turtleFSI.modules import *
 import numpy as np
-from mpi4py import MPI as pyMPI
-from os import path, makedirs, getcwd
+
+import pandas as pd
 
 # set compiler arguments
 parameters["form_compiler"]["quadrature_degree"] = 6
@@ -35,7 +35,6 @@ def set_problem_parameters(default_variables, **namespace):
         theta=0.501,                                      # Theta scheme (implicit/explicit time stepping)
         atol=1e-7,                                        # Absolute tolerance in the Newton solver
         rtol=1e-7,                                        # Relative tolerance in the Newton solver
-        mesh_file="hpg04_3d_200k_variable",               # Mesh file name
         inlet_id1=3,                                      # inlet 1 id (PA)
         inlet_id2=2,                                      # inlet 2 id (DA)
         outlet_id1=4,                                     # outlet id (V)
@@ -58,12 +57,12 @@ def set_problem_parameters(default_variables, **namespace):
         lambda_s=[lambda_s_val_artery,lambda_s_val_vein], # Solid 1rst Lamé coef. [Pa]
         material_model="MooneyRivlin",                    # Material model
         gravity=None,                                     # Gravitational force [m/s**2]
-	robin_bc = True,                                  # Robin BC
+	    robin_bc = True,                                  # Robin BC
         k_s = 1E5,                                        # elastic response necesary for RobinBC
         c_s = 1E1,                                        # viscoelastic response necesary for RobinBC 
         dx_f_id=1,                                        # ID of marker in the fluid domain
         dx_s_id=[2,1002],                                 # ID of marker in the solid domain
-	solid_properties = [{"dx_s_id":2, "material_model":"MooneyRivlin", "rho_s":1.0E3, "mu_s":mu_s_val_artery, "lambda_s":lambda_s_val_artery, "C01":0.03e6,"C10":0.0,"C11":2.2e6}, {"dx_s_id":1002, "material_model":"MooneyRivlin", "rho_s":1.0E3, "mu_s":mu_s_val_vein, "lambda_s":lambda_s_val_vein, "C01":0.003e6,"C10":0.0,"C11":0.538e6}],
+	    solid_properties = [{"dx_s_id":2, "material_model":"MooneyRivlin", "rho_s":1.0E3, "mu_s":mu_s_val_artery, "lambda_s":lambda_s_val_artery, "C01":0.03e6,"C10":0.0,"C11":2.2e6}, {"dx_s_id":1002, "material_model":"MooneyRivlin", "rho_s":1.0E3, "mu_s":mu_s_val_vein, "lambda_s":lambda_s_val_vein, "C01":0.003e6,"C10":0.0,"C11":0.538e6}],
         extrapolation="laplace",            # laplace, elastic, biharmonic, no-extrapolation
         extrapolation_sub_type="constant",  # constant, small_constant, volume, volume_change, bc1, bc2
         recompute=30,
@@ -71,17 +70,15 @@ def set_problem_parameters(default_variables, **namespace):
         save_step=1,                        # Save frequency of files for visualisation
         folder="avf",                       # Folder where the results will be stored
         checkpoint_step=50,                 # checkpoint frequency
-         # probe point(s)
    ))
     
     return default_variables
 
 
-def get_mesh_domain_and_boundaries(mesh_file, fsi_id, rigid_id, outer_id, outlet_s_id, folder, **namespace):
+def get_mesh_domain_and_boundaries(mesh_path, fsi_id, rigid_id, outer_id, **namespace):
     #Import mesh file
-    print("Obtaining mesh, domains and boundaries...")
     mesh = Mesh()
-    hdf = HDF5File(mesh.mpi_comm(), "mesh/" + mesh_file + ".h5", "r")
+    hdf = HDF5File(mesh.mpi_comm(), mesh_path, "r")
     hdf.read(mesh, "/mesh", False)
     boundaries = MeshFunction("size_t", mesh, 2)
     hdf.read(boundaries, "/boundaries")
@@ -89,9 +86,9 @@ def get_mesh_domain_and_boundaries(mesh_file, fsi_id, rigid_id, outer_id, outlet
     hdf.read(domains, "/domains")
 
     # Define the region outside the sphere and assign with rigid id
-    sph_x = 0.026
-    sph_y = 0.108
-    sph_z = 0.017
+    sph_x = 0.33642
+    sph_y = 0.0873934
+    sph_z = 0.0369964
     sph_rad = 0.02
     print("The coordinates of the sphere are [{}, {}, {}] of radius:{}".format(sph_x, sph_y, sph_z, sph_rad))
 
@@ -99,38 +96,27 @@ def get_mesh_domain_and_boundaries(mesh_file, fsi_id, rigid_id, outer_id, outlet
     for submesh_facet in facets(mesh):
         idx_facet = boundaries.array()[i]
         if idx_facet == fsi_id[0]:
-            vert = submesh_facet.entities(0)
             mid = submesh_facet.midpoint()
             dist_sph_center = sqrt((mid.x()-sph_x)**2 + (mid.y()-sph_y)**2 + (mid.z()-sph_z)**2)
             if dist_sph_center > sph_rad:
                 boundaries.array()[i] = rigid_id[0] # changed "fsi" idx to "rigid wall" idx
         if idx_facet == fsi_id[1]:
-            vert = submesh_facet.entities(0)
             mid = submesh_facet.midpoint()
             dist_sph_center = sqrt((mid.x()-sph_x)**2 + (mid.y()-sph_y)**2 + (mid.z()-sph_z)**2)
             if dist_sph_center > sph_rad:
                 boundaries.array()[i] = rigid_id[1]  # changed "fsi" idx to "rigid wall" idx
         if idx_facet == outer_id[0]:
-            vert = submesh_facet.entities(0)
             mid = submesh_facet.midpoint()
             dist_sph_center = sqrt((mid.x()-sph_x)**2 + (mid.y()-sph_y)**2 + (mid.z()-sph_z)**2)
             if dist_sph_center > sph_rad:
                 boundaries.array()[i] = rigid_id[0]  # changed "outer" idx to "rigid wall" idx
         if idx_facet == outer_id[1]:
-            vert = submesh_facet.entities(0)
             mid = submesh_facet.midpoint()
             dist_sph_center = sqrt((mid.x()-sph_x)**2 + (mid.y()-sph_y)**2 + (mid.z()-sph_z)**2)
             if dist_sph_center > sph_rad:
                 boundaries.array()[i] = rigid_id[1]  # changed "outer" idx to "rigid wall" idx
         i += 1
 
-    print("Obtained mesh, domains and boundaries.")
-
-    # Print pvd files for domains and boundaries
-    #ff = File("boundaries.pvd")
-    #ff << boundaries 
-    #ff = File("domains.pvd")
-    #ff << domains
 
     return mesh, domains, boundaries
 
@@ -155,11 +141,13 @@ class VelIn1Para(UserExpression):
         self.r = np.sqrt(self.A / np.pi)
         super().__init__(**kwargs)
 
+
     def update(self, t):
         self.t = t
         if self.number +1 < len(self.interp_PA):
                  self.number = int(self.t/self.dt)
-        
+
+
     def eval(self, value, x):
         # Define the parabola
         r2 = (x[0]-self.c[0])**2 + (x[1]-self.c[1])**2 + (x[2]-self.c[2])**2  # radius**2
@@ -175,6 +163,7 @@ class VelIn1Para(UserExpression):
             value[0] = -self.n[0] * (self.interp_PA[self.number]) *fact_r  # *self.t  # x-values
             value[1] = -self.n[1] * (self.interp_PA[self.number]) *fact_r  # *self.t. # y-values
             value[2] = -self.n[2] * (self.interp_PA[self.number]) *fact_r  # *self.t. # z-values
+
 
     def value_shape(self):
         return (3,)
@@ -236,10 +225,12 @@ class InnerP(UserExpression):
         self.p_t_ramp_end = p_t_ramp_end     
         super().__init__(**kwargs)
 
+
     def update(self, t):
         self.t = t
         if self.number +1 < len(self.interp_P):
                  self.number = int(self.t/self.dt)  
+
 
     def eval(self, value, x):
         if self.t < self.p_t_ramp_start:
@@ -248,6 +239,7 @@ class InnerP(UserExpression):
             value[0] = self.interp_P[self.number]*(-0.5*np.cos((pi/(self.p_t_ramp_end - self.p_t_ramp_start))*(self.t - self.p_t_ramp_start)) + 0.5) # Pressure initialisation with sigmoid
         else:
             value[0] = self.interp_P[self.number]
+
 
     def value_shape(self):
         return ()
@@ -270,445 +262,20 @@ def create_bcs(dvp_, DVP, mesh, boundaries, domains, T, dt, mu_f, fsi_id, outlet
     n_len2 = np.sqrt(sum([ni2[i]**2 for i in range(ndim)]))  
     normal1 = ni1/n_len1
     normal2 = ni2/n_len2
-    
-    # Pulsatile waveforms for velocity in PA and DA
-    v_PA = np.array([0.201425967	,
-                        0.200827292	,
-                        0.203056282	,
-                        0.212103705	,
-                        0.23039123	,
-                        0.255093955	,
-                        0.281151323	,
-                        0.303167705	,
-                        0.315970276	,
-                        0.316350925	,
-                        0.305454878	,
-                        0.287444723	,
-                        0.269347289	,
-                        0.256011546	,
-                        0.24728362	,
-                        0.24150285	,
-                        0.235431418	,
-                        0.229608112	,
-                        0.225669775	,
-                        0.223735716	,
-                        0.222195978	,
-                        0.223318895	,
-                        0.226595889	,
-                        0.230391432	,
-                        0.233503192	,
-                        0.234390499	,
-                        0.232264436	,
-                        0.227848503	,
-                        0.224130916	,
-                        0.222167198	,
-                        0.220558252	,
-                        0.217141176	,
-                        0.212674191	,
-                        0.206911632	,
-                        0.202972604	,
-                        0.201490261	,
-                        0.201409119	,
-                        0.202438817	,
-                        0.203426308	,
-                        0.203949508	,
-                        0.204922359	,
-                        0.202556712	,
-                        0.197580698	,
-                        0.19438862	,
-                        0.194877821	,
-                        0.198210955	,
-                        0.200573169	,
-                        0.201425967	,
-                        0.200827292	,
-                        0.203056282	,
-                        0.212103705	,
-                        0.23039123	,
-                        0.255093955	,
-                        0.281151323	,
-                        0.303167705	,
-                        0.315970276	,
-                        0.316350925	,
-                        0.305454878	,
-                        0.287444723	,
-                        0.269347289	,
-                        0.256011546	,
-                        0.24728362	,
-                        0.24150285	,
-                        0.235431418	,
-                        0.229608112	,
-                        0.225669775	,
-                        0.223735716	,
-                        0.222195978	,
-                        0.223318895	,
-                        0.226595889	,
-                        0.230391432	,
-                        0.233503192	,
-                        0.234390499	,
-                        0.232264436	,
-                        0.227848503	,
-                        0.224130916	,
-                        0.222167198	,
-                        0.220558252	,
-                        0.217141176	,
-                        0.212674191	,
-                        0.206911632	,
-                        0.202972604	,
-                        0.201490261	,
-                        0.201409119	,
-                        0.202438817	,
-                        0.203426308	,
-                        0.203949508	,
-                        0.204922359	,
-                        0.202556712	,
-                        0.197580698	,
-                        0.19438862	,
-                        0.194877821	,
-                        0.198210955	,
-                        0.200573169	,
-                        0.201425967	,
-                        0.200827292	,
-                        0.203056282	,
-                        0.212103705	,
-                        0.23039123	,
-                        0.255093955	,
-                        0.281151323	,
-                        0.303167705	,
-                        0.315970276	,
-                        0.316350925	,
-                        0.305454878	,
-                        0.287444723	,
-                        0.269347289	,
-                        0.256011546	,
-                        0.24728362	,
-                        0.24150285	,
-                        0.235431418	,
-                        0.229608112	,
-                        0.225669775	,
-                        0.223735716	,
-                        0.222195978	,
-                        0.223318895	,
-                        0.226595889	,
-                        0.230391432	,
-                        0.233503192	,
-                        0.234390499	,
-                        0.232264436	,
-                        0.227848503	,
-                        0.224130916	,
-                        0.222167198	,
-                        0.220558252	,
-                        0.217141176	,
-                        0.212674191	,
-                        0.206911632	,
-                        0.202972604	,
-                        0.201490261	,
-                        0.201409119	,
-                        0.202438817	,
-                        0.203426308	,
-                        0.203949508	,
-                        0.204922359	,
-                        0.202556712	,
-                        0.197580698	,
-                        0.19438862	,
-                        0.194877821	,
-                        0.198210955	,
-                        0.200573169])
 
-    v_DA = np.array([0.136583068	,
-                        0.136041343	,
-                        0.137443157	,
-                        0.143809779	,
-                        0.15669041	,
-                        0.173750418	,
-                        0.191421719	,
-                        0.206082241	,
-                        0.214428476	,
-                        0.21454891	,
-                        0.207321713	,
-                        0.195598389	,
-                        0.183727643	,
-                        0.174758413	,
-                        0.168522565	,
-                        0.16397017	,
-                        0.159261174	,
-                        0.155051167	,
-                        0.15247993	,
-                        0.151283993	,
-                        0.150500871	,
-                        0.151337032	,
-                        0.15339663	,
-                        0.155714099	,
-                        0.157601786	,
-                        0.158235352	,
-                        0.156961243	,
-                        0.154103182	,
-                        0.151615155	,
-                        0.150429306	,
-                        0.149348856	,
-                        0.147033991	,
-                        0.144078997	,
-                        0.140282632	,
-                        0.137679097	,
-                        0.136706087	,
-                        0.136704119	,
-                        0.137416882	,
-                        0.13797738	,
-                        0.138410678	,
-                        0.139002884	,
-                        0.137394297	,
-                        0.13420579	,
-                        0.132256908	,
-                        0.132744035	,
-                        0.134905372	,
-                        0.136305109	,
-                        0.136583068	,
-                        0.136041343	,
-                        0.137443157	,
-                        0.143809779	,
-                        0.15669041	,
-                        0.173750418	,
-                        0.191421719	,
-                        0.206082241	,
-                        0.214428476	,
-                        0.21454891	,
-                        0.207321713	,
-                        0.195598389	,
-                        0.183727643	,
-                        0.174758413	,
-                        0.168522565	,
-                        0.16397017	,
-                        0.159261174	,
-                        0.155051167	,
-                        0.15247993	,
-                        0.151283993	,
-                        0.150500871	,
-                        0.151337032	,
-                        0.15339663	,
-                        0.155714099	,
-                        0.157601786	,
-                        0.158235352	,
-                        0.156961243	,
-                        0.154103182	,
-                        0.151615155	,
-                        0.150429306	,
-                        0.149348856	,
-                        0.147033991	,
-                        0.144078997	,
-                        0.140282632	,
-                        0.137679097	,
-                        0.136706087	,
-                        0.136704119	,
-                        0.137416882	,
-                        0.13797738	,
-                        0.138410678	,
-                        0.139002884	,
-                        0.137394297	,
-                        0.13420579	,
-                        0.132256908	,
-                        0.132744035	,
-                        0.134905372	,
-                        0.136305109	,
-                        0.136583068	,
-                        0.136041343	,
-                        0.137443157	,
-                        0.143809779	,
-                        0.15669041	,
-                        0.173750418	,
-                        0.191421719	,
-                        0.206082241	,
-                        0.214428476	,
-                        0.21454891	,
-                        0.207321713	,
-                        0.195598389	,
-                        0.183727643	,
-                        0.174758413	,
-                        0.168522565	,
-                        0.16397017	,
-                        0.159261174	,
-                        0.155051167	,
-                        0.15247993	,
-                        0.151283993	,
-                        0.150500871	,
-                        0.151337032	,
-                        0.15339663	,
-                        0.155714099	,
-                        0.157601786	,
-                        0.158235352	,
-                        0.156961243	,
-                        0.154103182	,
-                        0.151615155	,
-                        0.150429306	,
-                        0.149348856	,
-                        0.147033991	,
-                        0.144078997	,
-                        0.140282632	,
-                        0.137679097	,
-                        0.136706087	,
-                        0.136704119	,
-                        0.137416882	,
-                        0.13797738	,
-                        0.138410678	,
-                        0.139002884	,
-                        0.137394297	,
-                        0.13420579	,
-                        0.132256908	,
-                        0.132744035	,
-                        0.134905372	,
-                        0.136305109])
- 
-    # Pulsatile waveforms for pressure in the outflow vein 
-    PV = np.array([3394.980676	        ,
-                        3384.890178	,
-                        3422.459198	,
-                        3574.951085	,
-                        3883.182414	,
-                        4299.54023	,
-                        4738.730186	,
-                        5109.810404	,
-                        5325.594307	,
-                        5332.010031	,
-                        5148.360081	,
-                        4844.803748	,
-                        4539.776348	,
-                        4315.005978	,
-                        4167.899118	,
-                        4070.465792	,
-                        3968.133443	,
-                        3869.983178	,
-                        3803.603562	,
-                        3771.005521	,
-                        3745.053645	,
-                        3763.980106	,
-                        3819.212967	,
-                        3883.18583	,
-                        3935.633701	,
-                        3950.589025	,
-                        3914.754807	,
-                        3840.325446	,
-                        3777.666507	,
-                        3744.568564	,
-                        3717.450217	,
-                        3659.856312	,
-                        3584.566479	,
-                        3487.440088	,
-                        3421.04883	,
-                        3396.064332	,
-                        3394.696713	,
-                        3412.051994	,
-                        3428.695886	,
-                        3437.514278	,
-                        3453.911431	,
-                        3414.039085	,
-                        3330.169701	,
-                        3276.368076	,
-                        3284.613426	,
-                        3340.792516	,
-                        3380.606997	,
-                        3394.980676	,
-                        3384.890178	,
-                        3422.459198	,
-                        3574.951085	,
-                        3883.182414	,
-                        4299.54023	,
-                        4738.730186	,
-                        5109.810404	,
-                        5325.594307	,
-                        5332.010031	,
-                        5148.360081	,
-                        4844.803748	,
-                        4539.776348	,
-                        4315.005978	,
-                        4167.899118	,
-                        4070.465792	,
-                        3968.133443	,
-                        3869.983178	,
-                        3803.603562	,
-                        3771.005521	,
-                        3745.053645	,
-                        3763.980106	,
-                        3819.212967	,
-                        3883.18583	,
-                        3935.633701	,
-                        3950.589025	,
-                        3914.754807	,
-                        3840.325446	,
-                        3777.666507	,
-                        3744.568564	,
-                        3717.450217	,
-                        3659.856312	,
-                        3584.566479	,
-                        3487.440088	,
-                        3421.04883	,
-                        3396.064332	,
-                        3394.696713	,
-                        3412.051994	,
-                        3428.695886	,
-                        3437.514278	,
-                        3453.911431	,
-                        3414.039085	,
-                        3330.169701	,
-                        3276.368076	,
-                        3284.613426	,
-                        3340.792516	,
-                        3380.606997	,
-                        3394.980676	,
-                        3384.890178	,
-                        3422.459198	,
-                        3574.951085	,
-                        3883.182414	,
-                        4299.54023	,
-                        4738.730186	,
-                        5109.810404	,
-                        5325.594307	,
-                        5332.010031	,
-                        5148.360081	,
-                        4844.803748	,
-                        4539.776348	,
-                        4315.005978	,
-                        4167.899118	,
-                        4070.465792	,
-                        3968.133443	,
-                        3869.983178	,
-                        3803.603562	,
-                        3771.005521	,
-                        3745.053645	,
-                        3763.980106	,
-                        3819.212967	,
-                        3883.18583	,
-                        3935.633701	,
-                        3950.589025	,
-                        3914.754807	,
-                        3840.325446	,
-                        3777.666507	,
-                        3744.568564	,
-                        3717.450217	,
-                        3659.856312	,
-                        3584.566479	,
-                        3487.440088	,
-                        3421.04883	,
-                        3396.064332	,
-                        3394.696713	,
-                        3412.051994	,
-                        3428.695886	,
-                        3437.514278	,
-                        3453.911431	,
-                        3414.039085	,
-                        3330.169701	,
-                        3276.368076	,
-                        3284.613426	,
-                        3340.792516	,
-                        3380.606997])
+    patient_data = pd.read_csv("hpg03_3d_BC_p_v_DEF_3c.csv")
+    v_PA = patient_data["vel_PA (m/s) "].to_numpy()
+    v_DA = patient_data["vel_DA (m/s) "].to_numpy()
+    PV = patient_data["Pressure (Pa)"].to_numpy()
 
     len_v = len(v_PA)
     t_v = np.arange(len(v_PA))
     num_t = int(T/dt) #30.000 timesteps = 3s (T) / 0.0001s (dt)
     tnew = np.linspace (0, len_v, num=num_t) 
-    #print(tnew)
+
     interp_DA = np.array(np.interp(tnew,t_v, v_DA)) 
     interp_PA = np.array(np.interp(tnew,t_v, v_PA))
     interp_P = np.array(np.interp(tnew,t_v, PV)) #pressure interpolation (velocity and pressure waveforms must be syncronized)
-    #print(interp_PA)
-    #print(len(interp_PA))
     
     # Parabolic profile
     u_inflow_exp1 = VelIn1Para(t=0.0, dt=dt, vel_t_ramp=vel_t_ramp, n=normal1, dsi=dsi1, mesh=mesh, interp_PA=interp_PA, degree=v_deg)     
