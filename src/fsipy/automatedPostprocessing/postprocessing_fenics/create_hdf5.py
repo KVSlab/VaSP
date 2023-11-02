@@ -17,7 +17,7 @@ from dolfin import Mesh, HDF5File, VectorFunctionSpace, Function, MPI, parameter
 parameters["reorder_dofs_serial"] = False
 
 
-def create_hdf5(visualization_path, mesh_path, save_time_step, stride, start_t, end_t, extract_solid_only,
+def create_hdf5(visualization_path, mesh_path, save_time_step, stride, start_time, end_time, extract_solid_only,
                 fluid_domain_id, solid_domain_id):
 
     """
@@ -76,10 +76,10 @@ def create_hdf5(visualization_path, mesh_path, save_time_step, stride, start_t, 
 
     # Remove this if statement since it can be done when we are using d_ids
     if extract_solid_only:
-        logging.info("--- Extracting solid domain only \n")
+        logging.info("--- Displacement will be extracted for the solid domain only \n")
         d_ids = solid_ids
     else:
-        logging.info("--- Extracting both fluid and solid domains for displacement \n")
+        logging.info("--- Displacement will be extracted for both the fluid and solid domains \n")
         d_ids = all_ids
 
     # Open up the first velocity.h5 file to get the number of timesteps and nodes for the output data
@@ -97,76 +97,71 @@ def create_hdf5(visualization_path, mesh_path, save_time_step, stride, start_t, 
     d_output_path = visualization_path / "d.h5"
 
     # Initialize h5 file names that might differ during the loop
-    h5_file_prev = ""
-    h5_file_prev_d = ""
+    h5_file_prev = None
+    h5_file_prev_d = None
 
-    # Start file counter
-    file_counter = 0
-    while True:
+    # Define start and end time and indices for the loop
+    start_time = start_time if start_time is not None else timevalue_list[0]
+    end_time = end_time if end_time is not None else timevalue_list[-1]
 
-        try:
+    start_time_index = int(start_time / save_time_step) - 1
+    end_time_index = int(end_time / save_time_step) + 1
 
-            time = timevalue_list[file_counter]
-            logging.info("=" * 10, "Timestep: {}".format(time), "=" * 10)
+    for file_counter in range(start_time_index, end_time_index, stride):
 
-            if file_counter > 0:
-                if np.abs(time - timevalue_list[file_counter - 1] - save_time_step) > 1e-8:
-                    logging.info("WARNING : Uenven temporal spacing detected")
+        time = timevalue_list[file_counter]
+        logging.info(f"--- Reading data at time: {time}")
 
-            if start_t <= time <= end_t:
+        if file_counter > start_time_index:
+            if np.abs(time - timevalue_list[file_counter - 1] - save_time_step) > 1e-8:
+                logging.warning("WARNING : Uenven temporal spacing detected")
 
-                # Open input velocity h5 file
-                h5_file = visualization_path / h5file_name_list[file_counter]
-                if h5_file != h5_file_prev:
-                    vector_data.close()
-                    vector_data = h5py.File(str(h5_file))
-                h5_file_prev = h5_file
+        # Open input velocity h5 file
+        h5_file = visualization_path / h5file_name_list[file_counter]
+        if h5_file != h5_file_prev:
+            vector_data.close()
+            vector_data = h5py.File(str(h5_file))
+        h5_file_prev = h5_file
 
-                # Open input displacement h5 file
-                h5_file_d = visualization_path / h5file_name_list_d[file_counter]
-                if h5_file_d != h5_file_prev_d:
-                    vector_data_d.close()
-                    vector_data_d = h5py.File(str(h5_file_d))
-                h5_file_prev_d = h5_file_d
+        # Open input displacement h5 file
+        h5_file_d = visualization_path / h5file_name_list_d[file_counter]
+        if h5_file_d != h5_file_prev_d:
+            vector_data_d.close()
+            vector_data_d = h5py.File(str(h5_file_d))
+        h5_file_prev_d = h5_file_d
 
-                # Open up Vector Arrays from h5 file
-                ArrayName = 'VisualisationVector/' + str((index_list[file_counter]))
-                vector_arrayFull = vector_data[ArrayName][:, :]
-                ArrayName_d = 'VisualisationVector/' + str((index_list_d[file_counter]))
-                vector_arrayFull_d = vector_data_d[ArrayName_d][:, :]
+        # Open up Vector Arrays from h5 file
+        ArrayName = 'VisualisationVector/' + str((index_list[file_counter]))
+        vector_arrayFull = vector_data[ArrayName][:, :]
+        ArrayName_d = 'VisualisationVector/' + str((index_list_d[file_counter]))
+        vector_arrayFull_d = vector_data_d[ArrayName_d][:, :]
 
-                vector_array = vector_arrayFull[fluid_ids, :]
-                vector_array_d = vector_arrayFull_d[d_ids, :]
+        vector_array = vector_arrayFull[fluid_ids, :]
+        vector_array_d = vector_arrayFull_d[d_ids, :]
 
-                # Flatten the vector array and insert into the function
-                vector_np_flat = vector_array.flatten('F')
-                u.vector().set_local(vector_np_flat)
-                logging.info("Saved data in u.h5")
+        # Flatten the vector array and insert into the function
+        vector_np_flat = vector_array.flatten('F')
+        u.vector().set_local(vector_np_flat)
+        logging.info("Saved data in u.h5")
 
-                # Flatten the vector array and insert into the function
-                vector_np_flat_d = vector_array_d.flatten('F')
-                d.vector().set_local(vector_np_flat_d)
-                logging.info("Saved data in d.h5")
+        # Flatten the vector array and insert into the function
+        vector_np_flat_d = vector_array_d.flatten('F')
+        d.vector().set_local(vector_np_flat_d)
+        logging.info("Saved data in d.h5")
 
-                file_mode = "a" if file_counter > 0 else "w"
+        file_mode = "a" if file_counter > start_time_index else "w"
 
-                # Save velocity
-                viz_u_file = HDF5File(MPI.comm_world, str(u_output_path), file_mode=file_mode)
-                viz_u_file.write(u, "/velocity", time)
-                viz_u_file.close()
+        # Save velocity
+        viz_u_file = HDF5File(MPI.comm_world, str(u_output_path), file_mode=file_mode)
+        viz_u_file.write(u, "/velocity", time)
+        viz_u_file.close()
 
-                # Save displacment
-                viz_d_file = HDF5File(MPI.comm_world, str(d_output_path), file_mode=file_mode)
-                viz_d_file.write(d, "/displacement", time)
-                viz_d_file.close()
+        # Save displacment
+        viz_d_file = HDF5File(MPI.comm_world, str(d_output_path), file_mode=file_mode)
+        viz_d_file.write(d, "/displacement", time)
+        viz_d_file.close()
 
-        except Exception as error:
-            logging.info("An exception occurred:", error)
-            logging.info("=" * 10, "Finished reading solutions", "=" * 10)
-            break
-
-        # Update file_counter
-        file_counter += stride
+    logging.info("--- Finished reading solutions")
 
 
 def get_domain_ids(mesh_path, fluid_domain_id=1, solid_domain_id=2):
@@ -249,7 +244,7 @@ def main() -> None:
 
     args = postprocessing_fenics_common.parse_arguments()
 
-    logging.basicConfig(level=20, format="%(message)s")
+    logging.basicConfig(level=args.log_level, format="%(message)s")
 
     # Define paths for visulization and mesh files
     folder_path = Path(args.folder)
@@ -286,7 +281,7 @@ def main() -> None:
         assert mesh_path.exists(), "Mesh file not found."
 
     create_hdf5(visualization_path, mesh_path, save_time_step, args.stride,
-                args.start_t, args.end_t, args.extract_solid_only, fluid_domain_id, solid_domain_id)
+                args.start_time, args.end_time, args.extract_solid_only, fluid_domain_id, solid_domain_id)
 
 
 if __name__ == '__main__':
