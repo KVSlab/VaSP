@@ -102,6 +102,11 @@ def create_hdf5(visualization_path, mesh_path, save_time_step, stride, start_tim
 
     # Define start and end time and indices for the loop
     start_time = start_time if start_time is not None else timevalue_list[0]
+
+    if end_time is not None:
+        assert end_time > start_time, "end_time must be greater than start_time"
+        assert end_time <= timevalue_list[-1], "end_time must be less than the last time step"
+
     end_time = end_time if end_time is not None else timevalue_list[-1]
 
     start_time_index = int(start_time / save_time_step) - 1
