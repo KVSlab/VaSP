@@ -119,10 +119,10 @@ def main() -> None:
             fluid_domain_id = parameters["dx_f_id"]
             solid_domain_id = parameters["dx_s_id"]
 
-            if type(fluid_domain_id) is not int:
+            if type(fluid_domain_id) is list:
                 fluid_domain_id = fluid_domain_id[0]
                 print("fluid_domain_id is not int, using first element of list \n")
-            if type(solid_domain_id) is not int:
+            if type(solid_domain_id) is list:
                 solid_domain_id = solid_domain_id[0]
                 print("solid_domain_id is not int, using first element of list \n")
 
