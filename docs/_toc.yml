@@ -28,5 +28,5 @@ parts:
     - file: avf
 
   - caption: Python API
-     chapters:
-     - file: api
+    chapters:
+    - file: api
