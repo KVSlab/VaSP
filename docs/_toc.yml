@@ -26,3 +26,7 @@ parts:
     - file: offset_stenosis
     - file: aneurysm
     - file: avf
+
+  - caption: Python API
+     chapters:
+     - file: api
