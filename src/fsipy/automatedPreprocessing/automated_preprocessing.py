@@ -611,7 +611,7 @@ def read_command_line(input_path=None):
                              "The 'curvature' method and 'diameter' method produces a variable density mesh," +
                              " based on the surface curvature and the distance from the " +
                              "centerline to the surface, respectively. The 'distancetospheres' method allows to " +
-                             "place spheres where the surface is pointing by pressing 'space'. By pressing 'd', the " +
+                             "place spheres where the cursor is pointing by pressing 'space'. By pressing 'd', the " +
                              "surface is coloured by the distance to the spheres. By pressing 'a', a scaling " +
                              "function can be specified by four parameters: 'offset', 'scale', 'min' and 'max'. " +
                              "These parameters for the scaling function can also be controlled by the -mp argument.")
