@@ -518,6 +518,20 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
 
     find_boundaries(base_path, mean_inflow_rate, network, mesh, verbose_print, has_multiple_inlets)
 
+    # Load updated parameters after setting boundary ID's
+    parameters = get_parameters(base_path)
+
+    # Determine the key for inlet and outlet based on whether we have multiple inlets or not
+    inlet_key = "inlet_ids" if has_multiple_inlets else "inlet_id"
+    outlet_key = "outlet_id" if has_multiple_inlets else "outlet_ids"
+
+    # Adjust inlet and outlet ID's by incrementing each by 1
+    for key in [inlet_key, outlet_key]:
+        parameters[key] = [val + 1 for val in parameters[key]]
+
+    # Write parameters back to file after adjusting inlet and outlet ID's
+    write_parameters(parameters, base_path)
+
     # Display the flow split at the outlets, inlet flow rate, and probes.
     if visualize:
         print("--- Visualizing flow split at outlets, inlet flow rate, and probes in VTK render window. ")
