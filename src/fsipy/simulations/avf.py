@@ -1,13 +1,11 @@
 """
 Problem file for AVF FSI simulation
 """
-from dolfin import *
-import os
-from turtleFSI.problems import *
-from turtleFSI.modules import *
 import numpy as np
 
-import pandas as pd
+from dolfin import *
+from turtleFSI.problems import *
+
 
 # set compiler arguments
 parameters["form_compiler"]["quadrature_degree"] = 6
@@ -27,7 +25,6 @@ def set_problem_parameters(default_variables, **namespace):
     lambda_s_val_artery = nu_s_val*2.*mu_s_val_artery/(1. - 2.*nu_s_val) # artery Solid 1rst Lamé coef. [Pa]
     lambda_s_val_vein = nu_s_val*2.*mu_s_val_vein/(1. - 2.*nu_s_val)     # vein Solid 1rst Lamé coef. [Pa]
 
-    
 
     default_variables.update(dict( 
         T=3,                                              # Simulation end time (3 cardiac cycles)
@@ -62,14 +59,16 @@ def set_problem_parameters(default_variables, **namespace):
         c_s = 1E1,                                        # viscoelastic response necesary for RobinBC 
         dx_f_id=1,                                        # ID of marker in the fluid domain
         dx_s_id=[2,1002],                                 # ID of marker in the solid domain
-	    solid_properties = [{"dx_s_id":2, "material_model":"MooneyRivlin", "rho_s":1.0E3, "mu_s":mu_s_val_artery, "lambda_s":lambda_s_val_artery, "C01":0.03e6,"C10":0.0,"C11":2.2e6}, {"dx_s_id":1002, "material_model":"MooneyRivlin", "rho_s":1.0E3, "mu_s":mu_s_val_vein, "lambda_s":lambda_s_val_vein, "C01":0.003e6,"C10":0.0,"C11":0.538e6}],
+	    solid_properties = [{"dx_s_id":2, "material_model":"MooneyRivlin", "rho_s":1.0E3, "mu_s":mu_s_val_artery, "lambda_s":lambda_s_val_artery, "C01":0.03e6,"C10":0.0,"C11":2.2e6},
+                            {"dx_s_id":1002, "material_model":"MooneyRivlin", "rho_s":1.0E3, "mu_s":mu_s_val_vein, "lambda_s":lambda_s_val_vein, "C01":0.003e6,"C10":0.0,"C11":0.538e6}],
         extrapolation="laplace",            # laplace, elastic, biharmonic, no-extrapolation
         extrapolation_sub_type="constant",  # constant, small_constant, volume, volume_change, bc1, bc2
         recompute=30,
         recompute_tstep=10,                 # Number of time steps before recompute Jacobian. 
         save_step=1,                        # Save frequency of files for visualisation
-        folder="avf",                       # Folder where the results will be stored
+        folder="avf_results",                       # Folder where the results will be stored
         checkpoint_step=50,                 # checkpoint frequency
+        compiler_parameters=_compiler_parameters,  # Update the defaul values of the compiler arguments (FEniCS)
    ))
     
     return default_variables
@@ -263,11 +262,11 @@ def create_bcs(dvp_, DVP, mesh, boundaries, domains, T, dt, mu_f, fsi_id, outlet
     normal1 = ni1/n_len1
     normal2 = ni2/n_len2
 
-    patient_data = pd.read_csv("hpg03_3d_BC_p_v_DEF_3c.csv")
-    v_PA = patient_data["vel_PA (m/s) "].to_numpy()
-    v_DA = patient_data["vel_DA (m/s) "].to_numpy()
-    PV = patient_data["Pressure (Pa)"].to_numpy()
-
+    patient_data = np.loadtxt("hpg03_3d_BC_p_v_DEF_3c.csv", skiprows=1, delimiter=",", usecols=(0,1,2))
+    v_PA = patient_data[:,0]
+    v_DA = patient_data[:,1]
+    PV = patient_data[:,2]
+    
     len_v = len(v_PA)
     t_v = np.arange(len(v_PA))
     num_t = int(T/dt) #30.000 timesteps = 3s (T) / 0.0001s (dt)
