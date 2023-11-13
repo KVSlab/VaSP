@@ -31,7 +31,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
                        region_points, compress_mesh, scale_factor, scale_factor_h5, resampling_step, meshing_parameters,
                        remove_all, solid_thickness, solid_thickness_parameters, mesh_format, flow_rate_factor,
                        solid_side_wall_id, interface_fsi_id, solid_outer_wall_id, fluid_volume_id, solid_volume_id,
-                       mesh_generation_retries):
+                       mesh_generation_retries, no_solid):
     """
     Automatically generate mesh of surface model in .vtu and .xml format, including prescribed
     flow rates at inlet and outlet based on flow network model.
@@ -72,6 +72,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
         fluid_volume_id (int): ID for the fluid volume
         solid_volume_id (int): ID for the solid volume
         mesh_generation_retries (int): Number of mesh generation retries before trying alternative method
+        no_solid (bool): Generate mesh without solid
     """
     # Get paths
     case_name = input_model.rsplit(path.sep, 1)[-1].rsplit('.')[0]
@@ -434,7 +435,9 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
                               number_of_sublayers_solid, solid_thickness, solid_thickness_parameters):
             try:
                 return generate_mesh(distance_to_sphere, number_of_sublayers_fluid,
-                                     number_of_sublayers_solid, solid_thickness, solid_thickness_parameters)
+                                     number_of_sublayers_solid, solid_thickness, solid_thickness_parameters,
+                                     solid_side_wall_id, interface_fsi_id, solid_outer_wall_id, fluid_volume_id,
+                                     solid_volume_id, no_solid)
             except RuntimeError:
                 return None
 
@@ -755,6 +758,12 @@ def read_command_line(input_path=None):
                         help="Number of mesh generation retries before trying to subdivide and smooth the " +
                              "input model (default: 2)")
 
+    no_solid = parser.add_mutually_exclusive_group(required=False)
+    no_solid.add_argument('-ns', '--no-solid',
+                          action="store_true",
+                          default=False,
+                          help="Generate mesh without solid.")
+
     # Parse path to get default values
     if required:
         args = parser.parse_args()
@@ -798,7 +807,8 @@ def read_command_line(input_path=None):
                 mesh_format=args.mesh_format, flow_rate_factor=args.flow_rate_factor,
                 solid_side_wall_id=args.solid_side_wall_id, interface_fsi_id=args.interface_fsi_id,
                 solid_outer_wall_id=args.solid_outer_wall_id, fluid_volume_id=args.fluid_volume_id,
-                solid_volume_id=args.solid_volume_id, mesh_generation_retries=args.mesh_generation_retries)
+                solid_volume_id=args.solid_volume_id, mesh_generation_retries=args.mesh_generation_retries,
+                no_solid=args.no_solid)
 
 
 def main_meshing():
