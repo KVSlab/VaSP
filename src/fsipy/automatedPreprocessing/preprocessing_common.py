@@ -104,7 +104,7 @@ def dist_sphere_spheres(surface: vtkPolyData, save_path: str,
 def generate_mesh(surface: vtkPolyData, number_of_sublayers_fluid: int, number_of_sublayers_solid: int,
                   solid_thickness: str, solid_thickness_parameters: list,
                   solid_side_wall_id: int = 11, interface_fsi_id: int = 22, solid_outer_wall_id: int = 33,
-                  fluid_volume_id: int = 0, solid_volume_id: int = 1) -> tuple:
+                  fluid_volume_id: int = 0, solid_volume_id: int = 1, no_solid: bool = False) -> tuple:
     """
     Generates a mesh suitable for FSI from an input surface model.
 
@@ -119,11 +119,12 @@ def generate_mesh(surface: vtkPolyData, number_of_sublayers_fluid: int, number_o
         solid_outer_wall_id (int, optional): ID for solid outer wall. Default is 33.
         fluid_volume_id (int, optional): ID for the fluid volume. Default is 0.
         solid_volume_id (int, optional): ID for the solid volume. Default is 1.
+        no_solid (bool, optional): Generate mesh without solid
 
     Returns:
         tuple: A tuple containing the generated mesh (vtkUnstructuredGrid) and the remeshed surface (vtkPolyData).
     """
-    meshGenerator = vmtkMeshGeneratorFsi()
+    meshGenerator = vmtkscripts.vmtkMeshGenerator() if no_solid else vmtkMeshGeneratorFsi()
     meshGenerator.Surface = surface
 
     # Mesh Parameters
@@ -134,9 +135,11 @@ def generate_mesh(surface: vtkPolyData, number_of_sublayers_fluid: int, number_o
     meshGenerator.BoundaryLayer = 1
     meshGenerator.NumberOfSubLayersSolid = number_of_sublayers_solid
     meshGenerator.NumberOfSubLayersFluid = number_of_sublayers_fluid
+    meshGenerator.NumberOfSubLayers = number_of_sublayers_fluid
     meshGenerator.BoundaryLayerOnCaps = 0
     meshGenerator.SubLayerRatioFluid = 0.75
     meshGenerator.SubLayerRatioSolid = 0.75
+    meshGenerator.SubLayerRatio = 0.75
     meshGenerator.BoundaryLayerThicknessFactor = 0.5
     meshGenerator.Tetrahedralize = 1
     meshGenerator.VolumeElementScaleFactor = 0.8

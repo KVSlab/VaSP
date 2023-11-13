@@ -31,7 +31,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
                        region_points, compress_mesh, scale_factor, scale_factor_h5, resampling_step, meshing_parameters,
                        remove_all, solid_thickness, solid_thickness_parameters, mesh_format, flow_rate_factor,
                        solid_side_wall_id, interface_fsi_id, solid_outer_wall_id, fluid_volume_id, solid_volume_id,
-                       mesh_generation_retries):
+                       mesh_generation_retries, no_solid):
     """
     Automatically generate mesh of surface model in .vtu and .xml format, including prescribed
     flow rates at inlet and outlet based on flow network model.
@@ -72,6 +72,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
         fluid_volume_id (int): ID for the fluid volume
         solid_volume_id (int): ID for the solid volume
         mesh_generation_retries (int): Number of mesh generation retries before trying alternative method
+        no_solid (bool): Generate mesh without solid
     """
     # Get paths
     case_name = input_model.rsplit(path.sep, 1)[-1].rsplit('.')[0]
@@ -434,7 +435,9 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
                               number_of_sublayers_solid, solid_thickness, solid_thickness_parameters):
             try:
                 return generate_mesh(distance_to_sphere, number_of_sublayers_fluid,
-                                     number_of_sublayers_solid, solid_thickness, solid_thickness_parameters)
+                                     number_of_sublayers_solid, solid_thickness, solid_thickness_parameters,
+                                     solid_side_wall_id, interface_fsi_id, solid_outer_wall_id, fluid_volume_id,
+                                     solid_volume_id, no_solid)
             except RuntimeError:
                 return None
 
@@ -514,6 +517,20 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
     mean_inflow_rate = compute_flow_rate(has_multiple_inlets, inlet, parameters, flow_rate_factor)
 
     find_boundaries(base_path, mean_inflow_rate, network, mesh, verbose_print, has_multiple_inlets)
+
+    # Load updated parameters after setting boundary ID's
+    parameters = get_parameters(base_path)
+
+    # Determine the key for inlet and outlet based on whether we have multiple inlets or not
+    inlet_key = "inlet_ids" if has_multiple_inlets else "inlet_id"
+    outlet_key = "outlet_id" if has_multiple_inlets else "outlet_ids"
+
+    # Adjust inlet and outlet ID's by incrementing each by 1
+    for key in [inlet_key, outlet_key]:
+        parameters[key] = [val + 1 for val in parameters[key]]
+
+    # Write parameters back to file after adjusting inlet and outlet ID's
+    write_parameters(parameters, base_path)
 
     # Display the flow split at the outlets, inlet flow rate, and probes.
     if visualize:
@@ -608,7 +625,7 @@ def read_command_line(input_path=None):
                              "The 'curvature' method and 'diameter' method produces a variable density mesh," +
                              " based on the surface curvature and the distance from the " +
                              "centerline to the surface, respectively. The 'distancetospheres' method allows to " +
-                             "place spheres where the surface is pointing by pressing 'space'. By pressing 'd', the " +
+                             "place spheres where the cursor is pointing by pressing 'space'. By pressing 'd', the " +
                              "surface is coloured by the distance to the spheres. By pressing 'a', a scaling " +
                              "function can be specified by four parameters: 'offset', 'scale', 'min' and 'max'. " +
                              "These parameters for the scaling function can also be controlled by the -mp argument.")
@@ -755,6 +772,12 @@ def read_command_line(input_path=None):
                         help="Number of mesh generation retries before trying to subdivide and smooth the " +
                              "input model (default: 2)")
 
+    no_solid = parser.add_mutually_exclusive_group(required=False)
+    no_solid.add_argument('-ns', '--no-solid',
+                          action="store_true",
+                          default=False,
+                          help="Generate mesh without solid.")
+
     # Parse path to get default values
     if required:
         args = parser.parse_args()
@@ -798,7 +821,8 @@ def read_command_line(input_path=None):
                 mesh_format=args.mesh_format, flow_rate_factor=args.flow_rate_factor,
                 solid_side_wall_id=args.solid_side_wall_id, interface_fsi_id=args.interface_fsi_id,
                 solid_outer_wall_id=args.solid_outer_wall_id, fluid_volume_id=args.fluid_volume_id,
-                solid_volume_id=args.solid_volume_id, mesh_generation_retries=args.mesh_generation_retries)
+                solid_volume_id=args.solid_volume_id, mesh_generation_retries=args.mesh_generation_retries,
+                no_solid=args.no_solid)
 
 
 def main_meshing():

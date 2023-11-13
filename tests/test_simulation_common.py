@@ -110,8 +110,8 @@ def test_load_mesh_info(temporary_hdf5_file):
     Test the load_mesh_info function with specific expected values.
     """
     # Define expected values
-    expected_id_in = [2]
-    expected_id_out = [1, 3]
+    expected_id_in = [3]
+    expected_id_out = [2, 4]
     expected_id_wall = min(expected_id_in + expected_id_out) - 1
     expected_Q_mean = 2.4817264611257612
     expected_area_ratio = [0.4124865453872114, 0.5875134546127886]
