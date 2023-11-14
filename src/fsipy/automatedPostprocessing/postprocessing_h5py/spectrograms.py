@@ -1,31 +1,21 @@
-import matplotlib as mpl
-mpl.use('Agg')
-import pandas as pd 
-#import vtk
+import os
+import time
+from argparse import ArgumentParser
+import configparser
+
 import numpy as np
-import matplotlib.pyplot as plt
-from scipy.signal import butter, lfilter, filtfilt
-from scipy.signal import spectrogram, periodogram
-import scipy
-print(scipy.__version__)
-import random
+from scipy.signal import butter, filtfilt, spectrogram, periodogram
 from scipy.interpolate import RectBivariateSpline
 from scipy.stats import entropy
-from scipy.spatial import cKDTree as KDTree 
-import random
-import time
+from scipy.spatial import cKDTree as KDTree
 
-from tempfile import mkdtemp
-import os
-import configparser
-from argparse import ArgumentParser
-import postprocessing_common_h5py
 try:
-    import postprocessing_common_pv
     import pyvista as pv
-except:
-    print("Could not import pyvista and/or vtk, install these packages or use 'RandomPoint' sampling for spectrograms.")
+    import postprocessing_common_pv
+except ImportError:
+    print("Could not import pyvista and/or vtk. Install these packages or use 'RandomPoint' sampling for spectrograms.")
 
+import postprocessing_common_h5py
 from chroma_filters import normalize, chroma_filterbank
 
 """
