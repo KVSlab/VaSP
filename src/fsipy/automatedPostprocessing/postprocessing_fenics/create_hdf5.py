@@ -31,8 +31,8 @@ def create_hdf5(visualization_path, mesh_path, save_time_step, stride, start_tim
         end_t (float): desired end time for the output file
         extracct_solid_only (bool): If True, only the solid domain is extracted for displacement.
                                     If False, both the fluid and solid domains are extracted.
-        fluid_domain_id (int): ID of the fluid domain
-        solid_domain_id (int): ID of the solid domain
+        fluid_domain_id (int or list): ID of the fluid domain
+        solid_domain_id (int or list): ID of the solid domain
     """
 
     # Define mesh path related variables
@@ -191,7 +191,7 @@ def get_domain_ids(mesh_path, fluid_domain_id, solid_domain_id):
             id_fluid = np.where((domains == fluid_domain_id[0]) | (domains == fluid_domain_id[1]))
         else:
             id_fluid = np.where(domains == fluid_domain_id)
-        
+
         if isinstance(solid_domain_id, list):
             id_solid = np.where((domains == solid_domain_id[0]) | (domains == solid_domain_id[1]))
         else:
@@ -276,7 +276,11 @@ def main() -> None:
 
         logging.info(f"--- Fluid domain ID: {fluid_domain_id} and Solid domain ID: {solid_domain_id} \n")
 
-    if save_deg == 2:
+    if args.mesh_path:
+        mesh_path = Path(args.mesh_path)
+        logging.info("--- Using user-defined mesh \n")
+        assert mesh_path.exists(), "Mesh file not found."
+    elif save_deg == 2:
         mesh_path = folder_path / "Mesh" / "mesh_refined.h5"
         logging.info("--- Using refined mesh \n")
         assert mesh_path.exists(), "Mesh file not found."
