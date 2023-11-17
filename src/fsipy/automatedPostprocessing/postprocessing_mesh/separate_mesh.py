@@ -6,21 +6,23 @@ import json
 import numpy as np
 import h5py
 from pathlib import Path
+from typing import Union
 
 from fsipy.automatedPostprocessing.postprocessing_mesh import postprocessing_mesh_common
 
 from dolfin import MPI, Mesh, MeshFunction, HDF5File, SubMesh, File
 
 
-def separate_mesh(mesh_path: Path, fluid_domain_id: int, solid_domain_id: int, view: bool = False) -> None:
+def separate_mesh(mesh_path: Path, fluid_domain_id: Union[int, list],
+                  solid_domain_id: Union[int, list], view: bool = False) -> None:
     """
     Given a mesh file that contains fluid and solid domains, this function separates the domains and saves them as
     separate mesh files. These domain specific mesh files are later used in the other postprocessing scripts.
 
     args:
         mesh_path (Path): Path to the mesh file.
-        fluid_domain_id (int): Domain ID for fluid domain.
-        solid_domain_id (int): Domain ID for solid domain.
+        fluid_domain_id (int or list): Domain ID for fluid domain.
+        solid_domain_id (int or list): Domain ID for solid domain.
 
     Returns:
         None
@@ -35,17 +37,28 @@ def separate_mesh(mesh_path: Path, fluid_domain_id: int, solid_domain_id: int, v
         hdf.read(boundaries, "/boundaries")
 
     for domain_id, domain_name in zip([fluid_domain_id, solid_domain_id], ["fluid", "solid"]):
+        if isinstance(domain_id, list):
+            # In case of multiple domains, we need to merge them into one domain first
+            merged_domains = MeshFunction("size_t", mesh, mesh.topology().dim(), 1)
+            tmp_array = domains.array().copy()
+            tmp_array[domains.where_equal(domain_id[0])] = domain_id[0]
+            tmp_array[domains.where_equal(domain_id[1])] = domain_id[0]
+            merged_domains.set_values(tmp_array)
+            domain_of_interest = SubMesh(mesh, merged_domains, domain_id[0])
+            sub_domains = MeshFunction("size_t", domain_of_interest, domain_of_interest.topology().dim())
+            parent_cell_indices = domain_of_interest.data().array(
+                "parent_cell_indices", domain_of_interest.topology().dim())
+            tmp_sub_array = sub_domains.array().copy()
+            tmp_sub_array[:] = domains.array()[parent_cell_indices]
+            sub_domains.set_values(tmp_sub_array)
+            domain_of_interest = sub_domains
+        else:
+            domain_of_interest = SubMesh(mesh, domains, domain_id)
 
-        domain_of_interest = SubMesh(mesh, domains, domain_id)
         domain_of_interest_path = mesh_path.with_name(mesh_path.stem + f"_{domain_name}.h5")
         print(f" --- Saving {domain_name} domain to {domain_of_interest_path} \n")
-        with HDF5File(domain_of_interest.mpi_comm(), str(domain_of_interest_path), "w") as hdf:
+        with HDF5File(mesh.mpi_comm(), str(domain_of_interest_path), "w") as hdf:
             hdf.write(domain_of_interest, "/mesh")
-
-        # Save for viewing in paraview
-        if view:
-            domain_of_interest_pvd_path = domain_of_interest_path.with_suffix(".pvd")
-            File(str(domain_of_interest_pvd_path)) << domain_of_interest
 
     print(" --- Done separating domains \n")
 
@@ -56,7 +69,10 @@ def separate_mesh(mesh_path: Path, fluid_domain_id: int, solid_domain_id: int, v
 
     for domain_id, domain_name in zip([fluid_domain_id, solid_domain_id], ["fluid", "solid"]):
         # non-zero is used to find the indices of the domain of interest
-        domain_of_interest_index = (domain_values == domain_id).nonzero()
+        if isinstance(domain_id, list):
+            domain_of_interest_index = np.where((domain_values == domain_id[0]) | (domain_values == domain_id[1]))
+        else:
+            domain_of_interest_index = np.where(domain_values == domain_id)
         # extract the topology of the domain of interest
         domain_of_interest_topology = domain_topology[domain_of_interest_index[0], :]
         # Here, we want to extract the coordinates of the domain of interest
@@ -90,6 +106,14 @@ def separate_mesh(mesh_path: Path, fluid_domain_id: int, solid_domain_id: int, v
         domain_of_interest_path.unlink()
         domain_of_interest_fixed_path.rename(domain_of_interest_path)
 
+        # Save for viewing in paraview
+        if view:
+            domain_of_interest = Mesh()
+            with HDF5File(mesh.mpi_comm(), str(domain_of_interest_path), "r") as hdf:
+                hdf.read(domain_of_interest, "/mesh", False)
+                domain_of_interest_pvd_path = domain_of_interest_path.with_suffix(".pvd")
+                File(str(domain_of_interest_pvd_path)) << domain_of_interest
+
 
 def main() -> None:
 
@@ -119,12 +143,10 @@ def main() -> None:
             fluid_domain_id = parameters["dx_f_id"]
             solid_domain_id = parameters["dx_s_id"]
 
-            if type(fluid_domain_id) is list:
-                fluid_domain_id = fluid_domain_id[0]
-                print("fluid_domain_id is not int, using first element of list \n")
-            if type(solid_domain_id) is list:
-                solid_domain_id = solid_domain_id[0]
-                print("solid_domain_id is not int, using first element of list \n")
+        if isinstance(fluid_domain_id, list):
+            assert len(fluid_domain_id) == 2, "Only two fluid domains are supported."
+        if isinstance(solid_domain_id, list):
+            assert len(solid_domain_id) == 2, "Only two solid domains are supported."
 
         print(f" --- Fluid domain ID: {fluid_domain_id} and Solid domain ID: {solid_domain_id} \n")
 

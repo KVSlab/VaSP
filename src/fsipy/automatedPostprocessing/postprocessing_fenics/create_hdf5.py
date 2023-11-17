@@ -31,8 +31,8 @@ def create_hdf5(visualization_path, mesh_path, save_time_step, stride, start_tim
         end_t (float): desired end time for the output file
         extracct_solid_only (bool): If True, only the solid domain is extracted for displacement.
                                     If False, both the fluid and solid domains are extracted.
-        fluid_domain_id (int): ID of the fluid domain
-        solid_domain_id (int): ID of the solid domain
+        fluid_domain_id (int or list): ID of the fluid domain
+        solid_domain_id (int or list): ID of the solid domain
     """
 
     # Define mesh path related variables
@@ -169,7 +169,7 @@ def create_hdf5(visualization_path, mesh_path, save_time_step, stride, start_tim
     logging.info("--- Finished reading solutions")
 
 
-def get_domain_ids(mesh_path, fluid_domain_id=1, solid_domain_id=2):
+def get_domain_ids(mesh_path, fluid_domain_id, solid_domain_id):
     """
     Given a mesh file, this function returns the IDs of the fluid and solid domains
 
@@ -187,8 +187,15 @@ def get_domain_ids(mesh_path, fluid_domain_id=1, solid_domain_id=2):
         domains = vector_data['domains/values'][:]
         topology = vector_data['domains/topology'][:, :]
 
-        id_solid = (domains == solid_domain_id).nonzero()
-        id_fluid = (domains == fluid_domain_id).nonzero()
+        if isinstance(fluid_domain_id, list):
+            id_fluid = np.where((domains == fluid_domain_id[0]) | (domains == fluid_domain_id[1]))
+        else:
+            id_fluid = np.where(domains == fluid_domain_id)
+
+        if isinstance(solid_domain_id, list):
+            id_solid = np.where((domains == solid_domain_id[0]) | (domains == solid_domain_id[1]))
+        else:
+            id_solid = np.where(domains == solid_domain_id)
 
         wall_topology = topology[id_solid, :]
         fluid_topology = topology[id_fluid, :]
@@ -267,23 +274,20 @@ def main() -> None:
         fluid_domain_id = parameters["dx_f_id"]
         solid_domain_id = parameters["dx_s_id"]
 
-        if type(fluid_domain_id) is list:
-            fluid_domain_id = fluid_domain_id[0]
-            logging.info("fluid_domain_id is not int, using first element of list \n")
-        if type(solid_domain_id) is list:
-            solid_domain_id = solid_domain_id[0]
-            logging.info("solid_domain_id is not int, using first element of list \n")
-
         logging.info(f"--- Fluid domain ID: {fluid_domain_id} and Solid domain ID: {solid_domain_id} \n")
 
-    if save_deg == 2:
+    if args.mesh_path:
+        mesh_path = Path(args.mesh_path)
+        logging.info("--- Using user-defined mesh \n")
+        assert mesh_path.exists(), f"Mesh file {mesh_path} not found."
+    elif save_deg == 2:
         mesh_path = folder_path / "Mesh" / "mesh_refined.h5"
         logging.info("--- Using refined mesh \n")
-        assert mesh_path.exists(), "Mesh file not found."
+        assert mesh_path.exists(), f"Mesh file {mesh_path} not found."
     else:
         mesh_path = folder_path / "Mesh" / "mesh.h5"
         logging.info("--- Using non-refined mesh \n")
-        assert mesh_path.exists(), "Mesh file not found."
+        assert mesh_path.exists(), f"Mesh file {mesh_path} not found."
 
     create_hdf5(visualization_path, mesh_path, save_time_step, args.stride,
                 args.start_time, args.end_time, args.extract_solid_only, fluid_domain_id, solid_domain_id)
