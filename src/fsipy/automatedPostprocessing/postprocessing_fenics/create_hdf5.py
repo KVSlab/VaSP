@@ -279,15 +279,15 @@ def main() -> None:
     if args.mesh_path:
         mesh_path = Path(args.mesh_path)
         logging.info("--- Using user-defined mesh \n")
-        assert mesh_path.exists(), "Mesh file not found."
+        assert mesh_path.exists(), f"Mesh file {mesh_path} not found."
     elif save_deg == 2:
         mesh_path = folder_path / "Mesh" / "mesh_refined.h5"
         logging.info("--- Using refined mesh \n")
-        assert mesh_path.exists(), "Mesh file not found."
+        assert mesh_path.exists(), f"Mesh file {mesh_path} not found."
     else:
         mesh_path = folder_path / "Mesh" / "mesh.h5"
         logging.info("--- Using non-refined mesh \n")
-        assert mesh_path.exists(), "Mesh file not found."
+        assert mesh_path.exists(), f"Mesh file {mesh_path} not found."
 
     create_hdf5(visualization_path, mesh_path, save_time_step, args.stride,
                 args.start_time, args.end_time, args.extract_solid_only, fluid_domain_id, solid_domain_id)
