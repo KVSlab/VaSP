@@ -18,12 +18,14 @@ _compiler_parameters = dict(parameters["form_compiler"])
 
 
 def set_problem_parameters(default_variables, **namespace):
-    # Overwrite default values
+
+    # Compute some solid parameters
+    # Need to stay here due to arithmetics
     E_s_val_artery = 1E6  # artery Young modulus (elasticity) [Pa]
     E_s_val_vein = 1E6  # vein Young modulus (elasticity) [Pa]
     nu_s_val = 0.45  # Poisson ratio (compressibility)
-    mu_s_val_artery = E_s_val_artery / (2 * (1 + nu_s_val))                    # artery Shear modulus
-    mu_s_val_vein = E_s_val_vein / (2 * (1 + nu_s_val))                        # vein Shear modulus
+    mu_s_val_artery = E_s_val_artery / (2 * (1 + nu_s_val))  # artery Shear modulus
+    mu_s_val_vein = E_s_val_vein / (2 * (1 + nu_s_val))  # vein Shear modulus
     lambda_s_val_artery = nu_s_val * 2. * mu_s_val_artery / (1. - 2. * nu_s_val)  # artery Solid 1rst Lamé coef. [Pa]
     lambda_s_val_vein = nu_s_val * 2. * mu_s_val_vein / (1. - 2. * nu_s_val)     # vein Solid 1rst Lamé coef. [Pa]
 
