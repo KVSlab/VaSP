@@ -5,6 +5,7 @@
 import argparse
 from pathlib import Path
 
+
 def parse_arguments() -> argparse.Namespace:
     """
     Parse command line arguments.
