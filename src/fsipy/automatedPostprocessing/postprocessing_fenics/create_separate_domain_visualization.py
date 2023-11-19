@@ -68,7 +68,6 @@ def create_separate_domain_visualiation(visualization_path, mesh_path, save_time
     xdmf_file_d = visualization_path / "displacement.xdmf"
 
 
-
     fluid_ids, solid_ids, all_ids = get_domain_ids(mesh_path, fluid_domain_id, solid_domain_id)
 
     # Remove this if statement since it can be done when we are using d_ids
@@ -79,19 +78,9 @@ def create_separate_domain_visualiation(visualization_path, mesh_path, save_time
         logging.info("--- Displacement will be extracted for both the fluid and solid domains \n")
         d_ids = all_ids
 
-    # Open up the first velocity.h5 file to get the number of timesteps and nodes for the output data
-    file = visualization_path / h5file_name_list[0]
-    vector_data = h5py.File(str(file))
-    vector_array = vector_data['VisualisationVector/0'][fluid_ids, :]
-
-    # Open up the first displacement.h5 file to get the number of timesteps and nodes for the output data
-    file_d = visualization_path / h5file_name_list_d[0]
-    vector_data_d = h5py.File(str(file_d))
-    vector_array_d = vector_data['VisualisationVector/0'][d_ids, :]
-
     # Deinfe path to the output files
-    u_output_path = visualization_path / "u.h5"
-    d_output_path = visualization_path / "d.h5"
+    u_iutput_path = visualization_path / "u.h5"
+    d_iutput_path = visualization_path / "d.h5"
 
     # Initialize h5 file names that might differ during the loop
     h5_file_prev = None
@@ -166,45 +155,6 @@ def create_separate_domain_visualiation(visualization_path, mesh_path, save_time
     logging.info("--- Finished reading solutions")
 
 
-def get_domain_ids(mesh_path, fluid_domain_id, solid_domain_id):
-    """
-    Given a mesh file, this function returns the IDs of the fluid and solid domains
-
-    Args:
-        mesh_path (Path): Path to the mesh file that contains the fluid and solid domains
-        fluid_domain_id (int): ID of the fluid domain
-        solid_domain_id (int): ID of the solid domain
-
-    Returns:
-        fluid_ids (list): List of IDs of the fluid domain
-        solid_ids (list): List of IDs of the solid domain
-        all_ids (list): List of IDs of the whole mesh
-    """
-    with h5py.File(mesh_path) as vector_data:
-        domains = vector_data['domains/values'][:]
-        topology = vector_data['domains/topology'][:, :]
-
-        if isinstance(fluid_domain_id, list):
-            id_fluid = np.where((domains == fluid_domain_id[0]) | (domains == fluid_domain_id[1]))
-        else:
-            id_fluid = np.where(domains == fluid_domain_id)
-
-        if isinstance(solid_domain_id, list):
-            id_solid = np.where((domains == solid_domain_id[0]) | (domains == solid_domain_id[1]))
-        else:
-            id_solid = np.where(domains == solid_domain_id)
-
-        wall_topology = topology[id_solid, :]
-        fluid_topology = topology[id_fluid, :]
-
-        # Get topology of fluid, solid and whole mesh
-        solid_ids = np.unique(wall_topology)
-        fluid_ids = np.unique(fluid_topology)
-        all_ids = np.unique(topology)
-
-    return fluid_ids, solid_ids, all_ids
-
-
 def main() -> None:
 
     assert MPI.size(MPI.comm_world) == 1, "This script only runs in serial."
@@ -252,7 +202,7 @@ if __name__ == '__main__':
     main()
 
 
-def compute_velocity_and_pressure(visualization_path, dt, mesh_path, extract_solid_only):
+def compute_velocity_and_pressure(visualization_path, mesh_path, extract_solid_only):
     """
     Loads velocity and pressure from compressed .h5 CFD solution and
     converts and saves to .xdmf format for visualization (in e.g. ParaView).
@@ -276,8 +226,8 @@ def compute_velocity_and_pressure(visualization_path, dt, mesh_path, extract_sol
     file_u = HDF5File(MPI.comm_world, str(file_path_u), "r")
     
     # Read in datasets
-    dataset_d = get_dataset_names(file_d, step=step, vector_filename="/displacement/vector_%d")
-    dataset_u = get_dataset_names(file_u, step=step, vector_filename="/velocity/vector_%d")
+    dataset_d = get_dataset_names(file_d, step=1, vector_filename="/displacement/vector_%d")
+    dataset_u = get_dataset_names(file_u, step=1, vector_filename="/velocity/vector_%d")
 
     # Define mesh path related variables
     fluid_domain_path = mesh_path.with_name(mesh_path.stem + "_fluid.h5")
@@ -312,7 +262,6 @@ def compute_velocity_and_pressure(visualization_path, dt, mesh_path, extract_sol
     d = Function(Vs)
 
 
-
     # Create writer for velocity and pressure
     d_path = visualization_path / "displacement_solid.xdmf" if extract_solid_only else visualization_path / "displacement_whole.xdmf"
     u_path = visualization_path / "velocity_fluid.xdmf"
@@ -328,10 +277,19 @@ def compute_velocity_and_pressure(visualization_path, dt, mesh_path, extract_sol
     if MPI.rank(MPI.comm_world) == 0:
         print("=" * 10, "Start post processing", "=" * 10)
 
+    # Open up h5 file to get dt and start_time
+    h5_file = visualization_path / "u.h5"
+    vector_data = h5py.File(str(h5_file))
+    first_time_step_data = vector_data['velocity/vector_0']
+    second_time_step_data = vector_data['velocity/vector_1']
+    start_time = first_time_step_data.attrs['timestamp']
+    dt = second_time_step_data.attrs['timestamp'] - first_time_step_data.attrs['timestamp']
+    vector_data.close()
+
     counter = 1
     for i in range(len(dataset_u)):
         # Set physical time (in [ms])
-        t = dt * counter
+        t = dt * counter + start_time
 
         file_d.read(d, dataset_d[i])
         file_u.read(u, dataset_u[i])
@@ -348,15 +306,8 @@ def compute_velocity_and_pressure(visualization_path, dt, mesh_path, extract_sol
         d.rename("displacement", "displacement")
         d_writer.write(d, t)
 
-        # Store deformation
-        # NB: Storing together with velocity.
-        if file_d is not None:
-            file_d.read(d, dataset_d[i])
-            d.rename("deformation", "deformation")
-            u_writer.write(d, t)
-
+    
         # Update file_counter
-        counter += step
+        counter += 1
 
     print("========== Post processing finished ==========")
-    print("Results saved to: {}".format(folder))
