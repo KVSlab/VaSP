@@ -1,10 +1,6 @@
 # Copyright (c) 2023 David Bruneau
-# Modified by Kei Yamamoto 2023
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import numpy as np
-import h5py
-import re
 from pathlib import Path
 import json
 import logging
@@ -19,7 +15,7 @@ parameters["reorder_dofs_serial"] = False
 
 def create_separate_domain_visualization(visualization_path, mesh_path, extract_solid_only):
     """
-    Loads velocity and pressure from compressed .h5 CFD solution and
+    Loads displacement and velocity from compressed .h5 CFD solution and
     converts and saves to .xdmf format for visualization (in e.g. ParaView).
 
     Args:
