@@ -35,7 +35,7 @@ def create_separate_domain_visualization(visualization_path, mesh_path, stride=1
         extract_solid_only = True
         if MPI.rank(MPI.comm_world) == 0:
             print("--- Using d_solid.h5 file \n")
-    
+
     file_path_u = visualization_path / "u.h5"
 
     assert file_path_d.exists(), f"Displacement file {file_path_d} not found. Make sure to run create_hdf5.py first."
@@ -48,7 +48,6 @@ def create_separate_domain_visualization(visualization_path, mesh_path, stride=1
     # Read in datasets
     dataset_d = get_dataset_names(file_d, step=stride, vector_filename="/displacement/vector_%d")
     dataset_u = get_dataset_names(file_u, step=stride, vector_filename="/velocity/vector_%d")
-
 
     # Define mesh path related variables
     fluid_domain_path = mesh_path.with_name(mesh_path.stem + "_fluid.h5")
