@@ -15,8 +15,9 @@ parameters["reorder_dofs_serial"] = False
 
 def create_separate_domain_visualization(visualization_path, mesh_path, stride=1):
     """
-    Loads displacement and velocity from compressed .h5 CFD solution and
+    Loads displacement and velocity from .h5 file given by create_hdf5.py,
     converts and saves to .xdmf format for visualization (in e.g. ParaView).
+    This function works with MPI.
 
     Args:
         visualization_path (Path): Path to the visualization folder
