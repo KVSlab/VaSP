@@ -1,43 +1,54 @@
-# Copyright (c) 2023 David Bruneau
+# Copyright (c) 2023 Simula Research Laboratory
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from pathlib import Path
 import json
 
+from dolfin import Mesh, HDF5File, VectorFunctionSpace, Function, MPI, parameters, XDMFFile
 from vampy.automatedPostprocessing.postprocessing_common import get_dataset_names
 from fsipy.automatedPostprocessing.postprocessing_fenics import postprocessing_fenics_common
-from dolfin import Mesh, HDF5File, VectorFunctionSpace, Function, MPI, parameters, XDMFFile
 
 
 # set compiler arguments
 parameters["reorder_dofs_serial"] = False
 
 
-def create_separate_domain_visualization(visualization_path, mesh_path, extract_solid_only):
+def create_separate_domain_visualization(visualization_path, mesh_path, stride=1):
     """
     Loads displacement and velocity from compressed .h5 CFD solution and
     converts and saves to .xdmf format for visualization (in e.g. ParaView).
 
     Args:
-        folder (str): Path to results from simulation
-        dt (float): Time step of simulation
-        velocity_degree (int): Finite element degree of velocity
-        pressure_degree (int): Finite element degree of pressure
-        step (int): Step size determining number of times data is sampled
+        visualization_path (Path): Path to the visualization folder
+        mesh_path (Path): Path to the mesh file
+        stride (int): Save frequency of visualization output (default: 1)
     """
-    # File paths
-    file_path_d = visualization_path / "d.h5"
+    # Path to the input files
+    try:
+        file_path_d = visualization_path / "d.h5"
+        assert file_path_d.exists()
+        extract_solid_only = False
+        if MPI.rank(MPI.comm_world) == 0:
+            print("--- Using d.h5 file \n")
+    except AssertionError:
+        file_path_d = visualization_path / "d_solid.h5"
+        extract_solid_only = True
+        if MPI.rank(MPI.comm_world) == 0:
+            print("--- Using d_solid.h5 file \n")
+    
     file_path_u = visualization_path / "u.h5"
-    assert file_path_d.exists(), f"Displacement file {file_path_d} not found."
-    assert file_path_u.exists(), f"Velocity file {file_path_u} not found."
+
+    assert file_path_d.exists(), f"Displacement file {file_path_d} not found. Make sure to run create_hdf5.py first."
+    assert file_path_u.exists(), f"Velocity file {file_path_u} not found.  Make sure to run create_hdf5.py first."
 
     # Define HDF5Files
     file_d = HDF5File(MPI.comm_world, str(file_path_d), "r")
     file_u = HDF5File(MPI.comm_world, str(file_path_u), "r")
 
     # Read in datasets
-    dataset_d = get_dataset_names(file_d, step=1, vector_filename="/displacement/vector_%d")
-    dataset_u = get_dataset_names(file_u, step=1, vector_filename="/velocity/vector_%d")
+    dataset_d = get_dataset_names(file_d, step=stride, vector_filename="/displacement/vector_%d")
+    dataset_u = get_dataset_names(file_u, step=stride, vector_filename="/velocity/vector_%d")
+
 
     # Define mesh path related variables
     fluid_domain_path = mesh_path.with_name(mesh_path.stem + "_fluid.h5")
@@ -106,6 +117,10 @@ def create_separate_domain_visualization(visualization_path, mesh_path, extract_
         d.rename("displacement", "displacement")
         d_writer.write(d, timestamp)
 
+    # Close files
+    d_writer.close()
+    u_writer.close()
+
     if MPI.rank(MPI.comm_world) == 0:
         print("========== Post processing finished ==========")
 
@@ -118,6 +133,7 @@ def main() -> None:
 
     # Define paths for visulization and mesh files
     folder_path = Path(args.folder)
+    assert folder_path.exists(), f"Folder {folder_path} not found."
     visualization_path = folder_path / "Visualization"
 
     # Read parameters from default_variables.json
@@ -142,7 +158,7 @@ def main() -> None:
             print("--- Using non-refined mesh \n")
         assert mesh_path.exists(), f"Mesh file {mesh_path} not found."
 
-    create_separate_domain_visualization(visualization_path, mesh_path, args.extract_solid_only)
+    create_separate_domain_visualization(visualization_path, mesh_path, args.stride)
 
 
 if __name__ == "__main__":

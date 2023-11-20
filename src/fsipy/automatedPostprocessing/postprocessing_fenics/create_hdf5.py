@@ -94,7 +94,7 @@ def create_hdf5(visualization_path, mesh_path, save_time_step, stride, start_tim
 
     # Deinfe path to the output files
     u_output_path = visualization_path / "u.h5"
-    d_output_path = visualization_path / "d.h5"
+    d_output_path = visualization_path / "d_solid.h5" if extract_solid_only else visualization_path / "d.h5"
 
     # Initialize h5 file names that might differ during the loop
     h5_file_prev = None
