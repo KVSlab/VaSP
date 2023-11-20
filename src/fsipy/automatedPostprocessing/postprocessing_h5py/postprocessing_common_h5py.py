@@ -187,12 +187,12 @@ def get_domain_ids_specified_region(mesh_path: [str, Path], fluid_sampling_domai
     return fluid_ids, wall_ids, all_ids
 
 
-def get_interface_ids(mesh_path: str) -> np.ndarray:
+def get_interface_ids(mesh_path: Union[str, Path]) -> np.ndarray:
     """
     Get the interface node IDs between fluid and wall domains from the given mesh file.
 
     Args:
-        mesh_path (str): Path to the mesh file.
+        mesh_path (Union[str, Path]): Path to the mesh file.
 
     Returns:
         np.ndarray: Array containing the interface node IDs.
@@ -230,7 +230,7 @@ def get_sampling_constants(df: pd.DataFrame, start_t: float, end_t: float) -> Tu
     return T, nsamples, fs
 
 
-def read_npz_files(filepath: [str, Path]) -> pd.DataFrame:
+def read_npz_files(filepath: Union[str, Path]) -> pd.DataFrame:
     """
     Read data from an npz file and return it as a DataFrame.
 
@@ -1074,15 +1074,16 @@ def create_fixed_xdmf_file(time_values,nElements,nNodes,attType,viz_type,h5_file
     xdmf_file.close()
 
 
-def create_transformed_matrix(input_path: str, output_folder: str, mesh_path: str, case_name: str, start_t: float,
-                              end_t: float, dvp: str, stride: int = 1) -> float:
+def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union[str, Path],
+                              mesh_path: Union[str, Path], case_name: str, start_t: float, end_t: float, dvp: str,
+                              stride: int = 1) -> float:
     """
     Create a transformed matrix from simulation data.
 
     Args:
-        input_path (str): Path to the input simulation data.
-        output_folder (str): Path to the output folder where the transformed matrix will be stored.
-        mesh_path (str): Path to the input mesh data.
+        input_path (Union[str, Path]): Path to the input simulation data.
+        output_folder (Union[str, Path]): Path to the output folder where the transformed matrix will be stored.
+        mesh_path (Union[str, Path]): Path to the input mesh data.
         case_name (str): Name of the simulation case.
         start_t (float): Start time for extracting data.
         end_t (float): End time for extracting data.

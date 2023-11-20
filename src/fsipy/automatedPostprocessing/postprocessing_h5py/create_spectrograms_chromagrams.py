@@ -1,4 +1,12 @@
+# Copyright (c) 2023 David Bruneau
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+"""
+This script creates spectrograms, power spectral density and chromagrams from formatted matrices (.npz files)"
+"""
+
 from pathlib import Path
+from typing import Union, Optional
 
 import numpy as np
 import pandas as pd
@@ -8,15 +16,13 @@ from scipy.io import wavfile
 
 from fsipy.automatedPostprocessing.postprocessing_h5py import spectrograms as spec
 
-"""
-This script creates spectrograms, power spectral density and chromagrams from formatted matrices (.npz files)"
-"""
-
 
 def create_spectrogram_composite(case_name: str, dvp: str, df: pd.DataFrame, start_t: float, end_t: float,
                                  num_windows_per_sec: float, overlap_frac: float, window: str, lowcut: float,
-                                 thresh_val: float, max_plot: float, image_folder: str, flow_rate_file: str = None,
-                                 amplitude_file: str = None, power_scaled: bool = False, ylim: float = None) -> None:
+                                 thresh_val: float, max_plot: float, image_folder: Union[str, Path],
+                                 flow_rate_file: Optional[Union[str, Path]] = None,
+                                 amplitude_file: Optional[Union[str, Path]] = None, power_scaled: bool = False,
+                                 ylim: Optional[float] = None) -> None:
     """
     Create a composite spectrogram figure.
 
@@ -32,9 +38,9 @@ def create_spectrogram_composite(case_name: str, dvp: str, df: pd.DataFrame, sta
         lowcut (float): Lowcut frequency for high-pass filter.
         thresh_val (float): Threshold value.
         max_plot (float): Maximum plot value.
-        image_folder (str): Folder to save the images.
-        flow_rate_file (str, optional): File containing flow rate data.
-        amplitude_file (str, optional): File containing amplitude data.
+        image_folder (Union[str, Path]): Folder to save the images.
+        flow_rate_file (Union[str, Path], optional): File containing flow rate data.
+        amplitude_file (Union[str, Path], optional): File containing amplitude data.
         power_scaled (bool, optional): Whether to scale the power.
         ylim (float, optional): Y-axis limit for the plot.
     """
@@ -55,7 +61,7 @@ def create_spectrogram_composite(case_name: str, dvp: str, df: pd.DataFrame, sta
     plt.plot(freq_array, Pxx_array)
     plt.xlabel('Freq. (Hz)')
     plt.ylabel('input units^2/Hz')
-    
+
     # Set ylim if provided
     if ylim is not None:
         plt.ylim([0, ylim])
@@ -68,13 +74,13 @@ def create_spectrogram_composite(case_name: str, dvp: str, df: pd.DataFrame, sta
 
     # Create composite figure
     if amplitude_file and flow_rate_file:
-        fig1, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(5, sharex=True,  gridspec_kw={'height_ratios': [1, 3, 1, 1, 1]})
+        fig1, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(5, sharex=True, gridspec_kw={'height_ratios': [1, 3, 1, 1, 1]})
     elif flow_rate_file:
-        fig1, (ax1, ax2, ax3, ax4) = plt.subplots(4, sharex=True,  gridspec_kw={'height_ratios': [1, 3, 1, 1]})
+        fig1, (ax1, ax2, ax3, ax4) = plt.subplots(4, sharex=True, gridspec_kw={'height_ratios': [1, 3, 1, 1]})
     elif amplitude_file:
-        fig1, (ax2, ax3, ax4, ax5) = plt.subplots(4, sharex=True,  gridspec_kw={'height_ratios': [3, 1, 1, 1]})
+        fig1, (ax2, ax3, ax4, ax5) = plt.subplots(4, sharex=True, gridspec_kw={'height_ratios': [3, 1, 1, 1]})
     else:
-        fig1, (ax2, ax3, ax4) = plt.subplots(3, sharex=True,  gridspec_kw={'height_ratios': [3, 1, 1]})
+        fig1, (ax2, ax3, ax4) = plt.subplots(3, sharex=True, gridspec_kw={'height_ratios': [3, 1, 1]})
 
     # Spectrogram--------------------------------------------------------------
     fig1.set_size_inches(7.5, 9)
@@ -102,7 +108,7 @@ def create_spectrogram_composite(case_name: str, dvp: str, df: pd.DataFrame, sta
     # in each column to 1)
     norm = "sum"
     chroma = spec.chromagram_from_spectrogram(Pxx_raw, fs, n_fft, n_chroma=n_chroma, norm=norm)
-    if power_scaled == True:
+    if power_scaled:
         chroma_power = chroma * (Pxx.max(axis=0) - thresh_val)
         spec.plot_chromagram(fig1, ax3, bins_raw, chroma_power)
     else:
@@ -116,7 +122,7 @@ def create_spectrogram_composite(case_name: str, dvp: str, df: pd.DataFrame, sta
     # Calculate SBI
     chroma_entropy = spec.calc_chroma_entropy(chroma, n_chroma)
     # Plot SBI
-    if power_scaled == True:
+    if power_scaled:
         chroma_entropy_power = chroma_entropy * (Pxx.max(axis=0) - thresh_val)
         ax4.plot(bins, chroma_entropy_power)
     else:
@@ -170,7 +176,7 @@ def create_spectrogram_composite(case_name: str, dvp: str, df: pd.DataFrame, sta
 
     output_csv_path = path_to_spec.with_suffix('.csv')
     data_csv = np.append(freqs[np.newaxis].T, Pxx, axis=1)
-    bins_txt = np.array2string(bins, max_line_width=10000, precision=2, separator=',').replace("[","").replace("]","")
+    bins_txt = np.array2string(bins, max_line_width=10000, precision=2, separator=',').replace("[", "").replace("]", "")
     np.savetxt(output_csv_path, data_csv, header=bins_txt, delimiter=",")
 
     # Save data to files (chromagram)
@@ -217,8 +223,6 @@ def sonify_point(case_name: str, dvp: str, df, start_t: float, end_t: float, ove
     # High-pass filter dataframe for spectrogram
     df_filtered = spec.filter_time_data(df, fs, lowcut=lowcut, highcut=15000.0, order=6, btype='highpass')
 
-    length = end_t - start_t
-    t = np.linspace(0, length, int(fs * length))  # Produces a 5-second Audio-File
     y2 = df_filtered.iloc[0] / np.max(df_filtered.iloc[0])
 
     sound_filename = f"{dvp}_sound_{y2.name}_{case_name}.wav"
@@ -239,8 +243,9 @@ def main():
                                    args.x_sphere, args.y_sphere, args.z_sphere, args.dvp, args.interface_only,
                                    args.component, args.point_id, sampling_method=args.sampling_method)
 
-    amplitude_file = Path(visualization_hi_pass_folder) / args.amplitude_file_name
-    flow_rate_file = Path(args.folder) / args.flow_rate_file_name
+    # Should these files be used?
+    # amplitude_file = Path(visualization_hi_pass_folder) / args.amplitude_file_name
+    # flow_rate_file = Path(args.folder) / args.flow_rate_file_name
 
     # Create spectrograms
     create_spectrogram_composite(case_name, dvp, df, args.start_time, args.end_time, args.num_windows_per_sec,
@@ -249,7 +254,7 @@ def main():
 
     if args.sampling_method == "SinglePoint":
         sonify_point(case_name, dvp, df, args.start_time, args.end_time, args.overlap_frac, args.lowcut,
-                     spectrogram_folder)
+                     image_folder)
 
 
 if __name__ == '__main__':

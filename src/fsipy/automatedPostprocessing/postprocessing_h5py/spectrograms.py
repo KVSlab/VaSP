@@ -11,7 +11,7 @@ import sys
 import timeit
 import configargparse
 from pathlib import Path
-from typing import Union
+from typing import Union, Optional, Literal
 
 import pandas as pd
 import numpy as np
@@ -147,11 +147,11 @@ def read_command_line_spec() -> configargparse.Namespace:
     return args
 
 
-def read_spectrogram_data(folder: str, mesh_path: str, save_deg: int, stride: int, start_t: float, end_t: float,
-                          n_samples: int, ylim: float, sampling_region: str, fluid_sampling_domain_id: int,
-                          solid_sampling_domain_id: int, r_sphere: float, x_sphere: float, y_sphere: float,
-                          z_sphere: float, dvp: str, interface_only: bool, component: str, point_id: int,
-                          sampling_method: str = "RandomPoint"):
+def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path], save_deg: int, stride: int,
+                          start_t: float, end_t: float, n_samples: int, ylim: float, sampling_region: str,
+                          fluid_sampling_domain_id: int, solid_sampling_domain_id: int, r_sphere: float,
+                          x_sphere: float, y_sphere: float, z_sphere: float, dvp: str, interface_only: bool,
+                          component: str, point_id: int, sampling_method: str = "RandomPoint"):
     """
     Read spectrogram data and perform processing steps.
 
@@ -182,8 +182,9 @@ def read_spectrogram_data(folder: str, mesh_path: str, save_deg: int, stride: in
     """
     start_time = timeit.default_timer()
 
-    case_name = Path(folder).parent.name
-    visualization_path = Path(folder) / "Visualization"
+    folder_path = Path(folder)
+    case_name = folder_path.parent.name
+    visualization_path = folder_path / "Visualization"
 
     # 1. Get names of relevant directories, files
 
@@ -193,11 +194,11 @@ def read_spectrogram_data(folder: str, mesh_path: str, save_deg: int, stride: in
     mesh_path_fluid = mesh_path.with_name(f"{mesh_path.stem}_fluid.h5")  # Needed for formatting SPI data
 
     formatted_data_folder_name = f"res_{case_name}_stride_{stride}t{start_t}_to_{end_t}save_deg_{save_deg}"
-    formatted_data_folder = folder / formatted_data_folder_name
-    visualization_separate_domain_folder = folder / "Visualization_separate_domain"
-    visualization_hi_pass_folder = folder / "Visualization_hi_pass"
+    formatted_data_folder = folder_path / formatted_data_folder_name
+    visualization_separate_domain_folder = folder_path / "Visualization_separate_domain"
+    visualization_hi_pass_folder = folder_path / "Visualization_hi_pass"
 
-    image_folder = folder / "Spectrograms"
+    image_folder = folder_path / "Spectrograms"
     image_folder.mkdir(parents=True, exist_ok=True)
 
     output_file_name = f"{case_name}_{dvp}_{component}.npz"
@@ -253,18 +254,17 @@ def read_spectrogram_data(folder: str, mesh_path: str, save_deg: int, stride: in
         sphere_ids = find_points_in_sphere(sac_center, r_sphere, coords)
 
         # Get nodes in sac only
-        all_ids = list(set(sphere_ids).intersection(all_ids))
-        fluid_ids = list(set(sphere_ids).intersection(fluid_ids))
-        wall_ids = list(set(sphere_ids).intersection(wall_ids))
-        interface_ids = list(set(sphere_ids).intersection(interface_ids))
+        all_ids = np.intersect1d(sphere_ids, all_ids)
+        fluid_ids = np.intersect1d(sphere_ids, fluid_ids)
+        wall_ids = np.intersect1d(sphere_ids, wall_ids)
+        interface_ids = np.intersect1d(sphere_ids, interface_ids)
     elif sampling_region == "domain":
         # To use this option, input a mesh with domain markers and indicate which domain represents the desired fluid
         # region for the spectrogram (fluid_sampling_domain_id) and which domain represents the desired solid region
         # (solid_sampling_domain_id).
         fluid_ids, wall_ids, all_ids = \
             get_domain_ids_specified_region(mesh_path, fluid_sampling_domain_id, solid_sampling_domain_id)
-        interface_ids_set = set(fluid_ids) - (set(fluid_ids) - set(wall_ids))
-        interface_ids = list(interface_ids_set)
+        interface_ids = np.intersect1d(fluid_ids, wall_ids)
     else:
         raise ValueError(f"Invalid sampling method '{sampling_region}'. Please specify 'sphere' or 'domain'.")
 
@@ -292,7 +292,7 @@ def read_spectrogram_data(folder: str, mesh_path: str, save_deg: int, stride: in
     if sampling_method == "RandomPoint":
         idx_sampled = np.random.choice(region_ids, n_samples)
     elif sampling_method == "SinglePoint":
-        idx_sampled = [point_id]
+        idx_sampled = np.array([point_id])
         case_name = f"{case_name}_{sampling_method}_{point_id}"
         print(f"Single Point spectrogram for point: {point_id}")
     elif sampling_method == "Spatial":
@@ -493,7 +493,7 @@ def butter_bandpass(lowcut: float, highcut: float, fs: float, order: int = 5, bt
 
 
 def butter_bandpass_filter(data: np.ndarray, lowcut: float = 25.0, highcut: float = 15000.0, fs: float = 2500.0,
-                            order: int = 5, btype: str = 'band') -> np.ndarray:
+                           order: int = 5, btype: str = 'band') -> np.ndarray:
     """
     Apply a Butterworth bandpass, bandstop, highpass, or lowpass filter to the input data.
 
@@ -517,7 +517,7 @@ def butter_bandpass_filter(data: np.ndarray, lowcut: float = 25.0, highcut: floa
 
 
 def filter_time_data(df: pd.DataFrame, fs: float, lowcut: float = 25.0, highcut: float = 15000.0,
-                      order: int = 6, btype: str = 'highpass') -> pd.DataFrame:
+                     order: int = 6, btype: str = 'highpass') -> pd.DataFrame:
     """
     Apply a Butterworth highpass, lowpass, bandpass, or bandstop filter to the time series data in a DataFrame.
 
@@ -545,8 +545,8 @@ def filter_time_data(df: pd.DataFrame, fs: float, lowcut: float = 25.0, highcut:
 
 
 def compute_average_spectrogram(df: pd.DataFrame, fs: float, nWindow: int, overlapFrac: float, window: str,
-                                 start_t: float, end_t: float, thresh: float, scaling: str = "spectrum",
-                                 filter_data: bool = False, thresh_method: str = "new") -> tuple:
+                                start_t: float, end_t: float, thresh: float, scaling: str = "spectrum",
+                                filter_data: bool = False, thresh_method: str = "new") -> tuple:
     """
     Compute the average spectrogram for a DataFrame of time series data.
 
@@ -592,9 +592,10 @@ def compute_average_spectrogram(df: pd.DataFrame, fs: float, nWindow: int, overl
     return bins, freqs, Pxx_scaled, max_val, min_val, lower_thresh
 
 
-def plot_spectrogram(fig1: plt.Figure, ax1: plt.Axes, bins: np.ndarray, freqs: np.ndarray,
-                     Pxx: np.ndarray, ylim_: float, title: str = None, convert_a: float = 0.0, convert_b: float = 0.0,
-                     x_label: str = None, color_range: tuple = None) -> None:
+def plot_spectrogram(fig1: plt.Figure, ax1: plt.Axes, bins: np.ndarray, freqs: np.ndarray, Pxx: np.ndarray,
+                     ylim: Optional[float] = None, title: Optional[str] = None, convert_a: float = 0.0,
+                     convert_b: float = 0.0, x_label: Optional[str] = None,
+                     color_range: Optional[list[float]] = None) -> None:
     """
     Plot a spectrogram.
 
@@ -604,12 +605,12 @@ def plot_spectrogram(fig1: plt.Figure, ax1: plt.Axes, bins: np.ndarray, freqs: n
         bins (np.ndarray): Time bins.
         freqs (np.ndarray): Frequency values.
         Pxx (np.ndarray): Power spectral density values.
-        ylim_ (float): Maximum frequency to display on the y-axis.
+        ylim (float, optional): Maximum frequency to display on the y-axis.
         title (str, optional): Title of the plot. Default is None.
         convert_a (float, optional): Conversion factor for the x-axis. Default is 0.0.
         convert_b (float, optional): Offset for the x-axis conversion. Default is 0.0.
         x_label (str, optional): Label for the x-axis. Default is None.
-        color_range (tuple, optional): Range for the color scale. Default is None.
+        color_range (list[float], optional): Range for the color scale. Default is None.
 
     Returns:
         None
@@ -626,7 +627,8 @@ def plot_spectrogram(fig1: plt.Figure, ax1: plt.Axes, bins: np.ndarray, freqs: n
     if x_label is not None:
         ax1.set_xlabel(x_label)
     ax1.set_ylabel('Frequency [Hz]')
-    ax1.set_ylim([0, ylim_])
+    if ylim is not None:
+        ax1.set_ylim((0, ylim))
 
     if convert_a > 0.000001 or convert_b > 0.000001:
         ax2 = ax1.twiny()
@@ -637,7 +639,8 @@ def plot_spectrogram(fig1: plt.Figure, ax1: plt.Axes, bins: np.ndarray, freqs: n
 
         ax2.set_xticks(ax1.get_xticks())
         ax2.set_xticklabels(time_convert(ax1.get_xticks()))
-        ax2.set_xlabel(x_label)
+        if x_label is not None:
+            ax2.set_xlabel(x_label)
 
 
 def chromagram_from_spectrogram(Pxx: np.ndarray, fs: float, n_fft: int, n_chroma: int = 24,
@@ -703,9 +706,11 @@ def calc_chroma_entropy(chroma: np.ndarray, n_chroma: int) -> np.ndarray:
     return 1 - chroma_entropy
 
 
-def plot_chromagram(fig1: plt.Figure, ax1: plt.Axes, bins: np.ndarray, chroma: np.ndarray,
-                    title: str = None, path: str = None, convert_a: float = 1.0, convert_b: float = 0.0,
-                    x_label: str = None, shading: str = 'gouraud', color_range: tuple = None) -> None:
+def plot_chromagram(fig1: plt.Figure, ax1: plt.Axes, bins: np.ndarray, chroma: np.ndarray, title: Optional[str] = None,
+                    path: Optional[Union[str, Path]] = None, convert_a: float = 1.0, convert_b: float = 0.0,
+                    x_label: Optional[str] = None,
+                    shading: Optional[Literal['flat', 'nearest', 'gouraud', 'auto']] = 'gouraud',
+                    color_range: Optional[list[float]] = None) -> None:
     """
     Plot a chromagram.
 
@@ -720,7 +725,7 @@ def plot_chromagram(fig1: plt.Figure, ax1: plt.Axes, bins: np.ndarray, chroma: n
         convert_b (float, optional): Offset for the x-axis conversion. Default is 0.0.
         x_label (str, optional): Label for the x-axis. Default is None.
         shading (str, optional): Shading style for the plot. Default is 'gouraud'.
-        color_range (tuple, optional): Range for the color scale. Default is None.
+        color_range (list[float], optional): Range for the color scale. Default is None.
 
     Returns:
         None
@@ -745,7 +750,7 @@ def plot_chromagram(fig1: plt.Figure, ax1: plt.Axes, bins: np.ndarray, chroma: n
 
     if path is not None:
         fig1.savefig(path)
-        path_csv = path.replace(".png", ".csv")
+        path_csv = Path(path).with_suffix(".csv")
         np.savetxt(path_csv, chroma, delimiter=",")
 
 
