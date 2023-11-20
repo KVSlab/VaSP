@@ -3,347 +3,481 @@
 # Contributions:
 #   2023 Daniel Macdonald
 
-import os
-import time
-from argparse import ArgumentParser
-import configparser
+"""
+This file contains helper functions for creating spectrograms.
+"""
 
+import sys
+import timeit
+import configargparse
+from pathlib import Path
+from typing import Union
+
+import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 from scipy.signal import butter, filtfilt, spectrogram, periodogram
 from scipy.interpolate import RectBivariateSpline
-from scipy.stats import entropy
-from scipy.spatial import cKDTree as KDTree
 
-try:
-    import pyvista as pv
-    import postprocessing_common_pv
-except ImportError:
-    print("Could not import pyvista and/or vtk. Install these packages or use 'RandomPoint' sampling for spectrograms.")
-
-import postprocessing_common_h5py
-from chroma_filters import normalize, chroma_filterbank
-
-"""
-This library contains helper functions for creating spectrograms. All functions authored by David Bruneau unless otherwise specified.
-"""
+from fsipy.automatedPostprocessing.postprocessing_h5py.chroma_filters import normalize, chroma_filterbank
+from fsipy.automatedPostprocessing.postprocessing_h5py.postprocessing_common_h5py import create_transformed_matrix, \
+    read_npz_files, get_surface_topology_coords, get_coords, get_domain_ids, get_interface_ids, \
+    get_domain_ids_specified_region
 
 
+def read_command_line_spec() -> configargparse.Namespace:
+    """
+    Read arguments from the command line using ConfigArgParse.
 
-def read_spec_config(config_file,dvp):
+    Returns:
+        ArgumentParser: Parsed command-line arguments.
+    """
+    parser = configargparse.ArgumentParser(formatter_class=configargparse.RawDescriptionHelpFormatter)
 
-    config = configparser.ConfigParser()
-    with open(config_file) as stream:
-        config.read_string("[Spectrogram_Parameters]\n" + stream.read())
+    parser.add_argument("--folder", type=Path, required=True, default=None,
+                        help="Path to simulation results")
+    parser.add_argument('--mesh-path', type=Path, default=None,
+                        help="Path to the mesh file (default: <folder_path>/Mesh/mesh.h5)")
+    parser.add_argument('--save-deg', type=int, default=2,
+                        help="Specify the save_deg used during the simulation, i.e., whether the intermediate P2 nodes "
+                             "were saved. Entering save_deg=1 when the simulation was run with save_deg=2 will result "
+                             "in using only the corner nodes in postprocessing.")
+    parser.add_argument('--stride', type=int, default=1,
+                        help="Desired frequency of output data (i.e. to output every second step, use stride=2)")
+    parser.add_argument('--start-time', type=float, default=0.0,
+                        help="Start time of the simulation (in seconds).")
+    parser.add_argument('--end-time', type=float, default=0.05,
+                        help="End time of the simulation (in seconds).")
+    parser.add_argument('--lowcut', type=float, default=25,
+                        help="Cutoff frequency (Hz) for the high-pass filter.")
+    parser.add_argument('--ylim', type=float, default=800,
+                        help="Set the y-limit of the spectrogram graph.")
+    parser.add_argument('--sampling-region', type=str, default="sphere",
+                        help="Specify the sampling region. Choose 'sphere' to sample within a sphere or 'domain' to "
+                             "sample within a specified domain.")
+    parser.add_argument('--fluid-sampling-domain-id', type=int, default=1,
+                        help="Domain ID for the fluid region to be sampled. Input a labelled mesh with this ID.")
+    parser.add_argument('--solid-sampling-domain-id', type=int, default=2,
+                        help="Domain ID for the solid region to be sampled. Input a labelled mesh with this ID.")
+    parser.add_argument('--r-sphere', type=float, default=1000000,
+                        help="Radius of the sphere used to include points for spectrogram.")
+    parser.add_argument('--x-sphere', type=float, default=0.0,
+                        help="X-coordinate of the center of the sphere used to include points for spectrogram (in "
+                             "meters).")
+    parser.add_argument('--y-sphere', type=float, default=0.0,
+                        help="Y-coordinate of the center of the sphere used to include points for spectrogram (in "
+                             "meters).")
+    parser.add_argument('--z-sphere', type=float, default=0.0,
+                        help="Z-coordinate of the center of the sphere used to include points for spectrogram (in "
+                             "meters).")
+    parser.add_argument('--dvp', type=str, default="v",
+                        help="Quantity to postprocess. Choose 'v' for velocity, 'd' for displacement, 'p' for "
+                             "pressure, or 'wss' for wall shear stress.")
+    parser.add_argument('--Re_a', type=float, default=0.0,
+                        help="Assuming linearly increasing Reynolds number: Re(t) = Re_a*t + Re_b. If both Re_a and "
+                             "Re_b are 0, the plot won't be against Reynolds number.")
+    parser.add_argument('--Re_b', type=float, default=0.0,
+                        help="Assuming linearly increasing Reynolds number: Re(t) = Re_a*t + Re_b. If both Re_a and "
+                             "Re_b are 0, the plot won't be against Reynolds number.")
+    parser.add_argument('--interface-only', action='store_true',
+                        help="Generate spectrogram only for the fluid-solid interface. If present, interface-only "
+                             "spectrogram will be generated; otherwise, the volumetric spectrogram will include all "
+                             "fluid in the sac or all nodes through the wall.")
+    parser.add_argument('--component', type=str, default="mag",
+                        help="Component of the data to visualize. Choose 'x', 'y', 'z', or 'mag' (magnitude).")
+    parser.add_argument('--sampling-method', type=str, default="RandomPoint",
+                        help="Sampling method for spectrogram generation. Choose from 'RandomPoint' (random nodes), "
+                             "'SinglePoint' (single point specified by 'point_id'), or 'Spatial' (ensures uniform "
+                             "spatial sampling, e.g., in the case of fluid boundary layer, the sampling will not bias "
+                             "towards the boundary layer).")
+    parser.add_argument('--n-samples', type=int, default=10000,
+                        help="Number of samples to generate spectrogram data (ignored for SinglePoint sampling).")
+    parser.add_argument('--point-id', type=int, default=-1000000,
+                        help="Point ID for SinglePoint sampling. Ignored for other sampling methods.")
 
-    overlapFrac = float(config.get("Spectrogram_Parameters", "overlapFrac"))
-    window = config.get("Spectrogram_Parameters", "window")
-    n_samples = int(config.get("Spectrogram_Parameters", "n_samples"))
-    nWindow_per_sec = int(config.get("Spectrogram_Parameters", "nWindow_per_sec"))
-    lowcut = float(config.get("Spectrogram_Parameters", "lowcut"))
-    # Thresholds and file names dependant on whether processing d, v or p
-    if dvp == "d":
-        thresh_val = int(config.get("Spectrogram_Parameters", "thresh_val_d"))# log(m**2)
-        max_plot = int(config.get("Spectrogram_Parameters", "max_plot_d"))
-        amplitude_file_name = str(config.get("Spectrogram_Parameters", "amplitude_file_d"))
-    elif dvp == "wss":
-        thresh_val = int(config.get("Spectrogram_Parameters", "thresh_val_wss"))# log(Pa**2) this hasnt been investigated for wss
-        max_plot = int(config.get("Spectrogram_Parameters", "max_plot_wss"))
-        amplitude_file_name = str(config.get("Spectrogram_Parameters", "amplitude_file_wss"))
-    elif dvp == "v":
-        thresh_val = int(config.get("Spectrogram_Parameters", "thresh_val_v")) # log((m/s)**2)
-        max_plot = int(config.get("Spectrogram_Parameters", "max_plot_v"))
-        amplitude_file_name = str(config.get("Spectrogram_Parameters", "amplitude_file_v"))
-    else:
-        thresh_val = int(config.get("Spectrogram_Parameters", "thresh_val_p")) # log((Pa)**2)
-        max_plot = int(config.get("Spectrogram_Parameters", "max_plot_p"))
-        amplitude_file_name = str(config.get("Spectrogram_Parameters", "amplitude_file_p"))
-    flow_rate_file_name = str(config.get("Spectrogram_Parameters", "flow_rate_file_name"))
-
-    return overlapFrac, window, n_samples, nWindow_per_sec, lowcut, thresh_val, max_plot, amplitude_file_name, flow_rate_file_name
-
-def read_command_line_spec():
-    """Read arguments from commandline"""
-    parser = ArgumentParser()
-
-    parser.add_argument('--case', type=str, default="cyl_test", help="Path to simulation results",
-                        metavar="PATH")
-    parser.add_argument('--mesh', type=str, default="artery_coarse_rescaled", help="Mesh File Name",
-                        metavar="PATH")
-    parser.add_argument('--save_deg', type=int, default=2, help="Input save_deg of simulation, i.e whether the intermediate P2 nodes were saved. Entering save_deg = 1 when the simulation was run with save_deg = 2 will result in only the corner nodes being used in postprocessing")
-    parser.add_argument('--stride', type=int, default=1, help="Desired frequency of output data (i.e to output every second step, stride = 2)")
-    parser.add_argument('--start_t', type=float, default=0.0, help="Start time of simulation (s)")
-    parser.add_argument('--end_t', type=float, default=0.05, help="End time of simulation (s)")
-    parser.add_argument('--lowcut', type=float, default=25, help="High pass filter cutoff frequency (Hz)")
-    parser.add_argument('--ylim', type=float, default=800, help="y limit of spectrogram graph")
-    parser.add_argument('--sampling_region', type=str, default="sphere", help="sample within -sphere, or within specific -domain")
-    parser.add_argument('--fluid_sampling_domain_ID', type=int, default=1, help="Domain ID for fluid region to be sampled (need to input a labelled mesh with this ID)")
-    parser.add_argument('--solid_sampling_domain_ID', type=int, default=2, help="Domain ID for solid region to be sampled (need to input a labelled mesh with this ID)")
-    parser.add_argument('--r_sphere', type=float, default=1000000, help="Sphere in which to include points for spectrogram, this is the sphere radius")
-    parser.add_argument('--x_sphere', type=float, default=0.0, help="Sphere in which to include points for spectrogram, this is the x coordinate of the center of the sphere (in m)")
-    parser.add_argument('--y_sphere', type=float, default=0.0, help="Sphere in which to include points for spectrogram, this is the y coordinate of the center of the sphere (in m)")
-    parser.add_argument('--z_sphere', type=float, default=0.0, help="Sphere in which to include points for spectrogram, this is the z coordinate of the center of the sphere (in m)")
-    parser.add_argument('--dvp', type=str, default="v", help="Quantity to postprocess, input v for velocity, d for displacement, p for pressure, or wss for wall shear stress")
-    parser.add_argument('--Re_a', type=float, default=0.0, help="Assuming linearly increasing Reynolds number: Re(t) = Re_a*t + Re_b . if both Re_a and Re_b are 0, don't plot against Re.")
-    parser.add_argument('--Re_b', type=float, default=0.0, help="Assuming linearly increasing Reynolds number: Re(t) = Re_a*t + Re_b . if both Re_a and Re_b are 0, don't plot against Re.")
-    parser.add_argument('--interface_only', type=bool, default=False, help="True gives you only spectrogram for the fluid-solid interface, 'False' gives you the volumetric spectrogram for all fluid in the sac or all the nodes thru the wall")
-    parser.add_argument('--sampling_method', type=str, default="RandomPoint", help="'RandomPoint' (choose random nodes), 'SinglePoint' (choose Single Point with ID = 'point_id') or 'Spatial' (ensures uniform spatial sampling, e.g, in the case of fluid boundary layer the sampling will not bias towards the BL)")
-    parser.add_argument('--component', type=str, default="mag", help="x, y, z or mag (magnitude)")
-    parser.add_argument('--n_samples', type=int, default=10000, help="Number of samples for spectrogram (ignored for SinglePoint sampling)")
-    parser.add_argument('--point_id', type=int, default=-1000000, help="Point ID for SinglePoint sampling")
+    parser.add_argument('--overlap-frac', type=float, default=0.75,
+                        help="Fraction of overlap between adjacent windows.")
+    parser.add_argument('--window', type=str, default="blackmanharris",
+                        help="Window function to be used for spectrogram computation.")
+    parser.add_argument('--num-windows-per-sec', type=int, default=4,
+                        help="Number of windows per second for spectrogram computation.")
+    parser.add_argument('--thresh-val', type=int, default=None,
+                        help="Threshold value for the spectrogram. Default is determined based on the 'dvp' argument: "
+                             "if 'd', default is -42; if 'v', default is -20; if 'p', default is -5; if 'wss', "
+                             "default is -18.")
+    parser.add_argument('--max-plot', type=int, default=None,
+                        help="Maximum value for plotting the spectrogram. Default is determined based on the 'dvp' "
+                             "argument: if 'd', default is -30; if 'v', default is -7; if 'p', default is 5; if 'wss', "
+                             ", default is 0.")
+    parser.add_argument('--amplitude-file-name', type=Path, default=None,
+                        help="Name of the file containing displacement amplitude data.")
+    parser.add_argument('--flow-rate-file-name', type=Path, default="MCA_10",
+                        help="Name of the file containing flow rate data. Default is 'MCA_10'.")
 
     args = parser.parse_args()
 
-    return args.case, args.mesh, args.save_deg, args.stride, args.start_t, args.end_t, args.lowcut, args.ylim, args.sampling_region, args.fluid_sampling_domain_ID, args.solid_sampling_domain_ID, args.r_sphere, args.x_sphere, args.y_sphere, args.z_sphere, args.dvp, args.Re_a, args.Re_b, args.interface_only, args.sampling_method, args.component, args.n_samples, args.point_id
+    # Set default mesh path if not provided
+    args.mesh_path = args.folder / "Mesh" / "mesh.h5" if args.mesh_path is None else args.mesh_path
 
-
-def read_spectrogram_data(case_path, mesh_name, save_deg, stride, start_t, end_t, n_samples, ylim, sampling_region, fluid_sampling_domain_ID, solid_sampling_domain_ID,
-                          r_sphere, x_sphere, y_sphere, z_sphere, dvp, interface_only,component,point_id,flow_rate_file_name=None,sampling_method="RandomPoint"):
-
-
-    start = time.time()
-
-    case_name = os.path.basename(os.path.normpath(case_path)) # obtains only last folder in case_path
-    visualization_path = postprocessing_common_h5py.get_visualization_path(case_path)
-
-
-
-    #--------------------------------------------------------
-    # 1. Get names of relevant directories, files
-    #--------------------------------------------------------
-
-    if save_deg == 1:
-        mesh_path = case_path + "/mesh/" + mesh_name +".h5" # Mesh path. Points to the corner-node input mesh
+    # Set default thresh_val, max_plot and amplitude_file_name based in the dvp argument
+    if args.dvp == "d":
+        args.thresh_val = args.thresh_val if args.thresh_val is not None else -42
+        args.max_plot = args.max_plot if args.max_plot is not None else -30
+        args.amplitude_file_name = args.amplitude_file_name if args.amplitude_file_name is not None \
+            else f"displacement_amplitude_{args.lowcut}_to_100000.csv"
+    elif args.dvp == "v":
+        args.thresh_val = args.thresh_val if args.thresh_val is not None else -20
+        args.max_plot = args.max_plot if args.max_plot is not None else -7
+        args.amplitude_file_name = args.amplitude_file_name if args.amplitude_file_name is not None \
+            else f"velocity_amplitude_{args.lowcut}_to_100000.csv"
+    elif args.dvp == "p":
+        args.thresh_val = args.thresh_val if args.thresh_val is not None else -5
+        args.max_plot = args.max_plot if args.max_plot is not None else 5
+        args.amplitude_file_name = args.amplitude_file_name if args.amplitude_file_name is not None \
+            else f"pressure_amplitude_{args.lowcut}_to_100000.csv"
+    elif args.dvp == "wss":
+        args.thresh_val = args.thresh_val if args.thresh_val is not None else -18
+        args.max_plot = args.max_plot if args.max_plot is not None else 0
+        args.amplitude_file_name = args.amplitude_file_name if args.amplitude_file_name is not None \
+            else f"wss_amplitude_{args.lowcut}_to_100000.csv"
     else:
-        mesh_path = case_path + "/mesh/" + mesh_name +"_refined.h5" # Mesh path. Points to the visualization mesh with intermediate nodes
-    mesh_path_fluid = mesh_path.replace(".h5","_fluid_only.h5") # needed for formatting SPI data
+        print(f"ERROR: Invalid value for dvp - {args.dvp}. Please use 'd', 'v', 'p', or 'wss'.")
+        sys.exit(-1)
 
-    formatted_data_folder_name = "res_"+case_name+'_stride_'+str(stride)+"t"+str(start_t)+"_to_"+str(end_t)+"save_deg_"+str(save_deg)
-    formatted_data_folder = os.path.join(case_path,formatted_data_folder_name)
-    visualization_separate_domain_folder = os.path.join(visualization_path,"../Visualization_separate_domain")
-    visualization_hi_pass_folder = os.path.join(visualization_path,"../visualization_hi_pass")
+    return args
 
-    imageFolder = os.path.join(visualization_path,"../Spectrograms")
-    if not os.path.exists(imageFolder):
-        os.makedirs(imageFolder)
 
-    #  output folder and filenames (if these exist already, they will not be re-generated)
-    output_file_name = case_name+"_"+ dvp+"_"+component+".npz"
-    formatted_data_path = formatted_data_folder+"/"+output_file_name
+def read_spectrogram_data(folder: str, mesh_path: str, save_deg: int, stride: int, start_t: float, end_t: float,
+                          n_samples: int, ylim: float, sampling_region: str, fluid_sampling_domain_id: int,
+                          solid_sampling_domain_id: int, r_sphere: float, x_sphere: float, y_sphere: float,
+                          z_sphere: float, dvp: str, interface_only: bool, component: str, point_id: int,
+                          sampling_method: str = "RandomPoint"):
+    """
+    Read spectrogram data and perform processing steps.
 
-    t = time.time()
-    print("retrieved names")
-    print(t - start)
+    Args:
+        folder (str): Path to simulation results.
+        mesh_path (str): Path to the mesh file.
+        save_deg (int): Degree of mesh refinement.
+        stride (int): Desired frequency of output data.
+        start_t (float): Start time for data processing.
+        end_t (float): End time for data processing.
+        n_samples (int): Number of samples.
+        ylim (float): Y-axis limit of the spectrogram graph.
+        sampling_region (str): Region for sampling data ("sphere" or "domain").
+        fluid_sampling_domain_id (int): Domain ID for fluid sampling (used when sampling_region="domain").
+        solid_sampling_domain_id (int): Domain ID for solid sampling (used when sampling_region="domain").
+        r_sphere (float): Radius of the sphere (used when sampling_region="sphere").
+        x_sphere (float): X-coordinate of the sphere center (used when sampling_region="sphere").
+        y_sphere (float): Y-coordinate of the sphere center (used when sampling_region="sphere").
+        z_sphere (float): Z-coordinate of the sphere center (used when sampling_region="sphere").
+        dvp (str): Type of data to be processed.
+        interface_only (bool): Whether to include only interface ID's.
+        component (str): Component of the data to be visualized.
+        point_id (int): Point ID (used when sampling_method="SinglePoint").
+        sampling_method (str): Method for sampling data ("RandomPoint", "SinglePoint", or "Spatial").
 
-    #--------------------------------------------------------
+    Returns:
+        tuple: (Processed data type, DataFrame, Case name, Image folder, Hi-pass visualization folder).
+    """
+    start_time = timeit.default_timer()
+
+    case_name = Path(folder).parent.name
+    visualization_path = Path(folder) / "Visualization"
+
+    # 1. Get names of relevant directories, files
+
+    mesh_name_suffix = "" if save_deg == 1 else "_refined"
+    mesh_path = Path(mesh_path)
+    mesh_path = mesh_path.with_name(f"{mesh_path.stem}{mesh_name_suffix}{mesh_path.suffix}")
+    mesh_path_fluid = mesh_path.with_name(f"{mesh_path.stem}_fluid.h5")  # Needed for formatting SPI data
+
+    formatted_data_folder_name = f"res_{case_name}_stride_{stride}t{start_t}_to_{end_t}save_deg_{save_deg}"
+    formatted_data_folder = folder / formatted_data_folder_name
+    visualization_separate_domain_folder = folder / "Visualization_separate_domain"
+    visualization_hi_pass_folder = folder / "Visualization_hi_pass"
+
+    image_folder = folder / "Spectrograms"
+    image_folder.mkdir(parents=True, exist_ok=True)
+
+    output_file_name = f"{case_name}_{dvp}_{component}.npz"
+    formatted_data_path = formatted_data_folder / output_file_name
+
+    elapsed_time = timeit.default_timer() - start_time
+
     # 2. Prepare data
-    #--------------------------------------------------------
+
+    start_time = timeit.default_timer()
 
     # If the output file exists, don't re-make it
-    if os.path.exists(formatted_data_path):
-        print('path found!')
+    if formatted_data_path.exists():
+        print(f'Formatted data already exists at: {formatted_data_path}')
     elif dvp == "wss":
-        _ = postprocessing_common_h5py.create_transformed_matrix(visualization_separate_domain_folder, formatted_data_folder, mesh_path_fluid, case_name, start_t,end_t,dvp,stride)
+        create_transformed_matrix(visualization_separate_domain_folder, formatted_data_folder, mesh_path_fluid,
+                                  case_name, start_t, end_t, dvp, stride)
     else:
         # Make the output h5 files with dvp magnitudes
-        _ = postprocessing_common_h5py.create_transformed_matrix(visualization_path, formatted_data_folder, mesh_path, case_name, start_t,end_t,dvp,stride)
+        create_transformed_matrix(visualization_path, formatted_data_folder, mesh_path,
+                                  case_name, start_t, end_t, dvp, stride)
 
-    t = time.time()
-    print("made matrix")
-    print(t - start)
+    elapsed_time = timeit.default_timer() - start_time
+    print(f"Made matrix in {elapsed_time:.6f} seconds")
+
+    # 3. Read data
+
+    start_time = timeit.default_timer()
+
     # For spectrograms, we only want the magnitude
-    df = postprocessing_common_h5py.read_npz_files(formatted_data_path)
-    t = time.time()
-    print("read matrix")
-    print(t - start)
+    df = read_npz_files(formatted_data_path)
 
+    elapsed_time = timeit.default_timer() - start_time
+    print(f"Read matrix in {elapsed_time:.6f} seconds")
+
+    # 4. Process data and get ID's
+
+    start_time = timeit.default_timer()
 
     # We want to find the points in the sac, so we use a sphere to roughly define the sac.
     sac_center = np.array([x_sphere, y_sphere, z_sphere])
+
     if dvp == "wss":
-        outFile = os.path.join(visualization_separate_domain_folder,"WSS_ts.h5")
-        surfaceElements, coords = postprocessing_common_h5py.get_surface_topology_coords(outFile)
+        wss_output_file = visualization_separate_domain_folder / "WSS_ts.h5"
+        surface_elements, coords = get_surface_topology_coords(wss_output_file)
     else:
-        coords = postprocessing_common_h5py.get_coords(mesh_path)
+        coords = get_coords(mesh_path)
 
     if sampling_region == "sphere":
-        # Get wall and fluid ids
-        fluidIDs, wallIDs, allIDs = postprocessing_common_h5py.get_domain_ids(mesh_path)
-        interfaceIDs = postprocessing_common_h5py.get_interface_ids(mesh_path)
-        sphereIDs = find_points_in_sphere(sac_center,r_sphere,coords)
-        # Get nodes in sac only
-        allIDs=list(set(sphereIDs).intersection(allIDs))
-        fluidIDs=list(set(sphereIDs).intersection(fluidIDs))
-        wallIDs=list(set(sphereIDs).intersection(wallIDs))
-        interfaceIDs=list(set(sphereIDs).intersection(interfaceIDs))
+        # Get wall and fluid ID's
+        fluid_ids, wall_ids, all_ids = get_domain_ids(mesh_path)
+        interface_ids = get_interface_ids(mesh_path)
+        sphere_ids = find_points_in_sphere(sac_center, r_sphere, coords)
 
-    elif sampling_region == "domain": # To use this option, must input mesh with domain markers and indicate which domain represents the desired fluid region
-                                      # for the spectrogram (fluid_sampling_domain_ID) and which domain represents desired solid region (solid_sampling_domain_ID)
-        fluidIDs, wallIDs, allIDs = postprocessing_common_h5py.get_domain_ids_specified_region(mesh_path,fluid_sampling_domain_ID,solid_sampling_domain_ID)
-        interfaceIDs_set = set(fluidIDs) - (set(fluidIDs) - set(wallIDs))
-        interfaceIDs = list(interfaceIDs_set)
+        # Get nodes in sac only
+        all_ids = list(set(sphere_ids).intersection(all_ids))
+        fluid_ids = list(set(sphere_ids).intersection(fluid_ids))
+        wall_ids = list(set(sphere_ids).intersection(wall_ids))
+        interface_ids = list(set(sphere_ids).intersection(interface_ids))
+    elif sampling_region == "domain":
+        # To use this option, input a mesh with domain markers and indicate which domain represents the desired fluid
+        # region for the spectrogram (fluid_sampling_domain_id) and which domain represents the desired solid region
+        # (solid_sampling_domain_id).
+        fluid_ids, wall_ids, all_ids = \
+            get_domain_ids_specified_region(mesh_path, fluid_sampling_domain_id, solid_sampling_domain_id)
+        interface_ids_set = set(fluid_ids) - (set(fluid_ids) - set(wall_ids))
+        interface_ids = list(interface_ids_set)
     else:
-        #print("Need to specify sampling method as -sphere or -domain, got " + sampling_region)
-        raise Exception("Need to specify sampling method as -sphere or -domain, got " + sampling_region)
+        raise ValueError(f"Invalid sampling method '{sampling_region}'. Please specify 'sphere' or 'domain'.")
 
     if dvp == "wss":
-        region_ids = sphereIDs  # for wss spectrogram, we use all the nodes within the sphere because the input df only includes the wall
+        # For wss spectrogram, we use all the nodes within the sphere because the input df only includes the wall
+        region_ids = sphere_ids
     elif interface_only:
-        region_ids = interfaceIDs   # Use only the interface IDs
-        dvp=dvp+"_interface"
+        # Use only the interface IDs
+        region_ids = interface_ids
+        dvp = dvp + "_interface"
     elif dvp == "d":
-        region_ids = wallIDs    # For displacement spectrogram, we need to take only the wall IDs
+        # For displacement spectrogram, we need to take only the wall IDs
+        region_ids = wall_ids
     else:
-        region_ids = fluidIDs   # For pressure and velocity spectrogram, we need to take only the fluid IDs
+        # For pressure and velocity spectrogram, we need to take only the fluid IDs
+        region_ids = fluid_ids
 
-    t = time.time()
-    print("got IDs")
-    print(t - start)
+    elapsed_time = timeit.default_timer() - start_time
+    print(f"Got ID's in {elapsed_time:.6f} seconds")
 
-    # Sample data (reduce compute time by random sampling)
+    # 5. Sample data (reduce compute time by random sampling)
+
+    start_time = timeit.default_timer()
+
     if sampling_method == "RandomPoint":
         idx_sampled = np.random.choice(region_ids, n_samples)
     elif sampling_method == "SinglePoint":
         idx_sampled = [point_id]
-        case_name=case_name+"_"+sampling_method+"_"+str(point_id)
-        print("Single Point spectrogram for point: "+str(point_id))
-    elif sampling_method == "Spatial": # This method only works with a specified sphere
-        mesh, surf = postprocessing_common_pv.assemble_mesh(mesh_path)
+        case_name = f"{case_name}_{sampling_method}_{point_id}"
+        print(f"Single Point spectrogram for point: {point_id}")
+    elif sampling_method == "Spatial":
+        # See old code for implementation if needed
+        raise NotImplementedError("Spatial sampling method is not implemented.")
+    else:
+        raise ValueError(f"Invalid sampling method: {sampling_method}. Please choose from 'RandomPoint', "
+                         "'SinglePoint', or 'Spatial'.")
 
-        bounds = [x_sphere-r_sphere, x_sphere+r_sphere, y_sphere-r_sphere, y_sphere+r_sphere, z_sphere-r_sphere, z_sphere+r_sphere]
+    elapsed_time = timeit.default_timer() - start_time
+    print(f"Obtained sample points in {elapsed_time:.6f} seconds")
 
-
-        def generate_points(bounds, subdivisions=50):
-            x_points=np.linspace(bounds[0], bounds[1],num=subdivisions)
-            y_points=np.linspace(bounds[2], bounds[3],num=subdivisions)
-            z_points=np.linspace(bounds[4], bounds[5],num=subdivisions)
-            points = np.zeros((subdivisions**3,3))
-            for i in range(subdivisions):
-                for j in range(subdivisions):
-                    for k in range(subdivisions):
-                        ijk = (subdivisions**2)*i + subdivisions*j + k
-                        points[ijk,:] = [x_points[i], y_points[j], z_points[k]]
-            return points
-
-        t = time.time()
-        print("got surf")
-        print(t - start)
-        points = generate_points(bounds,subdivisions=50)
-
-        t = time.time()
-        print("generated points")
-        print(t - start)
-
-        point_cloud=pv.PolyData(points)
-        sphere = pv.Sphere(radius=r_sphere, center=(x_sphere, y_sphere, z_sphere))
-        surf_sel = point_cloud.select_enclosed_points(surf, tolerance=0.01).threshold(value=0.5,scalars='SelectedPoints')
-        sphere_sel = surf_sel.select_enclosed_points(sphere, tolerance=0.01).threshold(value=0.5,scalars='SelectedPoints')
-
-
-        t = time.time()
-        print("shaped point cloud")
-        print(t - start)
-        tree = KDTree(coords)
-        _, idx = tree.query(sphere_sel.points) #find closest node to the points in the equispaced points
-
-
-        t = time.time()
-        print("queried kdtree")
-        print(t - start)
-
-
-        # Make sure this is the correct order
-        equispaced_fluid_ids = [x for x in idx if x in region_ids]
-        idx_sampled = np.random.choice(equispaced_fluid_ids, n_samples)
-
-        idx_sampled_set = set(idx_sampled)
-        # compare the length and print if the list contains duplicates
-        if len(idx_sampled) != len(idx_sampled_set):
-            print("duplicates found in the list")
-        else:
-            print("No duplicates found in the list")
-
-        #sampled_point_cloud=pv.PolyData(coords[idx_sampled])
-        #plotter= pv.Plotter(off_screen=True)
-
-        #plotter.add_mesh(surf,
-        #                color='red',
-        #                show_scalar_bar=False,
-        #                opacity=0.05)
-        #plotter.add_points(sampled_point_cloud, render_points_as_spheres=True, point_size=0.03)
-        #plotter.show(auto_close=False)
-        #plotter.show(screenshot=imageFolder + "/points"+str(idx_sampled[0])+".png")
-
-        case_name=case_name+"_"+sampling_method
-
-    t = time.time()
-    print("obtained sample points")
-    print(t - start)
+    start_time = timeit.default_timer()
 
     df = df.iloc[idx_sampled]
-    dvp=dvp+"_"+component
-    dvp=dvp+"_"+str(n_samples)
-    t = time.time()
-    print("sampled dataframe")
-    print(t - start)
+    dvp = f"{dvp}_{component}_{n_samples}"
 
-    return dvp, df, case_name, case_path, imageFolder, visualization_hi_pass_folder
+    elapsed_time = timeit.default_timer() - start_time
+    print(f"Sampled dataframe in {elapsed_time:.6f} seconds")
 
-def get_location_from_pointID(probeID,polydata):
-    nearestPointLoc = [10000,10000,10000]
-    polydata.GetPoint(probeID,nearestPointLoc)
-    return nearestPointLoc
+    return dvp, df, case_name, image_folder, visualization_hi_pass_folder
 
 
-def find_points_in_sphere(cent,rad,coords):
+def find_points_in_sphere(center: np.ndarray, radius: float, coords: np.ndarray) -> np.ndarray:
+    """
+    Find points within a sphere defined by its center and radius.
 
-    # Calculate vector from  center to each node in the mesh
-    x=coords[:,0]-cent[0]
-    y=coords[:,1]-cent[1]
-    z=coords[:,2]-cent[2]
+    Args:
+        center (np.ndarray): The center of the sphere as a 1D NumPy array with shape (3,).
+        radius (float): The radius of the sphere.
+        coords (np.ndarray): The coordinates of mesh nodes as a 2D NumPy array with shape (n, 3).
 
-    # Assemble into vector ((vectorPoint))
-    vectorPoint=np.c_[x,y,z]
+    Returns:
+        np.ndarray: Indices of points within the sphere.
+    """
+    # Calculate vector from center to each node in the mesh
+    vector_point = coords - center
 
     # Calculate distance from each mesh node to center
-    radius_nodes = np.sqrt(x**2+y**2+z**2)
+    radius_nodes = np.linalg.norm(vector_point, axis=1)
 
-    # get all points in sphere
-    points_in_sphere_list=[index for index,value in enumerate(radius_nodes) if value < rad]
-    points_in_sphere = np.array(points_in_sphere_list)
+    # Get all points in the sphere
+    points_in_sphere = np.where(radius_nodes < radius)[0]
 
     return points_in_sphere
 
 
-def get_psd(dfNearest,fsamp,scaling="density"):
+def shift_bit_length(x: int) -> int:
+    """
+    Round up to the nearest power of 2.
+
+    Args:
+        x (int): Input integer.
+
+    Returns:
+        int: The smallest power of 2 greater than or equal to the input.
+
+    Author:
+        Daniel Macdonald
+    """
+    return 1 << (x - 1).bit_length()
+
+
+def get_psd(dfNearest: pd.DataFrame, fsamp: float, scaling: str = "density") -> tuple:
+    """
+    Calculate the Power Spectral Density (PSD) of a DataFrame of signals.
+
+    Args:
+        dfNearest (pd.DataFrame): DataFrame containing signals in rows.
+        fsamp (float): Sampling frequency of the signals.
+        scaling (str, optional): Scaling applied to the PSD. Default is "density".
+
+    Returns:
+        tuple: A tuple containing the mean PSD matrix and the corresponding frequency values.
+    """
     if dfNearest.shape[0] > 1:
-        #print("> 1")
+        Pxx_matrix = np.zeros_like(periodogram(dfNearest.iloc[0], fs=fsamp, window='blackmanharris')[1])
+
         for each in range(dfNearest.shape[0]):
             row = dfNearest.iloc[each]
-            f, Pxx = periodogram(row,fs=fsamp,window='blackmanharris',scaling=scaling)
+            f, Pxx = periodogram(row, fs=fsamp, window='blackmanharris', scaling=scaling)
+            Pxx_matrix += Pxx
+
+        Pxx_mean = Pxx_matrix / dfNearest.shape[0]
+    else:
+        f, Pxx_mean = periodogram(dfNearest.iloc[0], fs=fsamp, window='blackmanharris')
+
+    return Pxx_mean, f
+
+
+def get_spectrogram(dfNearest: pd.DataFrame, fsamp: float, nWindow: int, overlapFrac: float, window: str,
+                    start_t: float, end_t: float, scaling: str = 'spectrum', interpolate: bool = False) -> tuple:
+    """
+    Calculates spectrogram.
+
+    Args:
+        dfNearest (pd.DataFrame): DataFrame of shape (num_points, num_timesteps).
+        fsamp (float): Sampling frequency.
+        nWindow (int): Number of samples per window.
+        overlapFrac (float): Fraction of overlap between windows.
+        window (str): Window function for spectrogram.
+        start_t (float): Start time for the spectrogram.
+        end_t (float): End time for the spectrogram.
+        scaling (str, optional): Scaling for the spectrogram ('density' or 'spectrum'). Default is 'spectrum'.
+        interpolate (bool, optional): Perform interpolation. Default is False.
+
+    Returns:
+        tuple: Power Spectral Density matrix (Pxx_mean), frequency values (freqs), and time bins (bins).
+
+    Author:
+        Daniel Macdonald
+    """
+    NFFT = shift_bit_length(int(dfNearest.shape[1] / nWindow))
+
+    if dfNearest.shape[0] > 1:
+        for each in range(dfNearest.shape[0]):
+            row = dfNearest.iloc[each]
+            freqs, bins, Pxx = spectrogram(row, fs=fsamp, nperseg=NFFT, noverlap=int(overlapFrac * NFFT),
+                                           nfft=2 * NFFT, window=window, scaling=scaling)
             if each == 0:
                 Pxx_matrix = Pxx
             else:
                 Pxx_matrix = Pxx_matrix + Pxx
-                # Pxx_matrix = np.dstack((Pxx_matrix,Pxx))
-        Pxx_mean = Pxx_matrix/dfNearest.shape[0]
     else:
-        #print("<= 1")
+        freqs, bins, Pxx_matrix = spectrogram(dfNearest.iloc[0], fs=fsamp, nperseg=NFFT,
+                                              noverlap=int(overlapFrac * NFFT), nfft=2 * NFFT,
+                                              window=window, scaling=scaling)
 
-        f,Pxx_mean = periodogram(dfNearest.iloc[0],fs=fsamp,window='blackmanharris')
+    Pxx_mean = Pxx_matrix / dfNearest.shape[0] if dfNearest.shape[0] > 1 else Pxx_matrix
 
-    return Pxx_mean, f
+    if interpolate:
+        interp_spline = RectBivariateSpline(freqs, bins, Pxx_mean, kx=3, ky=3)
+        bins = np.linspace(start_t, end_t, 100)
+        Pxx_mean = interp_spline(freqs, bins)
 
-def butter_bandpass(lowcut, highcut, fs, order=5, btype='band'):
-    '''
-    Note: if highcut selected, 'highcut' is not used
-    lowcut = cutoff frequency for low cut
-    highcut = cutoff frequency for high cut
-    fs is samples per second
-    returns filter coeff for butter_bandpass_filter function
-    '''
+    Pxx_mean[Pxx_mean < 0] = 1e-16
+
+    return Pxx_mean, freqs, bins
+
+
+def spectrogram_scaling(Pxx_mean: np.ndarray, lower_thresh: float) -> tuple:
+    """
+    Scale a spectrogram.
+
+    Args:
+        Pxx_mean (np.ndarray): Power Spectral Density matrix.
+        lower_thresh (float): Threshold value for scaling.
+
+    Returns:
+        tuple: Scaled Power Spectral Density matrix (Pxx_scaled), maximum value after scaling (max_val),
+            minimum value after scaling (min_val), and the lower threshold used for scaling.
+
+    Author:
+        Daniel Macdonald
+    """
+    Pxx_scaled = np.log(Pxx_mean)
+    max_val = np.max(Pxx_scaled)
+    min_val = np.min(Pxx_scaled)
+    print('Pxx_scaled max', max_val)
+    print('Pxx_scaled max', min_val)
+    print('Pxx threshold', lower_thresh)
+    Pxx_threshold_indices = Pxx_scaled < lower_thresh
+    Pxx_scaled[Pxx_threshold_indices] = lower_thresh
+
+    return Pxx_scaled, max_val, min_val, lower_thresh
+
+
+def butter_bandpass(lowcut: float, highcut: float, fs: float, order: int = 5, btype: str = 'band') -> tuple:
+    """
+    Design a Butterworth bandpass, bandstop, highpass, or lowpass filter.
+
+    Args:
+        lowcut (float): Cutoff frequency for low cut.
+        highcut (float): Cutoff frequency for high cut (ignored if btype is 'highpass').
+        fs (float): Sampling frequency in samples per second.
+        order (int, optional): Order of the filter. Default is 5.
+        btype (str, optional): Type of filter ('band', 'stop', 'highpass', 'lowpass', or 'bandpass'). Default is 'band'.
+
+    Returns:
+        tuple: Numerator (b) and denominator (a) coefficients of the filter.
+    """
     nyq = 0.5 * fs
     low = lowcut / nyq
     high = highcut / nyq
+
     if btype == 'band':
         b, a = butter(order, [low, high], btype='band')
     elif btype == 'stop':
@@ -354,147 +488,96 @@ def butter_bandpass(lowcut, highcut, fs, order=5, btype='band'):
         b, a = butter(order, high, btype='lowpass')
     elif 'pass' in btype:
         b, a = butter(order, [low, high], btype='bandpass')
+
     return b, a
 
-def plot_spectrogram(fig1,ax1,bins,freqs,Pxx,ylim_,title=None,convert_a=0.0,convert_b=0.0,x_label=None,color_range=None):
 
-    if color_range == None:
-        im = ax1.pcolormesh(bins, freqs, Pxx, shading = 'gouraud')#, vmin = -30, vmax = -4) # look up in matplotlib to add colorbar
-    else:
-        im = ax1.pcolormesh(bins, freqs, Pxx, shading = 'gouraud', vmin = color_range[0], vmax = color_range[1]) # look up in matplotlib to add colorbar
+def butter_bandpass_filter(data: np.ndarray, lowcut: float = 25.0, highcut: float = 15000.0, fs: float = 2500.0,
+                            order: int = 5, btype: str = 'band') -> np.ndarray:
+    """
+    Apply a Butterworth bandpass, bandstop, highpass, or lowpass filter to the input data.
 
+    Args:
+        data (np.ndarray): Input data to filter.
+        lowcut (float, optional): Low cutoff frequency. Default is 25.0.
+        highcut (float, optional): High cutoff frequency. Default is 15000.0.
+        fs (float, optional): Sampling frequency. Default is 2500.0.
+        order (int, optional): Order of the filter. Default is 5.
+        btype (str, optional): Type of filter ('band', 'stop', 'highpass', 'lowpass'). Default is 'band'.
 
-    fig1.colorbar(im, ax=ax1)
-    #fig1.set_size_inches(10, 7) #fig1.set_size_inches(10, 7)
+    Returns:
+        np.ndarray: Filtered data.
 
-    if title != None:
-        ax1.set_title('{}'.format(title),y=1.08)
-    if x_label != None:
-        ax1.set_xlabel(x_label)
-    ax1.set_ylabel('Frequency [Hz]')
-    ax1.set_ylim([0,ylim_]) # new
-    if convert_a > 0.000001 or convert_b > 0.000001:
-        ax2 = ax1.twiny()
-        ax2.set_xlim(ax1.get_xlim())
-        def time_convert(x):
-            return np.round(x*convert_a + convert_b,decimals=2)
-
-        ax2.set_xticks( ax1.get_xticks() )
-        ax2.set_xticklabels(time_convert(ax1.get_xticks()))
-        ax2.set_xlabel(x_label)
-
-
-def plot_chromagram(fig1,ax1,bins,chroma,title=None,path=None,convert_a=1.0,convert_b=0.0,x_label=None,shading='gouraud',color_range=None):
-    #plt.figure(figsize=(14,7)) #fig size same as before
-
-    bins = bins*convert_a+convert_b
-    #fig1, ax1 = plt.subplots()
-    chroma_y = np.linspace(0,1,chroma.shape[0])
-    if color_range == None:
-        im = ax1.pcolormesh(bins, chroma_y, chroma, shading =shading)#, vmin = -30, vmax = -4) # look up in matplotlib to add colorbar
-    else:
-        im = ax1.pcolormesh(bins, chroma_y, chroma, shading =shading, vmin = color_range[0], vmax = color_range[1]) # look up in matplotlib to add colorbar
-
-    fig1.colorbar(im, ax=ax1)
-    #fig1.set_size_inches(8, 4) #fig1.set_size_inches(10, 7)
-
-    ax1.set_ylabel('Chroma')
-    if title != None:
-        ax1.set_title('{}'.format(title))
-    if x_label != None:
-        ax1.set_xlabel(x_label)
-
-    if path != None:
-        fig1.savefig(path)
-        path_csv = path.replace(".png",".csv")
-        np.savetxt(path_csv, chroma, delimiter=",")
-
-
-# Functions authored by Daniel Mcdonald
-# =====================================
-
-
-def shift_bit_length(x):
-    '''
-    round up to nearest pwr of 2
-    https://stackoverflow.com/questions/14267555/find-the-smallest-power-of-2-greater-than-n-in-python
-    '''
-    return 1<<(x-1).bit_length()
-
-
-def get_spectrogram(dfNearest,fsamp,nWindow,overlapFrac,window,start_t,end_t, scaling='spectrum', interpolate = False):
-    '''
-    Calculates spectrogram
-    input dfNearest is a pandas df of shape (num_points, num_timesteps)
-    fsamp is sampling frequency
-    Use scaling = 'angle' for phase
-
-    scaling{ ‘density’, ‘spectrum’ }, optional: power spectral density (‘density’) where Sxx has units of V**2/Hz or power spectrum (‘spectrum’) where Sxx has units of V**2, if x is measured in V and fs is measured in Hz. Defaults to ‘density’.
-
-    '''
-    NFFT = shift_bit_length(int(dfNearest.shape[1]/nWindow)) # Could change to /5
-    #print(dfNearest.shape[0])
-
-    if dfNearest.shape[0] > 1:
-        #print("> 1")
-        for each in range(dfNearest.shape[0]):
-            row = dfNearest.iloc[each]
-            #freqs,bins,Pxx = spectrogram(row,\
-            #    fs=fsamp)#,nperseg=NFFT,noverlap=int(overlapFrac*NFFT))#,nfft=2*NFFT,window=window)#,scaling=scaling)
-            freqs,bins,Pxx = spectrogram(row,\
-                fs=fsamp,nperseg=NFFT,noverlap=int(overlapFrac*NFFT),nfft=2*NFFT,window=window,scaling=scaling)
-            #print(np.max(Pxx))
-            if each == 0:
-                Pxx_matrix = Pxx
-            else:
-                Pxx_matrix = Pxx_matrix + Pxx
-                # Pxx_matrix = np.dstack((Pxx_matrix,Pxx))
-        Pxx_mean = Pxx_matrix/dfNearest.shape[0]
-    else:
-        #print("<= 1")
-
-        freqs,bins,Pxx_mean = spectrogram(dfNearest.iloc[0],\
-            fs=fsamp,nperseg=NFFT,noverlap=int(overlapFrac*NFFT),nfft=2*NFFT,window=window,scaling=scaling)
-
-    if interpolate == True:
-        interp_spline = RectBivariateSpline(freqs, bins, Pxx_mean, kx=3, ky=3)
-        bins = np.linspace(start_t,end_t,100) #arange(-xmax, xmax, dx2)
-        # freqs = np.linspace(0,freqs.max(),100) #np.arange(-ymax, ymax, dy2)
-        Pxx_mean = interp_spline(freqs, bins)
-        print('bins shape, freqs shape, pxx shape', bins.shape, freqs.shape, Pxx_mean.shape)
-
-    Pxx_mean[Pxx_mean<0] = 1e-16
-    return Pxx_mean, freqs, bins
-
-def spectrogram_scaling(Pxx_mean,lower_thresh):
-    Pxx_scaled = np.log(Pxx_mean)
-    max_val = np.max(Pxx_scaled)
-    min_val = np.min(Pxx_scaled)
-    print('Pxx_scaled max', max_val)
-    print('Pxx_scaled max', min_val)
-    print('Pxx threshold', lower_thresh)
-    Pxx_threshold_indices = Pxx_scaled < lower_thresh
-    Pxx_scaled[Pxx_threshold_indices] = lower_thresh
-    return Pxx_scaled, max_val, min_val, lower_thresh
-
-def butter_bandpass_filter(data, lowcut=25.0, highcut=15000.0, fs=2500.0, order=5, btype='band'):
-    b, a = butter_bandpass(lowcut, highcut, fs, order=order,btype=btype)
+    Author:
+        Daniel Macdonald
+    """
+    b, a = butter_bandpass(lowcut, highcut, fs, order=order, btype=btype)
     y = filtfilt(b, a, data)
     return y
 
-def filter_time_data(df,fs,lowcut=25.0,highcut=15000.0,order=6,btype='highpass'):
+
+def filter_time_data(df: pd.DataFrame, fs: float, lowcut: float = 25.0, highcut: float = 15000.0,
+                      order: int = 6, btype: str = 'highpass') -> pd.DataFrame:
+    """
+    Apply a Butterworth highpass, lowpass, bandpass, or bandstop filter to the time series data in a DataFrame.
+
+    Args:
+        df (pd.DataFrame): Input DataFrame containing time series data.
+        fs (float): Sampling frequency.
+        lowcut (float, optional): Low cutoff frequency. Default is 25.0.
+        highcut (float, optional): High cutoff frequency. Default is 15000.0.
+        order (int, optional): Order of the filter. Default is 6.
+        btype (str, optional): Type of filter ('highpass', 'lowpass', 'bandpass', 'bandstop'). Default is 'highpass'.
+
+    Returns:
+        pd.DataFrame: DataFrame containing filtered time series data.
+
+    Author:
+        Daniel Macdonald
+    """
     df_filtered = df.copy()
+
     for row in range(df.shape[0]):
-        df_filtered.iloc[row] = butter_bandpass_filter(df.iloc[row],lowcut=lowcut,highcut=highcut,fs=fs,order=order,btype=btype)
+        df_filtered.iloc[row] = butter_bandpass_filter(df.iloc[row], lowcut=lowcut, highcut=highcut, fs=fs,
+                                                       order=order, btype=btype)
+
     return df_filtered
 
-def compute_average_spectrogram(df, fs, nWindow,overlapFrac,window,start_t,end_t,thresh, scaling="spectrum", filter_data=False,thresh_method="new"):
-    if filter_data == True:
-        df = filter_time_data(df,fs)
 
-    Pxx_mean, freqs, bins = get_spectrogram(df,fs,nWindow,overlapFrac,window,start_t,end_t, scaling) # mode of the spectrogram
+def compute_average_spectrogram(df: pd.DataFrame, fs: float, nWindow: int, overlapFrac: float, window: str,
+                                 start_t: float, end_t: float, thresh: float, scaling: str = "spectrum",
+                                 filter_data: bool = False, thresh_method: str = "new") -> tuple:
+    """
+    Compute the average spectrogram for a DataFrame of time series data.
+
+    Args:
+        df (pd.DataFrame): Input DataFrame containing time series data.
+        fs (float): Sampling frequency.
+        nWindow (int): Number of samples per window.
+        overlapFrac (float): Fraction of overlap between windows.
+        window (str): Window function for spectrogram.
+        start_t (float): Start time for the spectrogram.
+        end_t (float): End time for the spectrogram.
+        thresh (float): Threshold value for scaling.
+        scaling (str, optional): Scaling for the spectrogram ('density' or 'spectrum'). Default is 'spectrum'.
+        filter_data (bool, optional): Apply a Butterworth highpass filter to the data. Default is False.
+        thresh_method (str, optional): Method for thresholding ('old', 'log_only', 'new'). Default is 'new'.
+
+    Returns:
+        tuple: Time bins (bins), frequency values (freqs), scaled Power Spectral Density matrix (Pxx_scaled),
+            maximum value after scaling (max_val), minimum value after scaling (min_val), and the lower threshold
+            used for scaling.
+
+    Author:
+        Daniel Macdonald
+    """
+    if filter_data:
+        df = filter_time_data(df, fs)
+
+    Pxx_mean, freqs, bins = get_spectrogram(df, fs, nWindow, overlapFrac, window, start_t, end_t, scaling)
+
     if thresh_method == "old":
-        Pxx_scaled, max_val, min_val, lower_thresh = spectrogram_scaling(Pxx_mean,thresh)
+        Pxx_scaled, max_val, min_val, lower_thresh = spectrogram_scaling(Pxx_mean, thresh)
     elif thresh_method == "log_only":
         Pxx_scaled = np.log(Pxx_mean)
         max_val = np.max(Pxx_scaled)
@@ -506,10 +589,76 @@ def compute_average_spectrogram(df, fs, nWindow,overlapFrac,window,start_t,end_t
         min_val = np.min(Pxx_scaled)
         lower_thresh = "None"
 
-    #print('Pxx_scaled max', Pxx_scaled.max())
     return bins, freqs, Pxx_scaled, max_val, min_val, lower_thresh
 
-def chromagram_from_spectrogram(Pxx,fs,n_fft,n_chroma=24,norm=True):
+
+def plot_spectrogram(fig1: plt.Figure, ax1: plt.Axes, bins: np.ndarray, freqs: np.ndarray,
+                     Pxx: np.ndarray, ylim_: float, title: str = None, convert_a: float = 0.0, convert_b: float = 0.0,
+                     x_label: str = None, color_range: tuple = None) -> None:
+    """
+    Plot a spectrogram.
+
+    Args:
+        fig1 (plt.Figure): Matplotlib figure to plot on.
+        ax1 (plt.Axes): Matplotlib axes to plot on.
+        bins (np.ndarray): Time bins.
+        freqs (np.ndarray): Frequency values.
+        Pxx (np.ndarray): Power spectral density values.
+        ylim_ (float): Maximum frequency to display on the y-axis.
+        title (str, optional): Title of the plot. Default is None.
+        convert_a (float, optional): Conversion factor for the x-axis. Default is 0.0.
+        convert_b (float, optional): Offset for the x-axis conversion. Default is 0.0.
+        x_label (str, optional): Label for the x-axis. Default is None.
+        color_range (tuple, optional): Range for the color scale. Default is None.
+
+    Returns:
+        None
+    """
+    if color_range is None:
+        im = ax1.pcolormesh(bins, freqs, Pxx, shading='gouraud')
+    else:
+        im = ax1.pcolormesh(bins, freqs, Pxx, shading='gouraud', vmin=color_range[0], vmax=color_range[1])
+
+    fig1.colorbar(im, ax=ax1)
+
+    if title is not None:
+        ax1.set_title('{}'.format(title), y=1.08)
+    if x_label is not None:
+        ax1.set_xlabel(x_label)
+    ax1.set_ylabel('Frequency [Hz]')
+    ax1.set_ylim([0, ylim_])
+
+    if convert_a > 0.000001 or convert_b > 0.000001:
+        ax2 = ax1.twiny()
+        ax2.set_xlim(ax1.get_xlim())
+
+        def time_convert(x):
+            return np.round(x * convert_a + convert_b, decimals=2)
+
+        ax2.set_xticks(ax1.get_xticks())
+        ax2.set_xticklabels(time_convert(ax1.get_xticks()))
+        ax2.set_xlabel(x_label)
+
+
+def chromagram_from_spectrogram(Pxx: np.ndarray, fs: float, n_fft: int, n_chroma: int = 24,
+                                norm: Union[bool, str] = True) -> np.ndarray:
+    """
+    Calculate chromagram from a spectrogram.
+
+    Args:
+        Pxx (np.ndarray): Input spectrogram.
+        fs (float): Sampling frequency.
+        n_fft (int): Number of FFT points.
+        n_chroma (int, optional): Number of chroma bins. Default is 24.
+        norm (bool, optional): Normalize chroma. Options are 'max', 'sum', or False for no normalization.
+           Default is True.
+
+    Returns:
+        np.ndarray: Chromagram.
+
+    Author:
+        Daniel Macdonald
+    """
     # Calculate chroma filterbank
     chromafb = chroma_filterbank(
         sr=fs,
@@ -518,33 +667,104 @@ def chromagram_from_spectrogram(Pxx,fs,n_fft,n_chroma=24,norm=True):
         n_chroma=n_chroma,
         ctroct=5,
         octwidth=2,
-        )
+    )
+
     # Calculate chroma
-    chroma = np.dot(chromafb,Pxx)
+    chroma = np.dot(chromafb, Pxx)
+
     # Normalize
-    if norm == "max": # normalize chroma so that the maximum value is 1 in each column
+    if norm == "max":
+        # Normalize chroma so that the maximum value is 1 in each column
         chroma = normalize(chroma, norm=np.inf, axis=0)
-    elif norm == "sum": # normalize chroma so that each column sums to 1
-        chroma = (chroma / np.sum(chroma,axis=0)) # Chroma must sum to one for entropy fuction to work
+    elif norm == "sum":
+        # Normalize chroma so that each column sums to 1
+        chroma = (chroma / np.sum(chroma, axis=0))  # Chroma must sum to one for entropy fuction to work
     else:
         print("Raw chroma selected")
 
     return chroma
 
-def calc_chroma_entropy(chroma,n_chroma):
+
+def calc_chroma_entropy(chroma: np.ndarray, n_chroma: int) -> np.ndarray:
+    """
+    Calculate chroma entropy.
+
+    Args:
+        chroma (np.ndarray): Chromagram.
+        n_chroma (int): Number of chroma bins.
+
+    Returns:
+        np.ndarray: Chroma entropy.
+
+    Author:
+        Daniel Macdonald
+    """
     chroma_entropy = -np.sum(chroma * np.log(chroma), axis=0) / np.log(n_chroma)
-    #print(np.sum(chroma,axis=0))
-    #chroma_entropy = entropy(normed_power) / np.log(n_chroma)
-    #chroma_entropy = entropy(normed_power, axis=0) / np.log(n_chroma)
     return 1 - chroma_entropy
 
-def get_sampling_constants(df,start_t,end_t):
-    '''
-    T = period, in seconds,
-    nsamples = samples per cycle
-    fs = sample rate
-    '''
+
+def plot_chromagram(fig1: plt.Figure, ax1: plt.Axes, bins: np.ndarray, chroma: np.ndarray,
+                    title: str = None, path: str = None, convert_a: float = 1.0, convert_b: float = 0.0,
+                    x_label: str = None, shading: str = 'gouraud', color_range: tuple = None) -> None:
+    """
+    Plot a chromagram.
+
+    Args:
+        fig1 (plt.Figure): Matplotlib figure to plot on.
+        ax1 (plt.Axes): Matplotlib axes to plot on.
+        bins (np.ndarray): Time bins.
+        chroma (np.ndarray): Chromagram values.
+        title (str, optional): Title of the plot. Default is None.
+        path (str, optional): Path to save the figure. Default is None.
+        convert_a (float, optional): Conversion factor for the x-axis. Default is 1.0.
+        convert_b (float, optional): Offset for the x-axis conversion. Default is 0.0.
+        x_label (str, optional): Label for the x-axis. Default is None.
+        shading (str, optional): Shading style for the plot. Default is 'gouraud'.
+        color_range (tuple, optional): Range for the color scale. Default is None.
+
+    Returns:
+        None
+    """
+    bins = bins * convert_a + convert_b
+
+    chroma_y = np.linspace(0, 1, chroma.shape[0])
+
+    if color_range is None:
+        im = ax1.pcolormesh(bins, chroma_y, chroma, shading=shading)
+    else:
+        im = ax1.pcolormesh(bins, chroma_y, chroma, shading=shading, vmin=color_range[0], vmax=color_range[1])
+
+    fig1.colorbar(im, ax=ax1)
+
+    ax1.set_ylabel('Chroma')
+
+    if title is not None:
+        ax1.set_title('{}'.format(title))
+    if x_label is not None:
+        ax1.set_xlabel(x_label)
+
+    if path is not None:
+        fig1.savefig(path)
+        path_csv = path.replace(".png", ".csv")
+        np.savetxt(path_csv, chroma, delimiter=",")
+
+
+def get_sampling_constants(df: pd.DataFrame, start_t: float, end_t: float) -> tuple:
+    """
+    Get sampling constants such as period, number of samples, and sample rate.
+
+    Args:
+        df (pd.DataFrame): Input DataFrame containing time series data.
+        start_t (float): Start time of the data.
+        end_t (float): End time of the data.
+
+    Returns:
+        tuple: Period, number of samples, and sample rate.
+
+    Author:
+        Daniel Macdonald
+    """
     T = end_t - start_t
     nsamples = df.shape[1]
-    fs = nsamples/T
+    fs = nsamples / T
     return T, nsamples, fs
