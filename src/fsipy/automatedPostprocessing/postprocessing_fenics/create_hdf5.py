@@ -85,12 +85,14 @@ def create_hdf5(visualization_path, mesh_path, save_time_step, stride, start_tim
     # Open up the first velocity.h5 file to get the number of timesteps and nodes for the output data
     file = visualization_path / h5file_name_list[0]
     vector_data = h5py.File(str(file))
-    vector_array = vector_data['VisualisationVector/0'][fluid_ids, :]
+    vector_array_all = vector_data['VisualisationVector/0'][:, :]
+    vector_array = vector_array_all[fluid_ids, :]
 
     # Open up the first displacement.h5 file to get the number of timesteps and nodes for the output data
     file_d = visualization_path / h5file_name_list_d[0]
     vector_data_d = h5py.File(str(file_d))
-    vector_array_d = vector_data['VisualisationVector/0'][d_ids, :]
+    vector_array_all_d = vector_data_d['VisualisationVector/0'][:, :]
+    vector_array_d = vector_array_all_d[d_ids, :]
 
     # Deinfe path to the output files
     u_output_path = visualization_path / "u.h5"
