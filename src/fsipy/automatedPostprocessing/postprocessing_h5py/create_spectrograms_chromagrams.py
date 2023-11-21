@@ -13,10 +13,10 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from scipy.io import wavfile
 
 from fsipy.automatedPostprocessing.postprocessing_h5py import spectrograms as spec
 from fsipy.automatedPostprocessing.postprocessing_h5py.postprocessing_common_h5py import sonify_point
+
 
 def create_spectrogram_composite(case_name: str, dvp: str, df: pd.DataFrame, start_t: float, end_t: float,
                                  num_windows_per_sec: float, overlap_frac: float, window: str, lowcut: float,
