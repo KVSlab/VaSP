@@ -4,9 +4,19 @@
 from pathlib import Path
 import json
 
-from dolfin import Mesh, HDF5File, VectorFunctionSpace, Function, MPI, parameters, XDMFFile
+from dolfin import (
+    Mesh,
+    HDF5File,
+    VectorFunctionSpace,
+    Function,
+    MPI,
+    parameters,
+    XDMFFile,
+)
 from vampy.automatedPostprocessing.postprocessing_common import get_dataset_names
-from fsipy.automatedPostprocessing.postprocessing_fenics import postprocessing_fenics_common
+from fsipy.automatedPostprocessing.postprocessing_fenics import (
+    postprocessing_fenics_common,
+)
 
 
 # set compiler arguments
@@ -17,49 +27,61 @@ def create_separate_domain_visualization(visualization_path, mesh_path, stride=1
     """
     Loads displacement and velocity from .h5 file given by create_hdf5.py,
     converts and saves to .xdmf format for visualization (in e.g. ParaView).
-    This function works with MPI.
+    This function works with MPI. If the displacement was saved for the entire domain,
+    no additional xdmf file will be created for the displacement.
 
     Args:
         visualization_path (Path): Path to the visualization folder
-        mesh_path (Path): Path to the mesh file
+        mesh_path (Path): Path to the mesh that contains both fluid and solid domain
         stride (int): Save frequency of visualization output (default: 1)
     """
     # Path to the input files
     try:
+        file_path_d = visualization_path / "d_solid.h5"
+        assert file_path_d.exists()
+        extract_solid_only = True
+        if MPI.rank(MPI.comm_world) == 0:
+            print("--- Using d_solid.h5 file \n")
+    except AssertionError:
         file_path_d = visualization_path / "d.h5"
         assert file_path_d.exists()
         extract_solid_only = False
         if MPI.rank(MPI.comm_world) == 0:
-            print("--- Using d.h5 file \n")
-    except AssertionError:
-        file_path_d = visualization_path / "d_solid.h5"
-        extract_solid_only = True
-        if MPI.rank(MPI.comm_world) == 0:
-            print("--- Using d_solid.h5 file \n")
+            print("--- displacement is for the entire domain \n")
+            print("--- No additional xdmf file will be created for displacement \n")
 
     file_path_u = visualization_path / "u.h5"
 
-    assert file_path_d.exists(), f"Displacement file {file_path_d} not found. Make sure to run create_hdf5.py first."
-    assert file_path_u.exists(), f"Velocity file {file_path_u} not found.  Make sure to run create_hdf5.py first."
+    assert (
+        file_path_d.exists()
+    ), f"Displacement file {file_path_d} not found. Make sure to run create_hdf5.py first."
+    if extract_solid_only:
+        assert (
+            file_path_u.exists()
+        ), f"Velocity file {file_path_u} not found.  Make sure to run create_hdf5.py first."
 
     # Define HDF5Files
-    file_d = HDF5File(MPI.comm_world, str(file_path_d), "r")
+    if extract_solid_only:
+        file_d = HDF5File(MPI.comm_world, str(file_path_d), "r")
     file_u = HDF5File(MPI.comm_world, str(file_path_u), "r")
 
     # Read in datasets
-    dataset_d = get_dataset_names(file_d, step=stride, vector_filename="/displacement/vector_%d")
-    dataset_u = get_dataset_names(file_u, step=stride, vector_filename="/velocity/vector_%d")
+    if extract_solid_only:
+        dataset_d = get_dataset_names(
+            file_d, step=stride, vector_filename="/displacement/vector_%d"
+        )
+    dataset_u = get_dataset_names(
+        file_u, step=stride, vector_filename="/velocity/vector_%d"
+    )
 
     # Define mesh path related variables
     fluid_domain_path = mesh_path.with_name(mesh_path.stem + "_fluid.h5")
+    assert fluid_domain_path.exists(), f"Fluid mesh file {fluid_domain_path} not found."
     if extract_solid_only:
         solid_domain_path = mesh_path.with_name(mesh_path.stem + "_solid.h5")
-    else:
-        solid_domain_path = mesh_path
-
-    # Check if the input mesh exists
-    if not fluid_domain_path.exists() or not solid_domain_path.exists():
-        raise ValueError("Mesh file not found.")
+        assert (
+            solid_domain_path.exists()
+        ), f"Solid mesh file {solid_domain_path} not found."
 
     # Read fluid and solid mesh
     if MPI.rank(MPI.comm_world) == 0:
@@ -68,41 +90,42 @@ def create_separate_domain_visualization(visualization_path, mesh_path, stride=1
     with HDF5File(MPI.comm_world, str(fluid_domain_path), "r") as mesh_file:
         mesh_file.read(mesh_fluid, "mesh", False)
 
-    mesh_solid = Mesh()
-    with HDF5File(MPI.comm_world, str(solid_domain_path), "r") as mesh_file:
-        mesh_file.read(mesh_solid, "mesh", False)
+    if extract_solid_only:
+        mesh_solid = Mesh()
+        with HDF5File(MPI.comm_world, str(solid_domain_path), "r") as mesh_file:
+            mesh_file.read(mesh_solid, "mesh", False)
 
     # Define functionspaces and functions
     if MPI.rank(MPI.comm_world) == 0:
         print("--- Define function spaces \n")
 
     Vf = VectorFunctionSpace(mesh_fluid, "CG", 1)
-    Vs = VectorFunctionSpace(mesh_solid, "CG", 1)
-
     u = Function(Vf)
-    d = Function(Vs)
+
+    if extract_solid_only:
+        Vs = VectorFunctionSpace(mesh_solid, "CG", 1)
+        d = Function(Vs)
 
     # Create writer for velocity and pressure
-    d_path = (
-        visualization_path / "displacement_solid.xdmf"
-        if extract_solid_only
-        else visualization_path / "displacement_whole.xdmf"
-    )
+    if extract_solid_only:
+        d_path = visualization_path / "displacement_solid.xdmf"
+        d_writer = XDMFFile(MPI.comm_world, str(d_path))
+        d_writer.parameters["flush_output"] = True
+        d_writer.parameters["functions_share_mesh"] = False
+        d_writer.parameters["rewrite_function_mesh"] = False
+
     u_path = visualization_path / "velocity_fluid.xdmf"
-
-    d_writer = XDMFFile(MPI.comm_world, str(d_path))
     u_writer = XDMFFile(MPI.comm_world, str(u_path))
-
-    for writer in [d_writer, u_writer]:
-        writer.parameters["flush_output"] = True
-        writer.parameters["functions_share_mesh"] = False
-        writer.parameters["rewrite_function_mesh"] = False
+    u_writer.parameters["flush_output"] = True
+    u_writer.parameters["functions_share_mesh"] = False
+    u_writer.parameters["rewrite_function_mesh"] = False
 
     if MPI.rank(MPI.comm_world) == 0:
         print("=" * 10, "Start post processing", "=" * 10)
 
     for i in range(len(dataset_u)):
-        file_d.read(d, dataset_d[i])
+        if extract_solid_only:
+            file_d.read(d, dataset_d[i])
         file_u.read(u, dataset_u[i])
 
         timestamp = file_u.attributes(dataset_u[i])["timestamp"]
@@ -114,11 +137,13 @@ def create_separate_domain_visualization(visualization_path, mesh_path, stride=1
         u_writer.write(u, timestamp)
 
         # Store pressure
-        d.rename("displacement", "displacement")
-        d_writer.write(d, timestamp)
+        if extract_solid_only:
+            d.rename("displacement", "displacement")
+            d_writer.write(d, timestamp)
 
     # Close files
-    d_writer.close()
+    if extract_solid_only:
+        d_writer.close()
     u_writer.close()
 
     if MPI.rank(MPI.comm_world) == 0:
