@@ -10,6 +10,7 @@ This file contains helper functions for creating spectrograms.
 import sys
 import timeit
 import configargparse
+import logging
 from pathlib import Path
 from typing import Union, Optional, Literal
 
@@ -113,6 +114,8 @@ def read_command_line_spec() -> configargparse.Namespace:
                         help="Name of the file containing displacement amplitude data.")
     parser.add_argument('--flow-rate-file-name', type=Path, default="MCA_10",
                         help="Name of the file containing flow rate data. Default is 'MCA_10'.")
+    parser.add_argument("--log-level", type=int, default=20,
+                        help="Specify the log level (default is 20, which is INFO)")
 
     args = parser.parse_args()
 
@@ -141,7 +144,7 @@ def read_command_line_spec() -> configargparse.Namespace:
         args.amplitude_file_name = args.amplitude_file_name if args.amplitude_file_name is not None \
             else f"wss_amplitude_{args.lowcut}_to_100000.csv"
     else:
-        print(f"ERROR: Invalid value for dvp - {args.dvp}. Please use 'd', 'v', 'p', or 'wss'.")
+        logging.error(f"ERROR: Invalid value for dvp - {args.dvp}. Please use 'd', 'v', 'p', or 'wss'.")
         sys.exit(-1)
 
     return args
@@ -212,7 +215,7 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
 
     # If the output file exists, don't re-make it
     if formatted_data_path.exists():
-        print(f'Formatted data already exists at: {formatted_data_path}')
+        logging.info(f'Formatted data already exists at: {formatted_data_path}')
     elif dvp == "wss":
         create_transformed_matrix(visualization_separate_domain_folder, formatted_data_folder, mesh_path_fluid,
                                   case_name, start_t, end_t, dvp, stride)
@@ -222,7 +225,7 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
                                   case_name, start_t, end_t, dvp, stride)
 
     elapsed_time = timeit.default_timer() - start_time
-    print(f"Made matrix in {elapsed_time:.6f} seconds")
+    logging.info(f"Made matrix in {elapsed_time:.6f} seconds")
 
     # 3. Read data
 
@@ -232,7 +235,7 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
     df = read_npz_files(formatted_data_path)
 
     elapsed_time = timeit.default_timer() - start_time
-    print(f"Read matrix in {elapsed_time:.6f} seconds")
+    logging.info(f"Read matrix in {elapsed_time:.6f} seconds")
 
     # 4. Process data and get ID's
 
@@ -283,7 +286,7 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
         region_ids = fluid_ids
 
     elapsed_time = timeit.default_timer() - start_time
-    print(f"Got ID's in {elapsed_time:.6f} seconds")
+    logging.info(f"Got ID's in {elapsed_time:.6f} seconds")
 
     # 5. Sample data (reduce compute time by random sampling)
 
@@ -294,7 +297,7 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
     elif sampling_method == "SinglePoint":
         idx_sampled = np.array([point_id])
         case_name = f"{case_name}_{sampling_method}_{point_id}"
-        print(f"Single Point spectrogram for point: {point_id}")
+        logging.info(f"Single Point spectrogram for point: {point_id}")
     elif sampling_method == "Spatial":
         # See old code for implementation if needed
         raise NotImplementedError("Spatial sampling method is not implemented.")
@@ -303,7 +306,7 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
                          "'SinglePoint', or 'Spatial'.")
 
     elapsed_time = timeit.default_timer() - start_time
-    print(f"Obtained sample points in {elapsed_time:.6f} seconds")
+    logging.info(f"Obtained sample points in {elapsed_time:.6f} seconds")
 
     start_time = timeit.default_timer()
 
@@ -311,7 +314,7 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
     dvp = f"{dvp}_{component}_{n_samples}"
 
     elapsed_time = timeit.default_timer() - start_time
-    print(f"Sampled dataframe in {elapsed_time:.6f} seconds")
+    logging.info(f"Sampled dataframe in {elapsed_time:.6f} seconds")
 
     return dvp, df, case_name, image_folder, visualization_hi_pass_folder
 
@@ -451,9 +454,9 @@ def spectrogram_scaling(Pxx_mean: np.ndarray, lower_thresh: float) -> tuple:
     Pxx_scaled = np.log(Pxx_mean)
     max_val = np.max(Pxx_scaled)
     min_val = np.min(Pxx_scaled)
-    print('Pxx_scaled max', max_val)
-    print('Pxx_scaled max', min_val)
-    print('Pxx threshold', lower_thresh)
+    logging.info(f"Pxx_scaled max: {max_val}")
+    logging.info(f"Pxx_scaled max: {min_val}")
+    logging.info(f"Pxx threshold: {lower_thresh}")
     Pxx_threshold_indices = Pxx_scaled < lower_thresh
     Pxx_scaled[Pxx_threshold_indices] = lower_thresh
 
@@ -683,7 +686,7 @@ def chromagram_from_spectrogram(Pxx: np.ndarray, fs: float, n_fft: int, n_chroma
         # Normalize chroma so that each column sums to 1
         chroma = (chroma / np.sum(chroma, axis=0))  # Chroma must sum to one for entropy fuction to work
     else:
-        print("Raw chroma selected")
+        logging.info("Raw chroma selected")
 
     return chroma
 

@@ -5,6 +5,7 @@
 This script creates spectrograms, power spectral density and chromagrams from formatted matrices (.npz files)"
 """
 
+import logging
 from pathlib import Path
 from typing import Union, Optional
 
@@ -15,7 +16,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.io import wavfile
 
 from fsipy.automatedPostprocessing.postprocessing_h5py import spectrograms as spec
-
+from fsipy.automatedPostprocessing.postprocessing_h5py.postprocessing_common_h5py import sonify_point
 
 def create_spectrogram_composite(case_name: str, dvp: str, df: pd.DataFrame, start_t: float, end_t: float,
                                  num_windows_per_sec: float, overlap_frac: float, window: str, lowcut: float,
@@ -199,41 +200,12 @@ def create_spectrogram_composite(case_name: str, dvp: str, df: pd.DataFrame, sta
     np.savetxt(csv_output_path, data_csv, header="t (s), SBI", delimiter=",")
 
 
-def sonify_point(case_name: str, dvp: str, df, start_t: float, end_t: float, overlap_frac: float, lowcut: float,
-                 image_folder: str) -> None:
-    """
-    Sonify a point in the dataframe and save the resulting audio as a WAV file.
-
-    Args:
-        case_name (str): Name of the case.
-        dvp (str): Type of data to be sonified.
-        df (pd.DataFrame): Input DataFrame containing relevant data.
-        start_t (float): Start time for sonification.
-        end_t (float): End time for sonification.
-        overlap_frac (float): Fraction of overlap between consecutive segments.
-        lowcut (float): Cutoff frequency for the high-pass filter.
-        image_folder (str): Folder to save the sonified audio file.
-
-    Returns:
-        None: Saves the sonified audio file in WAV format.
-    """
-    # Get sampling constants
-    T, _, fs = spec.get_sampling_constants(df, start_t, end_t)
-
-    # High-pass filter dataframe for spectrogram
-    df_filtered = spec.filter_time_data(df, fs, lowcut=lowcut, highcut=15000.0, order=6, btype='highpass')
-
-    y2 = df_filtered.iloc[0] / np.max(df_filtered.iloc[0])
-
-    sound_filename = f"{dvp}_sound_{y2.name}_{case_name}.wav"
-    path_to_sound = Path(image_folder) / sound_filename
-
-    wavfile.write(path_to_sound, int(fs), y2)
-
-
 def main():
     # Load in case-specific parameters
     args = spec.read_command_line_spec()
+
+    # Create logger and set log level
+    logging.basicConfig(level=args.log_level, format="%(message)s")
 
     # Create or read in spectrogram dataframe
     dvp, df, case_name, image_folder, visualization_hi_pass_folder = \
@@ -253,8 +225,7 @@ def main():
                                  image_folder, flow_rate_file=None, amplitude_file=None, power_scaled=False)
 
     if args.sampling_method == "SinglePoint":
-        sonify_point(case_name, dvp, df, args.start_time, args.end_time, args.overlap_frac, args.lowcut,
-                     image_folder)
+        sonify_point(case_name, dvp, df, args.start_time, args.end_time, args.overlap_frac, args.lowcut, image_folder)
 
 
 if __name__ == '__main__':

@@ -11,6 +11,7 @@ This file contains helper functions for creating visualizations outside of FEniC
 import sys
 import os
 import re
+import logging
 from pathlib import Path
 from typing import Tuple, Union
 
@@ -242,10 +243,10 @@ def read_npz_files(filepath: Union[str, Path]) -> pd.DataFrame:
         pd.DataFrame: DataFrame containing the data.
     """
     data = np.load(filepath)['component']
-    print(f'Reading data from: {filepath}')
+    logging.info(f'Reading data from: {filepath}')
     df = pd.DataFrame(data, copy=False)
     df.index.names = ['Ids']
-    print('DataFrame creation complete.')
+    logging.info('DataFrame creation complete.')
     return df
 
 
@@ -1093,16 +1094,16 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
     Returns:
         float: Time between simulation output files.
     """
-    print(f"Creating matrix for case {case_name}...")
+    logging.info(f"Creating matrix for case {case_name}...")
     input_path = Path(input_path)
     output_folder = Path(output_folder)
 
     # Create output directory if it doesn't exist
     if not output_folder.exists():
         output_folder.mkdir(parents=True)
-        print(f'Output directory created: {output_folder}')
+        logging.info(f'Output directory created: {output_folder}')
     else:
-        print(f'Output directory already exists: {output_folder}')
+        logging.info(f'Output directory already exists: {output_folder}')
 
     # Get node ID's from input mesh. If save_deg=2, you can supply the original mesh to get the data for the
     # corner nodes, or supply a refined mesh to get the data for all nodes (very computationally intensive)
@@ -1191,7 +1192,7 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
 
         # Check if the spacing between files is not equal to the intended timestep
         if i > 0 and np.abs(time_file - time_ts[i - 1] - time_between_files) > tol:
-            print('Warning: Uneven temporal spacing detected!!')
+            logging.warning('WARNING: Uneven temporal spacing detected!!')
 
         # Open input h5 file
         h5_file = input_path / h5_ts[i]
@@ -1228,14 +1229,14 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
                     dvp_magnitude[:, idx_zeroed] = LA.norm(vector_array, axis=1)
 
             except Exception as e:
-                print(f"Error: An unexpected error occurred - {e}")
+                logging.info(f"Error: An unexpected error occurred - {e}")
                 break
 
-            print(f"Transferred timestep number {index_ts[i]} at time: {time_ts[i]} from file: {h5_ts[i]}")
+            logging.info(f"Transferred timestep number {index_ts[i]} at time: {time_ts[i]} from file: {h5_ts[i]}")
             idx_zeroed += 1  # Move to the next index of the output h5 file
 
     vector_data.close()
-    print("Finished reading data.")
+    logging.info("Finished reading data.")
 
     # Create output h5 file
     if dvp in {"d", "v"}:
@@ -1255,7 +1256,7 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
 
         # Remove old file path
         if output_path.exists():
-            print("File path exists; rewriting")
+            logging.info("File path exists; rewriting")
             output_path.unlink()
 
         # Store output in npz file
@@ -1420,5 +1421,33 @@ def get_eig(T):
 
 
 
-if __name__ == "__main__":
-    print('See functions.')
+def sonify_point(case_name: str, dvp: str, df, start_t: float, end_t: float, overlap_frac: float, lowcut: float,
+                 image_folder: str) -> None:
+    """
+    Sonify a point in the dataframe and save the resulting audio as a WAV file.
+
+    Args:
+        case_name (str): Name of the case.
+        dvp (str): Type of data to be sonified.
+        df (pd.DataFrame): Input DataFrame containing relevant data.
+        start_t (float): Start time for sonification.
+        end_t (float): End time for sonification.
+        overlap_frac (float): Fraction of overlap between consecutive segments.
+        lowcut (float): Cutoff frequency for the high-pass filter.
+        image_folder (str): Folder to save the sonified audio file.
+
+    Returns:
+        None: Saves the sonified audio file in WAV format.
+    """
+    # Get sampling constants
+    T, _, fs = spec.get_sampling_constants(df, start_t, end_t)
+
+    # High-pass filter dataframe for spectrogram
+    df_filtered = spec.filter_time_data(df, fs, lowcut=lowcut, highcut=15000.0, order=6, btype='highpass')
+
+    y2 = df_filtered.iloc[0] / np.max(df_filtered.iloc[0])
+
+    sound_filename = f"{dvp}_sound_{y2.name}_{case_name}.wav"
+    path_to_sound = Path(image_folder) / sound_filename
+
+    wavfile.write(path_to_sound, int(fs), y2)
