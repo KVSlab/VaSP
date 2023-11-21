@@ -8,7 +8,6 @@
 This file contains helper functions for creating visualizations outside of FEniCS.
 """
 
-import os
 import re
 import logging
 from pathlib import Path
