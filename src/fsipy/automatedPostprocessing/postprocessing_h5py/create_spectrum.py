@@ -1,140 +1,98 @@
-import os
+# Copyright (c) 2023 David Bruneau
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+"""
+This script creates a power spectrum plot.
+"""
+
+import logging
+from pathlib import Path
+from typing import Optional, Union
+
 import numpy as np
-import spectrograms as spec
-#import matplotlib.pyplot as plt
 import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-from scipy.io import wavfile
 
-"""
-This script creates spectrograms, power spectral density and chromagrams from formatted matrices (.npz files)"
-
-Args:
-    mesh_name: Name of the non-refined input mesh for the simulation. This function will find the refined mesh based on this name
-    case_path (Path): Path to results from simulation
-    stride: reduce output frequncy by this factor
-    save_deg (int): element degree saved from P2-P1 simulation (save_deg = 1 is corner nodes only). If we input save_deg = 1 for a simulation 
-       that was run in TurtleFSI with save_deg = 2, the output from this script will be save_deg = 1, i.e only the corner nodes will be output
-    start_t: Desired start time of the output files 
-    end_t:  Desired end time of the output files 
-    lowcut: High pass filter cutoff frequency (Hz)
-    ylim: y limit of spectrogram graph")
-    r_sphere: Sphere in which to include points for spectrogram, this is the sphere radius
-    x_sphere: Sphere in which to include points for spectrogram, this is the x coordinate of the center of the sphere (in m)
-    y_sphere: Sphere in which to include points for spectrogram, this is the y coordinate of the center of the sphere (in m)
-    z_sphere: Sphere in which to include points for spectrogram, this is the z coordinate of the center of the sphere (in m)
-    dvp: "d", "v", "p", or "wss", parameter to postprocess
-    interface_only: uses nodes at the interface only. Used for wall pressure spectrogram primarily
-
-"""
-
-def create_spectrum(case_name, dvp, df, start_t, end_t, 
-                                 nWindow_per_sec, overlapFrac, 
-                                 window, lowcut, thresh_val, max_plot, imageFolder, 
-                                 flow_rate_file=None, amplitude_file=None,
-                                 power_scaled=False):
+from fsipy.automatedPostprocessing.postprocessing_h5py import spectrograms as spec
+from fsipy.automatedPostprocessing.postprocessing_h5py.postprocessing_common_h5py import sonify_point
 
 
-    # Calculate number of windows (you can adjust this equation to fit your temporal/frequency resolution needs)
-    nWindow = np.round(nWindow_per_sec*(end_t-start_t))+3
+def create_spectrum(case_name: str, dvp: str, df, start_t: float, end_t: float, num_windows_per_sec: float,
+                    overlap_frac: float, window: str, lowcut: float, thresh_val: float, max_plot: float,
+                    image_folder: Union[str, Path], flow_rate_file: Optional[str] = None,
+                    amplitude_file: Optional[str] = None, power_scaled: bool = False) -> None:
+    """
+    Create a power spectrum plot and save the results as an image and CSV file.
 
+    Args:
+        case_name (str): Name of the case.
+        dvp (str): Type of data to be processed.
+        df: Input DataFrame containing relevant data.
+        start_t (float): Desired start time of the output files.
+        end_t (float): Desired end time of the output files.
+        num_windows_per_sec (float): Number of windows per second.
+        overlap_frac (float): Fraction of overlap between consecutive windows.
+        window (str): Type of window function to use.
+        lowcut (float): Cutoff frequency for the high-pass filter.
+        thresh_val (float): Threshold value for the color range.
+        max_plot (float): Maximum value for the color range.
+        image_folder (Union[str, Path]): Folder to save the spectrum image and CSV file.
+        flow_rate_file (str): File name for flow rate data.
+        amplitude_file (str): File name for amplitude data.
+        power_scaled (bool): Whether to use power scaling in the PSD calculation.
+
+    Returns:
+        None: Saves the spectrum plot as an image and CSV file.
+    """
     # Get sampling constants
-    T, _, fs = spec.get_sampling_constants(df,start_t,end_t)
-
-
-    ## High-pass filter dataframe for spectrogram
-    #df_filtered = spec.filter_time_data(df,fs,
-    #                                    lowcut=lowcut,
-    #                                    highcut=15000.0,
-    #                                    order=6,
-    #                                    btype='highpass')
-
-    
-
-    #length = end_t - start_t
-    #t = np.linspace(0, length, fs * length)  #  Produces a 5 second Audio-File
-
-    #y2 = df_filtered.iloc[3]/np.max(df_filtered.iloc[3])
-#
-    #fullname2 = dvp+ '_sound_'+str(y2.name)+"_"+case_name
-    #path_to_fig2 = os.path.join(imageFolder, fullname2 + '.wav')
-    #from scipy.io import wavfile
-    #wavfile.write(path_to_fig2, int(fs), y2)
-#
-    #y2 = df_filtered.iloc[10]/np.max(df_filtered.iloc[3])
-    #fullname2 = dvp+ '_sound_'+str(y2.name)+"_"+case_name
-    #path_to_fig2 = os.path.join(imageFolder, fullname2 + '.wav')
-    #from scipy.io import wavfile
-    #wavfile.write(path_to_fig2, int(fs), y2)
+    T, _, fs = spec.get_sampling_constants(df, start_t, end_t)
 
     # PSD calculation
-    Pxx_array, freq_array = spec.get_psd(df,fs,scaling="spectrum")
-    Pxx_log = np.log(Pxx_array)
+    Pxx_array, freq_array = spec.get_psd(df, fs, scaling="spectrum")
 
     # Plot PSD
-    plt.plot(freq_array, Pxx_log)
+    plt.plot(freq_array, np.log(Pxx_array))
     plt.xlabel('Freq. (Hz)')
     plt.ylabel('input units^2/Hz')
-    #plt.ylim([0,ylim_])
-    fullname = dvp+ '_psd_no_filter_'+case_name
-    path_to_fig = os.path.join(imageFolder, fullname + '.png')
+
+    plot_name = f"{dvp}_psd_no_filter_{case_name}"
+    path_to_fig = Path(image_folder) / f"{plot_name}.png"
+    path_csv = Path(image_folder) / f"{plot_name}.csv"
+
+    # Save the figure
     plt.savefig(path_to_fig)
-    path_csv = os.path.join(imageFolder, fullname + '.csv')
-    #print(freq_array.shape)
-    #print(Pxx_log.shape)
 
-    #data_csv = np.concatenate((freq_array,Pxx_log),axis=0)
-    #np.savetxt(path_csv, data_csv,header="Freqs(Hz),spectrum", delimiter=",")
-    data_csv = np.stack((freq_array,Pxx_log),axis=1)
-    path_csv = os.path.join(imageFolder, fullname + '.csv')
-    np.savetxt(path_csv, data_csv,header="Freqs(Hz),spectrum", delimiter=",")
+    # Save CSV data
+    data_csv = np.stack((freq_array, np.log(Pxx_array)), axis=1)
+    np.savetxt(path_csv, data_csv, header="Freqs(Hz),spectrum", delimiter=",")
 
-if __name__ == '__main__':
+
+def main():
     # Load in case-specific parameters
-    case_path, mesh_name, save_deg, stride,  start_t, end_t, lowcut, ylim, r_sphere, x_sphere, y_sphere, z_sphere, dvp, _, _, interface_only, sampling_method, component, _, point_id = spec.read_command_line_spec()
+    args = spec.read_command_line_spec()
 
-    # Read fixed spectrogram parameters from config file
-    config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),"Spectrogram.config")
-    overlapFrac, window, n_samples, nWindow_per_sec, lowcut, thresh_val, max_plot, amplitude_file_name, flow_rate_file_name = spec.read_spec_config(config_file,dvp)
+    # Create logger and set log level
+    logging.basicConfig(level=args.log_level, format="%(message)s")
 
     # Create or read in spectrogram dataframe
-    dvp, df, case_name, case_path, imageFolder, visualization_hi_pass_folder  = spec.read_spectrogram_data(case_path, 
-                                                                                                           mesh_name, 
-                                                                                                           save_deg, 
-                                                                                                           stride, 
-                                                                                                           start_t, 
-                                                                                                           end_t, 
-                                                                                                           n_samples, 
-                                                                                                           ylim, 
-                                                                                                           r_sphere, 
-                                                                                                           x_sphere, 
-                                                                                                           y_sphere, 
-                                                                                                           z_sphere, 
-                                                                                                           dvp, 
-                                                                                                           interface_only, 
-                                                                                                           component,
-                                                                                                           point_id,
-                                                                                                           flow_rate_file_name='MCA_10',
-                                                                                                           sampling_method=sampling_method)
-    
+    dvp, df, case_name, image_folder, visualization_hi_pass_folder = \
+        spec.read_spectrogram_data(args.folder, args.mesh_path, args.save_deg, args.stride, args.start_time,
+                                   args.end_time, args.n_samples, args.ylim, args.sampling_region,
+                                   args.fluid_sampling_domain_id, args.solid_sampling_domain_id, args.r_sphere,
+                                   args.x_sphere, args.y_sphere, args.z_sphere, args.dvp, args.interface_only,
+                                   args.component, args.point_id, sampling_method=args.sampling_method)
 
-    amplitude_file = os.path.join(visualization_hi_pass_folder,amplitude_file_name)    
-    flow_rate_file = os.path.join(case_path, flow_rate_file_name) 
+    # Should these files be used?
+    # amplitude_file = Path(visualization_hi_pass_folder) / args.amplitude_file_name
+    # flow_rate_file = Path(args.folder) / args.flow_rate_file_name
+
     # Create spectrograms
-    create_spectrum(case_name, 
-                                 dvp, 
-                                 df,
-                                 start_t, 
-                                 end_t, 
-                                 nWindow_per_sec, 
-                                 overlapFrac, 
-                                 window, 
-                                 lowcut,
-                                 thresh_val, 
-                                 max_plot, 
-                                 imageFolder, 
-                                 flow_rate_file=None,
-                                 amplitude_file=None,
-                                 power_scaled=False)
-    if sampling_method=="SinglePoint":
-        sonify_point(case_name, dvp, df, start_t, end_t, overlapFrac, lowcut, imageFolder)
+    create_spectrum(case_name, dvp, df, args.start_time, args.end_time, args.num_windows_per_sec, args.overlap_frac,
+                    args.window, args.lowcut, args.thresh_val, args.max_plot, image_folder, flow_rate_file=None,
+                    amplitude_file=None, power_scaled=False)
+
+    if args.sampling_method == "SinglePoint":
+        sonify_point(case_name, dvp, df, args.start_time, args.end_time, args.overlap_frac, args.lowcut, image_folder)
+
+
+if __name__ == '__main__':
+    main()

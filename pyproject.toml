@@ -22,6 +22,8 @@ fsipy-separate-mesh = "fsipy.automatedPostprocessing.postprocessing_mesh.separat
 fsipy-log-plotter = "fsipy.automatedPostprocessing.log_plotter:main"
 fsipy-create-hdf5 = "fsipy.automatedPostprocessing.postprocessing_fenics.create_hdf5:main"
 fsipy-create-spectrograms-chromagrams = "fsipy.automatedPostprocessing.postprocessing_h5py.create_spectrograms_chromagrams:main"
+fsipy-create-spectrogram-from-components = "fsipy.automatedPostprocessing.postprocessing_h5py.create_spectrogram_from_components:main"
+fsipy-create-spectrum = "fsipy.automatedPostprocessing.postprocessing_h5py.create_spectrum:main"
 
 [project.optional-dependencies]
 test = [
