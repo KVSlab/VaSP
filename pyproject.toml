@@ -21,6 +21,7 @@ fsipy-refine-mesh = "fsipy.automatedPostprocessing.postprocessing_mesh.create_re
 fsipy-separate-mesh = "fsipy.automatedPostprocessing.postprocessing_mesh.separate_mesh:main"
 fsipy-log-plotter = "fsipy.automatedPostprocessing.log_plotter:main"
 fsipy-create-hdf5 = "fsipy.automatedPostprocessing.postprocessing_fenics.create_hdf5:main"
+fsipy-create-separate-domain-viz = "fsipy.automatedPostprocessing.postprocessing_fenics.create_separate_domain_visualization:main"
 
 [project.optional-dependencies]
 test = [

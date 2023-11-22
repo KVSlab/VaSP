@@ -95,8 +95,10 @@ def create_hdf5(visualization_path, mesh_path, save_time_step, stride, start_tim
     vector_array_d = vector_array_all_d[d_ids, :]
 
     # Deinfe path to the output files
-    u_output_path = visualization_path / "u.h5"
-    d_output_path = visualization_path / "d.h5"
+    visualization_separate_domain_folder = visualization_path.parent / "Visualization_separate_domain"
+    u_output_path = visualization_separate_domain_folder / "u.h5"
+    d_output_path = visualization_separate_domain_folder / "d_solid.h5" if extract_solid_only \
+        else visualization_separate_domain_folder / "d.h5"
 
     # Initialize h5 file names that might differ during the loop
     h5_file_prev = None
@@ -169,6 +171,7 @@ def create_hdf5(visualization_path, mesh_path, save_time_step, stride, start_tim
         viz_d_file.close()
 
     logging.info("--- Finished reading solutions")
+    logging.info(f"--- Saved u.h5 and d.h5 in {visualization_separate_domain_folder.absolute()}")
 
 
 def get_domain_ids(mesh_path, fluid_domain_id, solid_domain_id):
