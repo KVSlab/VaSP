@@ -129,6 +129,17 @@ def create_separate_domain_visualization(visualization_separate_domain_folder, m
 def main() -> None:
     args = postprocessing_fenics_common.parse_arguments()
 
+    # Check if unused arguments are passed
+    if MPI.rank(MPI.comm_world) == 0:
+        if args.start_time is not None:
+            print("--- Warning: start_time is not used in this script. \n")
+        if args.end_time is not None:
+            print("--- Warning: end_time is not used in this script. \n")
+        if args.extract_solid_only:
+            print("--- Warning: extract_solid_only is not used in this script. \n")
+        if args.log_level != 20:
+            print("--- Warning: log_level is not used in this script. \n")
+
     if MPI.size(MPI.comm_world) == 1:
         print("--- Running in serial mode, you can use MPI to speed up the postprocessing. \n")
 
