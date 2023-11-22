@@ -13,33 +13,33 @@ from fsipy.automatedPostprocessing.postprocessing_fenics import postprocessing_f
 parameters["reorder_dofs_serial"] = False
 
 
-def create_separate_domain_visualization(visualization_path, mesh_path, stride=1):
+def create_separate_domain_visualization(visualization_separate_domain_folder, mesh_path, stride=1):
     """
     Loads displacement and velocity from .h5 file given by create_hdf5.py,
     converts and saves to .xdmf format for visualization (in e.g. ParaView).
     This function works with MPI. If the displacement was saved for the entire domain,
     no additional xdmf file will be created for the displacement.
     Args:
-        visualization_path (Path): Path to the visualization folder
+        visualization_separate_domain_folder (Path): Path to the folder containing the .h5 files
         mesh_path (Path): Path to the mesh that contains both fluid and solid domain
         stride (int): Save frequency of visualization output (default: 1)
     """
     # Path to the input files
     try:
-        file_path_d = visualization_path / "d_solid.h5"
+        file_path_d = visualization_separate_domain_folder / "d_solid.h5"
         assert file_path_d.exists()
         extract_solid_only = True
         if MPI.rank(MPI.comm_world) == 0:
             print("--- Using d_solid.h5 file \n")
     except AssertionError:
-        file_path_d = visualization_path / "d.h5"
+        file_path_d = visualization_separate_domain_folder / "d.h5"
         assert file_path_d.exists()
         extract_solid_only = False
         if MPI.rank(MPI.comm_world) == 0:
             print("--- displacement is for the entire domain \n")
             print("--- No additional xdmf file will be created for displacement \n")
 
-    file_path_u = visualization_path / "u.h5"
+    file_path_u = visualization_separate_domain_folder / "u.h5"
     assert file_path_u.exists(), f"Velocity file {file_path_u} not found.  Make sure to run create_hdf5.py first."
 
     # Define HDF5Files and get dataset names
@@ -83,13 +83,13 @@ def create_separate_domain_visualization(visualization_path, mesh_path, stride=1
 
     # Create writer for displacement and velocity
     if extract_solid_only:
-        d_path = visualization_path / "displacement_solid.xdmf"
+        d_path = visualization_separate_domain_folder / "displacement_solid.xdmf"
         d_writer = XDMFFile(MPI.comm_world, str(d_path))
         d_writer.parameters["flush_output"] = True
         d_writer.parameters["functions_share_mesh"] = False
         d_writer.parameters["rewrite_function_mesh"] = False
 
-    u_path = visualization_path / "velocity_fluid.xdmf"
+    u_path = visualization_separate_domain_folder / "velocity_fluid.xdmf"
     u_writer = XDMFFile(MPI.comm_world, str(u_path))
     u_writer.parameters["flush_output"] = True
     u_writer.parameters["functions_share_mesh"] = False
@@ -122,19 +122,20 @@ def create_separate_domain_visualization(visualization_path, mesh_path, stride=1
     u_writer.close()
 
     if MPI.rank(MPI.comm_world) == 0:
-        print("========== Post processing finished ==========")
+        print("========== Post processing finished ========== \n")
+        print(f"--- Visualization files are saved in: {visualization_separate_domain_folder.absolute()}")
 
 
 def main() -> None:
     args = postprocessing_fenics_common.parse_arguments()
 
     if MPI.size(MPI.comm_world) == 1:
-        print("Running in serial mode, you can use MPI to speed up the postprocessing.")
+        print("--- Running in serial mode, you can use MPI to speed up the postprocessing. \n")
 
     # Define paths for visulization and mesh files
     folder_path = Path(args.folder)
     assert folder_path.exists(), f"Folder {folder_path} not found."
-    visualization_path = folder_path / "Visualization"
+    visualization_separate_domain_folder = folder_path / "Visualization_separate_domain"
 
     # Read parameters from default_variables.json
     parameter_path = folder_path / "Checkpoint" / "default_variables.json"
@@ -158,7 +159,7 @@ def main() -> None:
             print("--- Using non-refined mesh \n")
         assert mesh_path.exists(), f"Mesh file {mesh_path} not found."
 
-    create_separate_domain_visualization(visualization_path, mesh_path, args.stride)
+    create_separate_domain_visualization(visualization_separate_domain_folder, mesh_path, args.stride)
 
 
 if __name__ == "__main__":
