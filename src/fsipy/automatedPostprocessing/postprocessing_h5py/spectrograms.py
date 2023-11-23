@@ -61,17 +61,6 @@ def read_command_line_spec() -> configargparse.Namespace:
                         help="Domain ID for the fluid region to be sampled. Input a labelled mesh with this ID.")
     parser.add_argument('--solid-sampling-domain-id', type=int, default=2,
                         help="Domain ID for the solid region to be sampled. Input a labelled mesh with this ID.")
-    parser.add_argument('--r-sphere', type=float, default=1000000,
-                        help="Radius of the sphere used to include points for spectrogram.")
-    parser.add_argument('--x-sphere', type=float, default=0.0,
-                        help="X-coordinate of the center of the sphere used to include points for spectrogram (in "
-                             "meters).")
-    parser.add_argument('--y-sphere', type=float, default=0.0,
-                        help="Y-coordinate of the center of the sphere used to include points for spectrogram (in "
-                             "meters).")
-    parser.add_argument('--z-sphere', type=float, default=0.0,
-                        help="Z-coordinate of the center of the sphere used to include points for spectrogram (in "
-                             "meters).")
     parser.add_argument('--dvp', type=str, default="v",
                         help="Quantity to postprocess. Choose 'v' for velocity, 'd' for displacement, 'p' for "
                              "pressure, or 'wss' for wall shear stress.")
