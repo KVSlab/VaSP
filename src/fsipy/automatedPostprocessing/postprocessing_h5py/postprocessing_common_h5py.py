@@ -8,7 +8,6 @@
 This file contains helper functions for creating visualizations outside of FEniCS.
 """
 
-import re
 import logging
 from pathlib import Path
 from typing import Tuple, Union
@@ -21,6 +20,7 @@ from numpy import linalg as LA
 from scipy.io import wavfile
 
 from fsipy.automatedPostprocessing.postprocessing_h5py import spectrograms as spec
+from fsipy.automatedPostprocessing.postprocessing_common import get_domain_ids, output_file_lists
 
 
 def read_command_line() -> configargparse.Namespace:
@@ -97,61 +97,6 @@ def get_surface_topology_coords(out_file: Union[str, Path]) -> tuple:
     return topology, coords
 
 
-def get_domain_topology(mesh_path: Union[str, Path]) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """
-    Obtain the topology for the fluid, solid, and all elements of the input mesh.
-
-    Args:
-        mesh_path (Union[str, Path]): Path to the HDF5 mesh file.
-
-    Returns:
-        Tuple[np.ndarray, np.ndarray, np.ndarray]: Tuple containing three NumPy arrays:
-            fluid_topology: Topology array for fluid elements.
-            wall_topology: Topology array for solid (wall) elements.
-            all_topology: Topology array for all elements.
-    """
-    vector_data = h5py.File(mesh_path, "r")
-
-    # Open domain array
-    domains_loc = 'domains/values'
-    domains = vector_data[domains_loc][:]
-
-    # Find indices for solid and fluid domains
-    id_wall = np.where(domains > 1)[0]  # domain = 2 is the solid
-    id_fluid = np.where(domains == 1)[0]  # domain = 1 is the fluid
-
-    # Get topology arrays
-    topology_loc = 'domains/topology'
-    all_topology = vector_data[topology_loc][:, :]
-    wall_topology = all_topology[id_wall, :]
-    fluid_topology = all_topology[id_fluid, :]
-
-    return fluid_topology, wall_topology, all_topology
-
-
-def get_domain_ids(mesh_path: Union[str, Path]) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """
-    Obtain a list of the node IDs for the fluid, solid, and all elements of the input mesh.
-
-    Args:
-        mesh_path (Union[str, Path]): Path to the HDF5 mesh file.
-
-    Returns:
-        Tuple[np.ndarray, np.ndarray, np.ndarray]: Tuple containing three NumPy arrays:
-            fluid_ids: Node IDs for fluid elements, sorted in ascending order.
-            wall_ids: Node IDs for solid (wall) elements, sorted in ascending order.
-            all_ids: Node IDs for all elements, sorted in ascending order.
-    """
-    fluid_topology, wall_topology, all_topology = get_domain_topology(mesh_path)
-
-    # Find the unique node ids in the wall, fluid, and all topologies, sorted in ascending order
-    wall_ids = np.unique(wall_topology)
-    fluid_ids = np.unique(fluid_topology)
-    all_ids = np.unique(all_topology)
-
-    return fluid_ids, wall_ids, all_ids
-
-
 def get_domain_ids_specified_region(mesh_path: Union[str, Path], fluid_sampling_domain_id: int,
                                     solid_sampling_domain_id: int) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
@@ -183,17 +128,20 @@ def get_domain_ids_specified_region(mesh_path: Union[str, Path], fluid_sampling_
     return fluid_ids, wall_ids, all_ids
 
 
-def get_interface_ids(mesh_path: Union[str, Path]) -> np.ndarray:
+def get_interface_ids(mesh_path: Union[str, Path], fluid_domain_id: Union[int, list[int]],
+                      solid_domain_id: Union[int, list[int]]) -> np.ndarray:
     """
     Get the interface node IDs between fluid and wall domains from the given mesh file.
 
     Args:
-        mesh_path (Union[str, Path]): Path to the mesh file.
+        mesh_path (str or Path): Path to the mesh file.
+        fluid_domain_id (int or list): ID of the fluid domain
+        solid_domain_id (int or list): ID of the solid domain
 
     Returns:
         np.ndarray: Array containing the interface node IDs.
     """
-    fluid_ids, wall_ids, _ = get_domain_ids(mesh_path)
+    fluid_ids, wall_ids, _ = get_domain_ids(mesh_path, fluid_domain_id, solid_domain_id)
 
     # Find the intersection of fluid and wall node IDs
     interface_ids_set = set(fluid_ids) & set(wall_ids)
@@ -247,6 +195,7 @@ def read_npz_files(filepath: Union[str, Path]) -> pd.DataFrame:
 
 def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union[str, Path],
                               mesh_path: Union[str, Path], case_name: str, start_t: float, end_t: float, dvp: str,
+                              fluid_domain_id: Union[int, list[int]], solid_domain_id: Union[int, list[int]],
                               stride: int = 1) -> float:
     """
     Create a transformed matrix from simulation data.
@@ -259,6 +208,8 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
         start_t (float): Start time for extracting data.
         end_t (float): End time for extracting data.
         dvp (str): Quantity to extract (e.g., 'd' for displacement, 'v' for velocity).
+        fluid_domain_id (int or list): ID of the fluid domain
+        solid_domain_id (int or list): ID of the solid domain
         stride (int): Stride for selecting timesteps.
 
     Returns:
@@ -278,7 +229,7 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
     # Get node ID's from input mesh. If save_deg=2, you can supply the original mesh to get the data for the
     # corner nodes, or supply a refined mesh to get the data for all nodes (very computationally intensive)
     if dvp in {"d", "v", "p"}:
-        fluid_ids, wall_ids, all_ids = get_domain_ids(mesh_path)
+        fluid_ids, wall_ids, all_ids = get_domain_ids(mesh_path, fluid_domain_id, solid_domain_id)
         ids = all_ids
 
     # Get name of xdmf file
@@ -296,34 +247,9 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
     else:
         raise ValueError("Invalid value for dvp. Please use 'd', 'v', 'p', 'wss', 'mps', or 'strain'.")
 
-    # If the simulation has been restarted, the output is stored in multiple files and may not have even
-    # temporal spacing.
-    # This loop determines the file names from the xdmf output file
-    with xdmf_path.open('r') as file1:
-        lines = file1.readlines()
-
-    h5_ts = []
-    time_ts = []
-    index_ts = []
-
-    # This loop goes through the xdmf output file and gets the time value (time_ts),
-    # associated .h5 file (h5_ts), and index of each timestep in the corresponding h5 file (index_ts)
-    for line in lines:
-        if '<Time Value' in line:
-            time_pattern = '<Time Value="(.+?)"'
-            time_str = re.findall(time_pattern, line)
-            time = float(time_str[0])
-            time_ts.append(time)
-
-        elif 'VisualisationVector' in line:
-            h5_pattern = '"HDF">(.+?):/'
-            h5_str = re.findall(h5_pattern, line)
-            h5_ts.append(h5_str[0])
-
-            index_pattern = "VisualisationVector/(.+?)</DataItem>"
-            index_str = re.findall(index_pattern, line)
-            index = int(index_str[0])
-            index_ts.append(index)
+    # Get information about h5 files associated with xdmf file and also information about the timesteps
+    logging.info("--- Getting information about h5 files \n")
+    h5_ts, time_ts, index_ts = output_file_lists(xdmf_path)
 
     # Calculate the time between files from the xdmf file
     time_between_files = time_ts[2] - time_ts[1]

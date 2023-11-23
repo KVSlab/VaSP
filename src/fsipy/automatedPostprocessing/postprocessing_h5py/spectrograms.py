@@ -22,8 +22,9 @@ from scipy.interpolate import RectBivariateSpline
 
 from fsipy.automatedPostprocessing.postprocessing_h5py.chroma_filters import normalize, chroma_filterbank
 from fsipy.automatedPostprocessing.postprocessing_h5py.postprocessing_common_h5py import create_transformed_matrix, \
-    read_npz_files, get_surface_topology_coords, get_coords, get_domain_ids, get_interface_ids, \
+    read_npz_files, get_surface_topology_coords, get_coords, get_interface_ids, \
     get_domain_ids_specified_region
+from fsipy.automatedPostprocessing.postprocessing_common import get_domain_ids
 
 
 def read_command_line_spec() -> configargparse.Namespace:
@@ -39,7 +40,7 @@ def read_command_line_spec() -> configargparse.Namespace:
                         help="Path to simulation results")
     parser.add_argument('--mesh-path', type=Path, default=None,
                         help="Path to the mesh file (default: <folder_path>/Mesh/mesh.h5)")
-    parser.add_argument('--save-deg', type=int, default=2,
+    parser.add_argument('--save-deg', type=int, default=None,
                         help="Specify the save_deg used during the simulation, i.e., whether the intermediate P2 nodes "
                              "were saved. Entering save_deg=1 when the simulation was run with save_deg=2 will result "
                              "in using only the corner nodes in postprocessing.")
@@ -152,15 +153,16 @@ def read_command_line_spec() -> configargparse.Namespace:
 
 def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path], save_deg: int, stride: int,
                           start_t: float, end_t: float, n_samples: int, ylim: float, sampling_region: str,
-                          fluid_sampling_domain_id: int, solid_sampling_domain_id: int, r_sphere: float,
-                          x_sphere: float, y_sphere: float, z_sphere: float, dvp: str, interface_only: bool,
-                          component: str, point_id: int, sampling_method: str = "RandomPoint"):
+                          fluid_sampling_domain_id: int, solid_sampling_domain_id: int, fsi_region: list[float],
+                          dvp: str, interface_only: bool, component: str, point_id: int,
+                          fluid_domain_id: Union[int, list[int]], solid_domain_id: Union[int, list[int]],
+                          sampling_method: str = "RandomPoint"):
     """
     Read spectrogram data and perform processing steps.
 
     Args:
-        folder (str): Path to simulation results.
-        mesh_path (str): Path to the mesh file.
+        folder (str or Path): Path to simulation results.
+        mesh_path (str or Path): Path to the mesh file.
         save_deg (int): Degree of mesh refinement.
         stride (int): Desired frequency of output data.
         start_t (float): Start time for data processing.
@@ -170,15 +172,15 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
         sampling_region (str): Region for sampling data ("sphere" or "domain").
         fluid_sampling_domain_id (int): Domain ID for fluid sampling (used when sampling_region="domain").
         solid_sampling_domain_id (int): Domain ID for solid sampling (used when sampling_region="domain").
-        r_sphere (float): Radius of the sphere (used when sampling_region="sphere").
-        x_sphere (float): X-coordinate of the sphere center (used when sampling_region="sphere").
-        y_sphere (float): Y-coordinate of the sphere center (used when sampling_region="sphere").
-        z_sphere (float): Z-coordinate of the sphere center (used when sampling_region="sphere").
+        fsi_region (list): x, y, and z coordinates of sphere center and radius of the sphere (used when
+            sampling_region="sphere").
         dvp (str): Type of data to be processed.
         interface_only (bool): Whether to include only interface ID's.
         component (str): Component of the data to be visualized.
         point_id (int): Point ID (used when sampling_method="SinglePoint").
         sampling_method (str): Method for sampling data ("RandomPoint", "SinglePoint", or "Spatial").
+        fluid_domain_id (int or list): ID of the fluid domain
+        solid_domain_id (int or list): ID of the solid domain
 
     Returns:
         tuple: (Processed data type, DataFrame, Case name, Image folder, Hi-pass visualization folder).
@@ -218,11 +220,11 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
         logging.info(f'Formatted data already exists at: {formatted_data_path}')
     elif dvp == "wss":
         create_transformed_matrix(visualization_separate_domain_folder, formatted_data_folder, mesh_path_fluid,
-                                  case_name, start_t, end_t, dvp, stride)
+                                  case_name, start_t, end_t, dvp, fluid_domain_id, solid_domain_id, stride)
     else:
         # Make the output h5 files with dvp magnitudes
         create_transformed_matrix(visualization_path, formatted_data_folder, mesh_path,
-                                  case_name, start_t, end_t, dvp, stride)
+                                  case_name, start_t, end_t, dvp, fluid_domain_id, solid_domain_id, stride)
 
     elapsed_time = timeit.default_timer() - start_time
     logging.info(f"Made matrix in {elapsed_time:.6f} seconds")
@@ -242,6 +244,7 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
     start_time = timeit.default_timer()
 
     # We want to find the points in the sac, so we use a sphere to roughly define the sac.
+    x_sphere, y_sphere, z_sphere, r_sphere = fsi_region
     sac_center = np.array([x_sphere, y_sphere, z_sphere])
 
     if dvp == "wss":
@@ -252,8 +255,8 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
 
     if sampling_region == "sphere":
         # Get wall and fluid ID's
-        fluid_ids, wall_ids, all_ids = get_domain_ids(mesh_path)
-        interface_ids = get_interface_ids(mesh_path)
+        fluid_ids, wall_ids, all_ids = get_domain_ids(mesh_path, fluid_domain_id, solid_domain_id)
+        interface_ids = get_interface_ids(mesh_path, fluid_domain_id, solid_domain_id)
         sphere_ids = find_points_in_sphere(sac_center, r_sphere, coords)
 
         # Get nodes in sac only

@@ -16,6 +16,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 from fsipy.automatedPostprocessing.postprocessing_h5py import spectrograms as spec
 from fsipy.automatedPostprocessing.postprocessing_h5py.postprocessing_common_h5py import sonify_point
+from fsipy.automatedPostprocessing.postprocessing_common import read_parameters_from_file
 
 
 def create_spectrogram_composite(case_name: str, dvp: str, df: pd.DataFrame, start_t: float, end_t: float,
@@ -207,13 +208,23 @@ def main():
     # Create logger and set log level
     logging.basicConfig(level=args.log_level, format="%(message)s")
 
+    # Load parameters from default_parameters.json
+    parameters = read_parameters_from_file(args.folder)
+
+    # Extract parameters
+    fsi_region = parameters["fsi_region"]
+    fluid_domain_id = parameters["dx_f_id"]
+    solid_domain_id = parameters["dx_s_id"]
+    end_time = args.end_time if args.end_time is not None else parameters["T"]
+    save_deg = args.save_deg if args.save_deg is not None else parameters["save_deg"]
+
     # Create or read in spectrogram dataframe
     dvp, df, case_name, image_folder, visualization_hi_pass_folder = \
-        spec.read_spectrogram_data(args.folder, args.mesh_path, args.save_deg, args.stride, args.start_time,
-                                   args.end_time, args.n_samples, args.ylim, args.sampling_region,
-                                   args.fluid_sampling_domain_id, args.solid_sampling_domain_id, args.r_sphere,
-                                   args.x_sphere, args.y_sphere, args.z_sphere, args.dvp, args.interface_only,
-                                   args.component, args.point_id, sampling_method=args.sampling_method)
+        spec.read_spectrogram_data(args.folder, args.mesh_path, save_deg, args.stride, args.start_time,
+                                   end_time, args.n_samples, args.ylim, args.sampling_region,
+                                   args.fluid_sampling_domain_id, args.solid_sampling_domain_id, fsi_region, args.dvp,
+                                   args.interface_only, args.component, args.point_id, fluid_domain_id, solid_domain_id,
+                                   sampling_method=args.sampling_method)
 
     # Should these files be used?
     # amplitude_file = Path(visualization_hi_pass_folder) / args.amplitude_file_name
