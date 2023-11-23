@@ -76,8 +76,8 @@ def get_coords(mesh_path: Union[str, Path]) -> np.ndarray:
     Returns:
         np.ndarray: Array containing the coordinates.
     """
-    mesh = h5py.File(mesh_path, "r")
-    coords = mesh['mesh/coordinates'][:, :]
+    with h5py.File(mesh_path, "r") as mesh:
+        coords = mesh['mesh/coordinates'][:, :]
     return coords
 
 
@@ -91,9 +91,9 @@ def get_surface_topology_coords(out_file: Union[str, Path]) -> tuple:
     Returns:
         tuple: Tuple containing the surface topology and coordinates.
     """
-    mesh = h5py.File(out_file, "r")
-    topology = mesh["Mesh/0/mesh/topology"][:, :]
-    coords = mesh["Mesh/0/mesh/geometry"][:, :]
+    with h5py.File(out_file, "r") as mesh:
+        topology = mesh["Mesh/0/mesh/topology"][:, :]
+        coords = mesh["Mesh/0/mesh/geometry"][:, :]
     return topology, coords
 
 
