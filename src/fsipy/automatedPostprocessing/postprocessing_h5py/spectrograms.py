@@ -48,11 +48,11 @@ def read_command_line_spec() -> configargparse.Namespace:
                         help="Desired frequency of output data (i.e. to output every second step, use stride=2)")
     parser.add_argument('--start-time', type=float, default=0.0,
                         help="Start time of the simulation (in seconds).")
-    parser.add_argument('--end-time', type=float, default=0.05,
+    parser.add_argument('--end-time', type=float, default=None,
                         help="End time of the simulation (in seconds).")
     parser.add_argument('--lowcut', type=float, default=25,
                         help="Cutoff frequency (Hz) for the high-pass filter.")
-    parser.add_argument('--ylim', type=float, default=800,
+    parser.add_argument('--ylim', type=float, default=None,
                         help="Set the y-limit of the spectrogram graph.")
     parser.add_argument('--sampling-region', type=str, default="sphere",
                         help="Specify the sampling region. Choose 'sphere' to sample within a sphere or 'domain' to "
@@ -145,7 +145,7 @@ def read_command_line_spec() -> configargparse.Namespace:
 
 
 def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path], save_deg: int, stride: int,
-                          start_t: float, end_t: float, n_samples: int, ylim: float, sampling_region: str,
+                          start_t: float, end_t: float, n_samples: int, sampling_region: str,
                           fluid_sampling_domain_id: int, solid_sampling_domain_id: int, fsi_region: list[float],
                           quantity: str, interface_only: bool, component: str, point_id: int,
                           fluid_domain_id: Union[int, list[int]], solid_domain_id: Union[int, list[int]],
@@ -161,7 +161,6 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
         start_t (float): Start time for data processing.
         end_t (float): End time for data processing.
         n_samples (int): Number of samples.
-        ylim (float): Y-axis limit of the spectrogram graph.
         sampling_region (str): Region for sampling data ("sphere" or "domain").
         fluid_sampling_domain_id (int): Domain ID for fluid sampling (used when sampling_region="domain").
         solid_sampling_domain_id (int): Domain ID for solid sampling (used when sampling_region="domain").

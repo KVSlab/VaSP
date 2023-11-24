@@ -221,22 +221,23 @@ def main():
     # Create or read in spectrogram dataframe
     quantity, df, case_name, image_folder, visualization_hi_pass_folder = \
         spec.read_spectrogram_data(args.folder, args.mesh_path, save_deg, args.stride, args.start_time,
-                                   end_time, args.n_samples, args.ylim, args.sampling_region,
-                                   args.fluid_sampling_domain_id, args.solid_sampling_domain_id, fsi_region,
-                                   args.quantity, args.interface_only, args.component, args.point_id, fluid_domain_id,
-                                   solid_domain_id, sampling_method=args.sampling_method)
+                                   end_time, args.n_samples, args.sampling_region, args.fluid_sampling_domain_id,
+                                   args.solid_sampling_domain_id, fsi_region, args.quantity, args.interface_only,
+                                   args.component, args.point_id, fluid_domain_id, solid_domain_id,
+                                   sampling_method=args.sampling_method)
 
     # Should these files be used?
     # amplitude_file = Path(visualization_hi_pass_folder) / args.amplitude_file_name
     # flow_rate_file = Path(args.folder) / args.flow_rate_file_name
 
     # Create spectrograms
-    create_spectrogram_composite(case_name, quantity, df, args.start_time, args.end_time, args.num_windows_per_sec,
+    create_spectrogram_composite(case_name, quantity, df, args.start_time, end_time, args.num_windows_per_sec,
                                  args.overlap_frac, args.window, args.lowcut, args.thresh_val, args.max_plot,
-                                 image_folder, flow_rate_file=None, amplitude_file=None, power_scaled=False)
+                                 image_folder, flow_rate_file=None, amplitude_file=None, power_scaled=False,
+                                 ylim=args.ylim)
 
     if args.sampling_method == "SinglePoint":
-        sonify_point(case_name, quantity, df, args.start_time, args.end_time, args.overlap_frac, args.lowcut,
+        sonify_point(case_name, quantity, df, args.start_time, end_time, args.overlap_frac, args.lowcut,
                      image_folder)
 
 
