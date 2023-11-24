@@ -16,14 +16,14 @@ import matplotlib.pyplot as plt
 from fsipy.automatedPostprocessing.postprocessing_h5py import spectrograms as spec
 
 
-def create_spectrogram_from_components(folder: Union[str, Path], dvp: str, n_samples: int, thresh_val: float,
+def create_spectrogram_from_components(folder: Union[str, Path], quantity: str, n_samples: int, thresh_val: float,
                                        max_plot: float, ylim: Optional[float] = None) -> None:
     """
     Create a composite spectrogram by averaging three component-wise spectrograms.
 
     Args:
-        folder (Union[str, Path]): Path to the case folder.
-        dvp (str): Type of data to be processed.
+        folder (str or Path): Path to the case folder.
+        quantity (str): Type of data to be processed.
         n_samples (int): Number of samples.
         thresh_val (float): Threshold value for the color range.
         max_plot (float): Maximum value for the color range.
@@ -36,9 +36,9 @@ def create_spectrogram_from_components(folder: Union[str, Path], dvp: str, n_sam
     image_folder = folder_path / "Spectrograms"
 
     # Get all csv files (make sure there is only one for each component)
-    x_csv_files = list(Path(image_folder).rglob(f"{dvp}_x_*spectrogram.csv"))
-    y_csv_files = list(Path(image_folder).rglob(f"{dvp}_y_*spectrogram.csv"))
-    z_csv_files = list(Path(image_folder).rglob(f"{dvp}_z_*spectrogram.csv"))
+    x_csv_files = list(Path(image_folder).rglob(f"{quantity}_x_*spectrogram.csv"))
+    y_csv_files = list(Path(image_folder).rglob(f"{quantity}_y_*spectrogram.csv"))
+    z_csv_files = list(Path(image_folder).rglob(f"{quantity}_z_*spectrogram.csv"))
 
     # Create the spec name
     spec_path = x_csv_files[0].with_name(x_csv_files[0].name.replace("_x_", "_combined_")).with_suffix(".png")
@@ -86,7 +86,7 @@ def main():
     logging.basicConfig(level=args.log_level, format="%(message)s")
 
     # Create spectrograms
-    create_spectrogram_from_components(args.folder, args.dvp, args.n_samples, args.thresh_val, args.max_plot,
+    create_spectrogram_from_components(args.folder, args.quantity, args.n_samples, args.thresh_val, args.max_plot,
                                        ylim=args.ylim)
 
 

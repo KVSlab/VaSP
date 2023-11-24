@@ -48,7 +48,7 @@ def read_command_line() -> configargparse.Namespace:
                         help="Start time of simulation (s)")
     parser.add_argument('--end-time', type=float, default=0.05,
                         help="End time of simulation (s)")
-    parser.add_argument('--dvp', type=str, default="v",
+    parser.add_argument('-q', '--quantity', type=str, default="v",
                         help="Quantity to postprocess. Choose 'v' for velocity, 'd' for displacement, 'p' for pressure,"
                              " or 'wss' for wall shear stress.")
     parser.add_argument('--bands', default="25,100000",
@@ -71,7 +71,7 @@ def get_coords(mesh_path: Union[str, Path]) -> np.ndarray:
     Get coordinates from a mesh file.
 
     Args:
-        mesh_path (Union[str, Path]): Path to the mesh file.
+        mesh_path (str or Path): Path to the mesh file.
 
     Returns:
         np.ndarray: Array containing the coordinates.
@@ -86,7 +86,7 @@ def get_surface_topology_coords(out_file: Union[str, Path]) -> tuple:
     Get surface topology and coordinates from an output file.
 
     Args:
-        out_file (Union[str, Path]): Path to the output file.
+        out_file (str or Path): Path to the output file.
 
     Returns:
         tuple: Tuple containing the surface topology and coordinates.
@@ -103,7 +103,7 @@ def get_domain_ids_specified_region(mesh_path: Union[str, Path], fluid_sampling_
     Obtain node IDs for the fluid, solid, and all elements within specified regions of the input mesh.
 
     Args:
-        mesh_path (str): The file path of the input mesh.
+        mesh_path (str or Path): The file path of the input mesh.
         fluid_sampling_domain_id (int): Domain ID for the fluid region to be sampled.
         solid_sampling_domain_id (int): Domain ID for the solid region to be sampled.
 
@@ -179,7 +179,7 @@ def read_npz_files(filepath: Union[str, Path]) -> pd.DataFrame:
     Read data from an npz file and return it as a DataFrame.
 
     Args:
-        filepath (Union[str, Path]): Path to the npz file.
+        filepath (str or Path): Path to the npz file.
         filepath (str): Path to the npz file.
 
     Returns:
@@ -194,20 +194,20 @@ def read_npz_files(filepath: Union[str, Path]) -> pd.DataFrame:
 
 
 def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union[str, Path],
-                              mesh_path: Union[str, Path], case_name: str, start_t: float, end_t: float, dvp: str,
+                              mesh_path: Union[str, Path], case_name: str, start_t: float, end_t: float, quantity: str,
                               fluid_domain_id: Union[int, list[int]], solid_domain_id: Union[int, list[int]],
                               stride: int = 1) -> float:
     """
     Create a transformed matrix from simulation data.
 
     Args:
-        input_path (Union[str, Path]): Path to the input simulation data.
-        output_folder (Union[str, Path]): Path to the output folder where the transformed matrix will be stored.
-        mesh_path (Union[str, Path]): Path to the input mesh data.
+        input_path (str or Path): Path to the input simulation data.
+        output_folder (str or Path): Path to the output folder where the transformed matrix will be stored.
+        mesh_path (str or Path): Path to the input mesh data.
         case_name (str): Name of the simulation case.
         start_t (float): Start time for extracting data.
         end_t (float): End time for extracting data.
-        dvp (str): Quantity to extract (e.g., 'd' for displacement, 'v' for velocity).
+        quantity (str): Quantity to extract (e.g., 'd' for displacement, 'v' for velocity).
         fluid_domain_id (int or list): ID of the fluid domain
         solid_domain_id (int or list): ID of the solid domain
         stride (int): Stride for selecting timesteps.
@@ -228,7 +228,7 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
 
     # Get node ID's from input mesh. If save_deg=2, you can supply the original mesh to get the data for the
     # corner nodes, or supply a refined mesh to get the data for all nodes (very computationally intensive)
-    if dvp in {"d", "v", "p"}:
+    if quantity in {"d", "v", "p"}:
         fluid_ids, wall_ids, all_ids = get_domain_ids(mesh_path, fluid_domain_id, solid_domain_id)
         ids = all_ids
 
@@ -242,10 +242,10 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
         'strain': 'InfinitesimalStrain.xdmf'
     }
 
-    if dvp in xdmf_files:
-        xdmf_path = input_path / xdmf_files[dvp]
+    if quantity in xdmf_files:
+        xdmf_path = input_path / xdmf_files[quantity]
     else:
-        raise ValueError("Invalid value for dvp. Please use 'd', 'v', 'p', 'wss', 'mps', or 'strain'.")
+        raise ValueError("Invalid value for quantity. Please use 'd', 'v', 'p', 'wss', 'mps', or 'strain'.")
 
     # Get information about h5 files associated with xdmf file and also information about the timesteps
     logging.info("--- Getting information about h5 files \n")
@@ -258,7 +258,7 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
     first_h5_file = input_path / h5_ts[0]
     vector_data = h5py.File(first_h5_file, 'r')
 
-    if dvp in {"wss", "mps", "strain"}:
+    if quantity in {"wss", "mps", "strain"}:
         ids = np.arange(len(vector_data['VisualisationVector/0'][:]))
 
     vector_array_all = vector_data['VisualisationVector/0'][:, :]
@@ -271,12 +271,13 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
     num_cols = int((end_t - start_t) / (time_between_files * stride)) - 1
 
     # Pre-allocate the arrays for the formatted data
-    if dvp in {"v", "d"}:
-        dvp_x, dvp_y, dvp_z = [np.zeros((num_rows, num_cols)) for _ in range(3)]
-    elif dvp == "strain":
-        dvp_11, dvp_12, dvp_22, dvp_23, dvp_33, dvp_31 = [np.zeros((num_rows, num_cols)) for _ in range(6)]
+    if quantity in {"v", "d"}:
+        quantity_x, quantity_y, quantity_z = [np.zeros((num_rows, num_cols)) for _ in range(3)]
+    elif quantity == "strain":
+        quantity_11, quantity_12, quantity_22, quantity_23, quantity_33, quantity_31 = \
+            [np.zeros((num_rows, num_cols)) for _ in range(6)]
 
-    dvp_magnitude = np.zeros((num_rows, num_cols))
+    quantity_magnitude = np.zeros((num_rows, num_cols))
 
     # Initialize variables
     tol = 1e-8  # temporal spacing tolerance
@@ -307,22 +308,22 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
 
             try:
                 # Get required data depending on whether pressure, displacement, or velocity
-                if dvp in {"p", "wss", "mps"}:
-                    dvp_magnitude[:, idx_zeroed] = vector_array_full[ids, 0]
-                elif dvp == "strain":
+                if quantity in {"p", "wss", "mps"}:
+                    quantity_magnitude[:, idx_zeroed] = vector_array_full[ids, 0]
+                elif quantity == "strain":
                     vector_array = vector_array_full[ids, :]
-                    dvp_11[:, idx_zeroed] = vector_array[:, 0]
-                    dvp_12[:, idx_zeroed] = vector_array[:, 1]
-                    dvp_22[:, idx_zeroed] = vector_array[:, 4]
-                    dvp_23[:, idx_zeroed] = vector_array[:, 5]
-                    dvp_33[:, idx_zeroed] = vector_array[:, 8]
-                    dvp_31[:, idx_zeroed] = vector_array[:, 6]
+                    quantity_11[:, idx_zeroed] = vector_array[:, 0]
+                    quantity_12[:, idx_zeroed] = vector_array[:, 1]
+                    quantity_22[:, idx_zeroed] = vector_array[:, 4]
+                    quantity_23[:, idx_zeroed] = vector_array[:, 5]
+                    quantity_33[:, idx_zeroed] = vector_array[:, 8]
+                    quantity_31[:, idx_zeroed] = vector_array[:, 6]
                 else:
                     vector_array = vector_array_full[ids, :]
-                    dvp_x[:, idx_zeroed] = vector_array[:, 0]
-                    dvp_y[:, idx_zeroed] = vector_array[:, 1]
-                    dvp_z[:, idx_zeroed] = vector_array[:, 2]
-                    dvp_magnitude[:, idx_zeroed] = LA.norm(vector_array, axis=1)
+                    quantity_x[:, idx_zeroed] = vector_array[:, 0]
+                    quantity_y[:, idx_zeroed] = vector_array[:, 1]
+                    quantity_z[:, idx_zeroed] = vector_array[:, 2]
+                    quantity_magnitude[:, idx_zeroed] = LA.norm(vector_array, axis=1)
 
             except Exception as e:
                 logging.info(f"Error: An unexpected error occurred - {e}")
@@ -335,18 +336,18 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
     logging.info("Finished reading data.")
 
     # Create output h5 file
-    if dvp in {"d", "v"}:
-        formatted_data = [dvp_magnitude, dvp_x, dvp_y, dvp_z]
+    if quantity in {"d", "v"}:
+        formatted_data = [quantity_magnitude, quantity_x, quantity_y, quantity_z]
         component_names = ["mag", "x", "y", "z"]
-    elif dvp == "strain":
-        formatted_data = [dvp_11, dvp_12, dvp_22, dvp_23, dvp_33, dvp_31]
+    elif quantity == "strain":
+        formatted_data = [quantity_11, quantity_12, quantity_22, quantity_23, quantity_33, quantity_31]
         component_names = ["11", "12", "22", "23", "33", "31"]
     else:
         component_names = ["mag"]
 
     for i, component_name in enumerate(component_names):
         # Create output path
-        component = f"{dvp}_{component_name}"
+        component = f"{quantity}_{component_name}"
         output_file_name = f"{case_name}_{component}.npz"
         output_path = output_folder / output_file_name
 
@@ -356,22 +357,22 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
             output_path.unlink()
 
         # Store output in npz file
-        if dvp in {"v", "d", "strain"}:
+        if quantity in {"v", "d", "strain"}:
             np.savez_compressed(output_path, component=formatted_data[i])
         else:
-            np.savez_compressed(output_path, component=dvp_magnitude)
+            np.savez_compressed(output_path, component=quantity_magnitude)
 
     return time_between_files
 
 
-def sonify_point(case_name: str, dvp: str, df, start_t: float, end_t: float, overlap_frac: float, lowcut: float,
+def sonify_point(case_name: str, quantity: str, df, start_t: float, end_t: float, overlap_frac: float, lowcut: float,
                  image_folder: str) -> None:
     """
     Sonify a point in the dataframe and save the resulting audio as a WAV file.
 
     Args:
         case_name (str): Name of the case.
-        dvp (str): Type of data to be sonified.
+        quantity (str): Type of data to be sonified.
         df (pd.DataFrame): Input DataFrame containing relevant data.
         start_t (float): Start time for sonification.
         end_t (float): End time for sonification.
@@ -390,7 +391,7 @@ def sonify_point(case_name: str, dvp: str, df, start_t: float, end_t: float, ove
 
     y2 = df_filtered.iloc[0] / np.max(df_filtered.iloc[0])
 
-    sound_filename = f"{dvp}_sound_{y2.name}_{case_name}.wav"
+    sound_filename = f"{quantity}_sound_{y2.name}_{case_name}.wav"
     path_to_sound = Path(image_folder) / sound_filename
 
     wavfile.write(path_to_sound, int(fs), y2)

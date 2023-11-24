@@ -32,7 +32,7 @@ def read_command_line_spec() -> configargparse.Namespace:
     Read arguments from the command line using ConfigArgParse.
 
     Returns:
-        ArgumentParser: Parsed command-line arguments.
+        Namespace: Parsed command-line arguments.
     """
     parser = configargparse.ArgumentParser(formatter_class=configargparse.RawDescriptionHelpFormatter)
 
@@ -58,10 +58,12 @@ def read_command_line_spec() -> configargparse.Namespace:
                         help="Specify the sampling region. Choose 'sphere' to sample within a sphere or 'domain' to "
                              "sample within a specified domain.")
     parser.add_argument('--fluid-sampling-domain-id', type=int, default=1,
-                        help="Domain ID for the fluid region to be sampled. Input a labelled mesh with this ID.")
+                        help="Domain ID for the fluid region to be sampled. Input a labelled mesh with this ID. Used "
+                             "only when sampling region is 'domain'.")
     parser.add_argument('--solid-sampling-domain-id', type=int, default=2,
-                        help="Domain ID for the solid region to be sampled. Input a labelled mesh with this ID.")
-    parser.add_argument('--dvp', type=str, default="v",
+                        help="Domain ID for the solid region to be sampled. Input a labelled mesh with this ID. Used "
+                             "only when sampling region is 'domain'.")
+    parser.add_argument('-q', '--quantity', type=str, default="v",
                         help="Quantity to postprocess. Choose 'v' for velocity, 'd' for displacement, 'p' for "
                              "pressure, or 'wss' for wall shear stress.")
     parser.add_argument('--Re_a', type=float, default=0.0,
@@ -78,28 +80,30 @@ def read_command_line_spec() -> configargparse.Namespace:
                         help="Component of the data to visualize. Choose 'x', 'y', 'z', or 'mag' (magnitude).")
     parser.add_argument('--sampling-method', type=str, default="RandomPoint",
                         help="Sampling method for spectrogram generation. Choose from 'RandomPoint' (random nodes), "
-                             "'SinglePoint' (single point specified by 'point_id'), or 'Spatial' (ensures uniform "
+                             "'SinglePoint' (single point specified by '--point-id'), or 'Spatial' (ensures uniform "
                              "spatial sampling, e.g., in the case of fluid boundary layer, the sampling will not bias "
                              "towards the boundary layer).")
     parser.add_argument('--n-samples', type=int, default=10000,
                         help="Number of samples to generate spectrogram data (ignored for SinglePoint sampling).")
     parser.add_argument('--point-id', type=int, default=-1000000,
                         help="Point ID for SinglePoint sampling. Ignored for other sampling methods.")
-
     parser.add_argument('--overlap-frac', type=float, default=0.75,
                         help="Fraction of overlap between adjacent windows.")
     parser.add_argument('--window', type=str, default="blackmanharris",
-                        help="Window function to be used for spectrogram computation.")
+                        help="Window function to be used for spectrogram computation. "
+                             "Choose from window types available at "
+                             "https://docs.scipy.org/doc/scipy/reference/signal.windows.html. "
+                             "Default is 'blackmanharris'.")
     parser.add_argument('--num-windows-per-sec', type=int, default=4,
                         help="Number of windows per second for spectrogram computation.")
     parser.add_argument('--thresh-val', type=int, default=None,
-                        help="Threshold value for the spectrogram. Default is determined based on the 'dvp' argument: "
-                             "if 'd', default is -42; if 'v', default is -20; if 'p', default is -5; if 'wss', "
-                             "default is -18.")
+                        help="Threshold value for the spectrogram. Default is determined based on the 'quantity' "
+                             "argument: if 'd', default is -42; if 'v', default is -20; if 'p', default is -5; if "
+                             "'wss', default is -18.")
     parser.add_argument('--max-plot', type=int, default=None,
-                        help="Maximum value for plotting the spectrogram. Default is determined based on the 'dvp' "
-                             "argument: if 'd', default is -30; if 'v', default is -7; if 'p', default is 5; if 'wss', "
-                             ", default is 0.")
+                        help="Maximum value for plotting the spectrogram. Default is determined based on the "
+                             "'quantity' argument: if 'd', default is -30; if 'v', default is -7; if 'p', default is "
+                             "5; if 'wss', default is 0.")
     parser.add_argument('--amplitude-file-name', type=Path, default=None,
                         help="Name of the file containing displacement amplitude data.")
     parser.add_argument('--flow-rate-file-name', type=Path, default="MCA_10",
@@ -112,29 +116,29 @@ def read_command_line_spec() -> configargparse.Namespace:
     # Set default mesh path if not provided
     args.mesh_path = args.folder / "Mesh" / "mesh.h5" if args.mesh_path is None else args.mesh_path
 
-    # Set default thresh_val, max_plot and amplitude_file_name based in the dvp argument
-    if args.dvp == "d":
+    # Set default thresh_val, max_plot and amplitude_file_name based in the quantity argument
+    if args.quantity == "d":
         args.thresh_val = args.thresh_val if args.thresh_val is not None else -42
         args.max_plot = args.max_plot if args.max_plot is not None else -30
         args.amplitude_file_name = args.amplitude_file_name if args.amplitude_file_name is not None \
             else f"displacement_amplitude_{args.lowcut}_to_100000.csv"
-    elif args.dvp == "v":
+    elif args.quantity == "v":
         args.thresh_val = args.thresh_val if args.thresh_val is not None else -20
         args.max_plot = args.max_plot if args.max_plot is not None else -7
         args.amplitude_file_name = args.amplitude_file_name if args.amplitude_file_name is not None \
             else f"velocity_amplitude_{args.lowcut}_to_100000.csv"
-    elif args.dvp == "p":
+    elif args.quantity == "p":
         args.thresh_val = args.thresh_val if args.thresh_val is not None else -5
         args.max_plot = args.max_plot if args.max_plot is not None else 5
         args.amplitude_file_name = args.amplitude_file_name if args.amplitude_file_name is not None \
             else f"pressure_amplitude_{args.lowcut}_to_100000.csv"
-    elif args.dvp == "wss":
+    elif args.quantity == "wss":
         args.thresh_val = args.thresh_val if args.thresh_val is not None else -18
         args.max_plot = args.max_plot if args.max_plot is not None else 0
         args.amplitude_file_name = args.amplitude_file_name if args.amplitude_file_name is not None \
             else f"wss_amplitude_{args.lowcut}_to_100000.csv"
     else:
-        logging.error(f"ERROR: Invalid value for dvp - {args.dvp}. Please use 'd', 'v', 'p', or 'wss'.")
+        logging.error(f"ERROR: Invalid value for quantity - {args.quantity}. Please use 'd', 'v', 'p', or 'wss'.")
         sys.exit(-1)
 
     return args
@@ -143,7 +147,7 @@ def read_command_line_spec() -> configargparse.Namespace:
 def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path], save_deg: int, stride: int,
                           start_t: float, end_t: float, n_samples: int, ylim: float, sampling_region: str,
                           fluid_sampling_domain_id: int, solid_sampling_domain_id: int, fsi_region: list[float],
-                          dvp: str, interface_only: bool, component: str, point_id: int,
+                          quantity: str, interface_only: bool, component: str, point_id: int,
                           fluid_domain_id: Union[int, list[int]], solid_domain_id: Union[int, list[int]],
                           sampling_method: str = "RandomPoint"):
     """
@@ -163,7 +167,7 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
         solid_sampling_domain_id (int): Domain ID for solid sampling (used when sampling_region="domain").
         fsi_region (list): x, y, and z coordinates of sphere center and radius of the sphere (used when
             sampling_region="sphere").
-        dvp (str): Type of data to be processed.
+        quantity (str): Quantity to postprocess.
         interface_only (bool): Whether to include only interface ID's.
         component (str): Component of the data to be visualized.
         point_id (int): Point ID (used when sampling_method="SinglePoint").
@@ -195,7 +199,7 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
     image_folder = folder_path / "Spectrograms"
     image_folder.mkdir(parents=True, exist_ok=True)
 
-    output_file_name = f"{case_name}_{dvp}_{component}.npz"
+    output_file_name = f"{case_name}_{quantity}_{component}.npz"
     formatted_data_path = formatted_data_folder / output_file_name
 
     elapsed_time = timeit.default_timer() - start_time
@@ -207,13 +211,13 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
     # If the output file exists, don't re-make it
     if formatted_data_path.exists():
         logging.info(f'Formatted data already exists at: {formatted_data_path}')
-    elif dvp == "wss":
+    elif quantity == "wss":
         create_transformed_matrix(visualization_separate_domain_folder, formatted_data_folder, mesh_path_fluid,
-                                  case_name, start_t, end_t, dvp, fluid_domain_id, solid_domain_id, stride)
+                                  case_name, start_t, end_t, quantity, fluid_domain_id, solid_domain_id, stride)
     else:
-        # Make the output h5 files with dvp magnitudes
+        # Make the output h5 files with quantity magnitudes
         create_transformed_matrix(visualization_path, formatted_data_folder, mesh_path,
-                                  case_name, start_t, end_t, dvp, fluid_domain_id, solid_domain_id, stride)
+                                  case_name, start_t, end_t, quantity, fluid_domain_id, solid_domain_id, stride)
 
     elapsed_time = timeit.default_timer() - start_time
     logging.info(f"Made matrix in {elapsed_time:.6f} seconds")
@@ -236,7 +240,7 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
     x_sphere, y_sphere, z_sphere, r_sphere = fsi_region
     sac_center = np.array([x_sphere, y_sphere, z_sphere])
 
-    if dvp == "wss":
+    if quantity == "wss":
         wss_output_file = visualization_separate_domain_folder / "WSS_ts.h5"
         surface_elements, coords = get_surface_topology_coords(wss_output_file)
     else:
@@ -263,14 +267,14 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
     else:
         raise ValueError(f"Invalid sampling method '{sampling_region}'. Please specify 'sphere' or 'domain'.")
 
-    if dvp == "wss":
+    if quantity == "wss":
         # For wss spectrogram, we use all the nodes within the sphere because the input df only includes the wall
         region_ids = sphere_ids
     elif interface_only:
         # Use only the interface IDs
         region_ids = interface_ids
-        dvp = dvp + "_interface"
-    elif dvp == "d":
+        quantity = quantity + "_interface"
+    elif quantity == "d":
         # For displacement spectrogram, we need to take only the wall IDs
         region_ids = wall_ids
     else:
@@ -303,12 +307,12 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
     start_time = timeit.default_timer()
 
     df = df.iloc[idx_sampled]
-    dvp = f"{dvp}_{component}_{n_samples}"
+    quantity = f"{quantity}_{component}_{n_samples}"
 
     elapsed_time = timeit.default_timer() - start_time
     logging.info(f"Sampled dataframe in {elapsed_time:.6f} seconds")
 
-    return dvp, df, case_name, image_folder, visualization_hi_pass_folder
+    return quantity, df, case_name, image_folder, visualization_hi_pass_folder
 
 
 def find_points_in_sphere(center: np.ndarray, radius: float, coords: np.ndarray) -> np.ndarray:

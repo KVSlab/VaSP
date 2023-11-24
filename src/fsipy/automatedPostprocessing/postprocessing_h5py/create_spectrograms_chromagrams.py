@@ -19,7 +19,7 @@ from fsipy.automatedPostprocessing.postprocessing_h5py.postprocessing_common_h5p
 from fsipy.automatedPostprocessing.postprocessing_common import read_parameters_from_file
 
 
-def create_spectrogram_composite(case_name: str, dvp: str, df: pd.DataFrame, start_t: float, end_t: float,
+def create_spectrogram_composite(case_name: str, quantity: str, df: pd.DataFrame, start_t: float, end_t: float,
                                  num_windows_per_sec: float, overlap_frac: float, window: str, lowcut: float,
                                  thresh_val: float, max_plot: float, image_folder: Union[str, Path],
                                  flow_rate_file: Optional[Union[str, Path]] = None,
@@ -30,7 +30,7 @@ def create_spectrogram_composite(case_name: str, dvp: str, df: pd.DataFrame, sta
 
     Args:
         case_name (str): Path to simulation results.
-        dvp (str): DVP identifier.
+        quantity (str): Quantity to postprocess.
         df (pd.DataFrame): Input dataframe.
         start_t (float): Start time for analysis.
         end_t (float): End time for analysis.
@@ -40,9 +40,9 @@ def create_spectrogram_composite(case_name: str, dvp: str, df: pd.DataFrame, sta
         lowcut (float): Lowcut frequency for high-pass filter.
         thresh_val (float): Threshold value.
         max_plot (float): Maximum plot value.
-        image_folder (Union[str, Path]): Folder to save the images.
-        flow_rate_file (Union[str, Path], optional): File containing flow rate data.
-        amplitude_file (Union[str, Path], optional): File containing amplitude data.
+        image_folder (str or Path): Folder to save the images.
+        flow_rate_file (str or Path, optional): File containing flow rate data.
+        amplitude_file (str or Path, optional): File containing amplitude data.
         power_scaled (bool, optional): Whether to scale the power.
         ylim (float, optional): Y-axis limit for the plot.
     """
@@ -68,7 +68,7 @@ def create_spectrogram_composite(case_name: str, dvp: str, df: pd.DataFrame, sta
     if ylim is not None:
         plt.ylim([0, ylim])
 
-    psd_filename = f"{dvp}_psd_{case_name}"
+    psd_filename = f"{quantity}_psd_{case_name}"
     path_to_psd_figure = Path(image_folder) / (psd_filename + '.png')
 
     # Save the figure
@@ -157,7 +157,7 @@ def create_spectrogram_composite(case_name: str, dvp: str, df: pd.DataFrame, sta
         ax4.set_xlabel('Time (s)')
 
     # Name composite figure and save
-    composite_figure_name = f"{dvp}_{case_name}_{num_windows}_windows_thresh{thresh_val}_composite_figure"
+    composite_figure_name = f"{quantity}_{case_name}_{num_windows}_windows_thresh{thresh_val}_composite_figure"
     if power_scaled:
         composite_figure_name += "_power_scaled"
 
@@ -172,7 +172,7 @@ def create_spectrogram_composite(case_name: str, dvp: str, df: pd.DataFrame, sta
                           x_label="Time (s)", color_range=[thresh_val, max_plot])
 
     # Save data to files (spectrogram)
-    spec_filename = f"{dvp}_{case_name}_{num_windows}_windows_thresh{thresh_val}_spectrogram"
+    spec_filename = f"{quantity}_{case_name}_{num_windows}_windows_thresh{thresh_val}_spectrogram"
     path_to_spec = Path(image_folder) / (spec_filename + '.png')
     fig2.savefig(path_to_spec)
 
@@ -182,7 +182,7 @@ def create_spectrogram_composite(case_name: str, dvp: str, df: pd.DataFrame, sta
     np.savetxt(output_csv_path, data_csv, header=bins_txt, delimiter=",")
 
     # Save data to files (chromagram)
-    chroma_filename = f"{dvp}_{case_name}_{num_windows}_windows_chromagram"
+    chroma_filename = f"{quantity}_{case_name}_{num_windows}_windows_chromagram"
     path_to_chroma = Path(image_folder) / (chroma_filename + '.png')
     chroma_y = np.linspace(0, 1, chroma.shape[0])
 
@@ -193,7 +193,7 @@ def create_spectrogram_composite(case_name: str, dvp: str, df: pd.DataFrame, sta
     np.savetxt(output_csv_path, data_csv, header=bins_txt, delimiter=",")
 
     # Save data to files (SBI)
-    sbi_filename = f"{dvp}_{case_name}_{num_windows}_windows_SBI"
+    sbi_filename = f"{quantity}_{case_name}_{num_windows}_windows_SBI"
     path_to_sbi = Path(image_folder) / (sbi_filename + '.png')
 
     csv_output_path = path_to_sbi.with_suffix('.csv')
@@ -219,24 +219,25 @@ def main():
     save_deg = args.save_deg if args.save_deg is not None else parameters["save_deg"]
 
     # Create or read in spectrogram dataframe
-    dvp, df, case_name, image_folder, visualization_hi_pass_folder = \
+    quantity, df, case_name, image_folder, visualization_hi_pass_folder = \
         spec.read_spectrogram_data(args.folder, args.mesh_path, save_deg, args.stride, args.start_time,
                                    end_time, args.n_samples, args.ylim, args.sampling_region,
-                                   args.fluid_sampling_domain_id, args.solid_sampling_domain_id, fsi_region, args.dvp,
-                                   args.interface_only, args.component, args.point_id, fluid_domain_id, solid_domain_id,
-                                   sampling_method=args.sampling_method)
+                                   args.fluid_sampling_domain_id, args.solid_sampling_domain_id, fsi_region,
+                                   args.quantity, args.interface_only, args.component, args.point_id, fluid_domain_id,
+                                   solid_domain_id, sampling_method=args.sampling_method)
 
     # Should these files be used?
     # amplitude_file = Path(visualization_hi_pass_folder) / args.amplitude_file_name
     # flow_rate_file = Path(args.folder) / args.flow_rate_file_name
 
     # Create spectrograms
-    create_spectrogram_composite(case_name, dvp, df, args.start_time, args.end_time, args.num_windows_per_sec,
+    create_spectrogram_composite(case_name, quantity, df, args.start_time, args.end_time, args.num_windows_per_sec,
                                  args.overlap_frac, args.window, args.lowcut, args.thresh_val, args.max_plot,
                                  image_folder, flow_rate_file=None, amplitude_file=None, power_scaled=False)
 
     if args.sampling_method == "SinglePoint":
-        sonify_point(case_name, dvp, df, args.start_time, args.end_time, args.overlap_frac, args.lowcut, image_folder)
+        sonify_point(case_name, quantity, df, args.start_time, args.end_time, args.overlap_frac, args.lowcut,
+                     image_folder)
 
 
 if __name__ == '__main__':
