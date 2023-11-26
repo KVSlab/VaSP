@@ -40,8 +40,21 @@ def create_spectrogram_from_components(folder: Union[str, Path], quantity: str, 
     y_csv_files = list(Path(image_folder).rglob(f"{quantity}_y_*spectrogram.csv"))
     z_csv_files = list(Path(image_folder).rglob(f"{quantity}_z_*spectrogram.csv"))
 
+    if not x_csv_files or not y_csv_files or not z_csv_files:
+        logging.error(f"ERROR: Missing CSV files for one or more components in {image_folder}")
+        return
+
+    if len(x_csv_files) > 1 or len(y_csv_files) > 1 or len(z_csv_files) > 1:
+        logging.error(f"ERROR: Multiple CSV files found for one or more components in {image_folder}. "
+                      "Please ensure there is only one CSV file per component.")
+        return
+
+    logging.info("--- Found CSV files for X, Y, and Z components.")
+
     # Create the spec name
     spec_path = x_csv_files[0].with_name(x_csv_files[0].name.replace("_x_", "_combined_")).with_suffix(".png")
+
+    logging.info("--- Creating combined spectrogram")
 
     # Get bins from x csv file header
     with open(x_csv_files[0], "r") as bins_file:
@@ -49,6 +62,7 @@ def create_spectrogram_from_components(folder: Union[str, Path], quantity: str, 
         bins = np.fromstring(bins_txt, sep=',', dtype=float)
 
     # Read data
+    logging.info("--- Loading CSV files...")
     csv_x_data = np.loadtxt(x_csv_files[0], delimiter=",")
     csv_y_data = np.loadtxt(y_csv_files[0], delimiter=",")
     csv_z_data = np.loadtxt(z_csv_files[0], delimiter=",")
@@ -57,14 +71,17 @@ def create_spectrogram_from_components(folder: Union[str, Path], quantity: str, 
     freqs = csv_x_data[:, 0]
 
     # Average the components
+    logging.info("--- Averaging components...")
     Pxx = np.mean([csv_x_data[:, 1:], csv_y_data[:, 1:], csv_z_data[:, 1:]], axis=0)
 
     # Create separate spectrogram figure
+    logging.info("--- Creating separate spectrogram figure...")
     fig, ax = plt.subplots()
     fig.set_size_inches(7.5, 5)
     title = f"threshold Pxx = {thresh_val}"
 
     # Plot and save the spectrogram
+    logging.info("--- Plotting and saving the spectrogram...")
     spec.plot_spectrogram(fig, ax, bins, freqs, Pxx, ylim, title=title, x_label="Time (s)",
                           color_range=[thresh_val, max_plot])
     fig.savefig(spec_path)
@@ -74,8 +91,8 @@ def create_spectrogram_from_components(folder: Union[str, Path], quantity: str, 
     data_csv = np.append(freqs[np.newaxis].T, Pxx, axis=1)
     np.savetxt(path_csv, data_csv, header=bins_txt, delimiter=",")
 
-    logging.info(f"Spectrogram saved at: {spec_path}")
-    logging.info(f"Data CSV saved at: {path_csv}")
+    logging.info(f"--- Spectrogram saved at: {spec_path}")
+    logging.info(f"--- Data CSV saved at: {path_csv}")
 
 
 def main():

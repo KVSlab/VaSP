@@ -18,9 +18,11 @@ import configargparse
 import numpy as np
 from numpy import linalg as LA
 from scipy.io import wavfile
+from tqdm import tqdm
 
 from fsipy.automatedPostprocessing.postprocessing_h5py import spectrograms as spec
-from fsipy.automatedPostprocessing.postprocessing_common import get_domain_ids, output_file_lists
+from fsipy.automatedPostprocessing.postprocessing_common import get_domain_ids, output_file_lists, \
+    read_parameters_from_file
 
 
 def read_command_line() -> configargparse.Namespace:
@@ -185,11 +187,11 @@ def read_npz_files(filepath: Union[str, Path]) -> pd.DataFrame:
     Returns:
         pd.DataFrame: DataFrame containing the data.
     """
+    logging.info(f'--- Reading data from: {filepath}')
     data = np.load(filepath)['component']
-    logging.info(f'Reading data from: {filepath}')
     df = pd.DataFrame(data, copy=False)
     df.index.names = ['Ids']
-    logging.info('DataFrame creation complete.')
+    logging.info('--- DataFrame creation complete.')
     return df
 
 
@@ -215,16 +217,19 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
     Returns:
         float: Time between simulation output files.
     """
-    logging.info(f"Creating matrix for case {case_name}...")
+    logging.info(f"--- Creating matrix for case {case_name}...")
     input_path = Path(input_path)
     output_folder = Path(output_folder)
+
+    # Get parameters
+    parameters = read_parameters_from_file(input_path.parent)
 
     # Create output directory if it doesn't exist
     if not output_folder.exists():
         output_folder.mkdir(parents=True)
-        logging.info(f'Output directory created: {output_folder}')
+        logging.info(f'--- Output directory created: {output_folder}')
     else:
-        logging.info(f'Output directory already exists: {output_folder}')
+        logging.info(f'--- Output directory already exists: {output_folder}')
 
     # Get node ID's from input mesh. If save_deg=2, you can supply the original mesh to get the data for the
     # corner nodes, or supply a refined mesh to get the data for all nodes (very computationally intensive)
@@ -248,7 +253,7 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
         raise ValueError("Invalid value for quantity. Please use 'd', 'v', 'p', 'wss', 'mps', or 'strain'.")
 
     # Get information about h5 files associated with xdmf file and also information about the timesteps
-    logging.info("--- Getting information about h5 files \n")
+    logging.info("--- Getting information about h5 files")
     h5_ts, time_ts, index_ts = output_file_lists(xdmf_path)
 
     # Calculate the time between files from the xdmf file
@@ -265,6 +270,8 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
     vector_array = vector_array_all[ids, :]
 
     num_ts = int(len(time_ts))  # Total amount of timesteps in original file
+
+    logging.info(f"--- Total number of timesteps: {num_ts}")
 
     # Get shape of output data
     num_rows = vector_array.shape[0]
@@ -284,7 +291,19 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
     idx_zeroed = 0  # Output index for formatted data
     h5_file_prev = ""
 
-    for i in range(0, num_ts):
+    # Set start and stop timesteps
+    if parameters is not None:
+        dt = parameters["dt"]
+        start = round(start_t / dt)
+        stop = round(end_t / dt) - 2
+    else:
+        start = 0
+        stop = num_ts
+
+    # Initialize tqdm with the total number of iterations
+    progress_bar = tqdm(total=stop - start, desc="--- Transferring timestep", unit="step")
+
+    for i in range(start, stop):
         time_file = time_ts[i]
 
         # Check if the spacing between files is not equal to the intended timestep
@@ -326,14 +345,19 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
                     quantity_magnitude[:, idx_zeroed] = LA.norm(vector_array, axis=1)
 
             except Exception as e:
-                logging.info(f"Error: An unexpected error occurred - {e}")
+                logging.error(f"ERROR: An unexpected error occurred - {e}")
                 break
 
-            logging.info(f"Transferred timestep number {index_ts[i]} at time: {time_ts[i]} from file: {h5_ts[i]}")
+            # Update the information in the progress bar
+            progress_bar.set_postfix({"Timestep": index_ts[i], "Time": time_ts[i], "File": h5_ts[i]})
             idx_zeroed += 1  # Move to the next index of the output h5 file
 
+        progress_bar.update()
+
+    progress_bar.close()
+
     vector_data.close()
-    logging.info("Finished reading data.")
+    logging.info("--- Finished reading h5 files")
 
     # Create output h5 file
     if quantity in {"d", "v"}:
@@ -345,7 +369,7 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
     else:
         component_names = ["mag"]
 
-    for i, component_name in enumerate(component_names):
+    for i, component_name in enumerate(tqdm(component_names, desc="--- Writing component files", unit="component")):
         # Create output path
         component = f"{quantity}_{component_name}"
         output_file_name = f"{case_name}_{component}.npz"
@@ -353,7 +377,6 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
 
         # Remove old file path
         if output_path.exists():
-            logging.info("File path exists; rewriting")
             output_path.unlink()
 
         # Store output in npz file
@@ -361,6 +384,8 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
             np.savez_compressed(output_path, component=formatted_data[i])
         else:
             np.savez_compressed(output_path, component=quantity_magnitude)
+
+    logging.info("--- Finished writing component files\n")
 
     return time_between_files
 

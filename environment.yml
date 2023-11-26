@@ -15,6 +15,7 @@ dependencies:
   - meshio
   - matplotlib
   - pandas
+  - tqdm
   - pip:
       - git+https://github.com/KVSlab/VaMPy.git
       - git+https://github.com/KVSlab/turtleFSI.git

@@ -45,16 +45,19 @@ def create_spectrum(case_name: str, quantity: str, df, start_t: float, end_t: fl
         None: Saves the spectrum plot as an image and CSV file.
     """
     # Get sampling constants
+    logging.info("--- Getting sampling constants...")
     T, _, fs = spec.get_sampling_constants(df, start_t, end_t)
 
     # PSD calculation
     Pxx_array, freq_array = spec.get_psd(df, fs, scaling="spectrum")
 
     # Plot PSD
+    logging.info("\n--- Plotting PSD...")
     plt.plot(freq_array, np.log(Pxx_array))
     plt.xlabel('Freq. (Hz)')
     plt.ylabel('input units^2/Hz')
 
+    logging.info("--- Saving PSD plot and CSV data...")
     plot_name = f"{quantity}_psd_no_filter_{case_name}"
     path_to_fig = Path(image_folder) / f"{plot_name}.png"
     path_csv = Path(image_folder) / f"{plot_name}.csv"
@@ -65,6 +68,9 @@ def create_spectrum(case_name: str, quantity: str, df, start_t: float, end_t: fl
     # Save CSV data
     data_csv = np.stack((freq_array, np.log(Pxx_array)), axis=1)
     np.savetxt(path_csv, data_csv, header="Freqs(Hz),spectrum", delimiter=",")
+
+    logging.info(f"--- PSD plot saved at: {path_to_fig}")
+    logging.info(f"--- CSV data saved at: {path_csv}")
 
 
 def main():
@@ -97,7 +103,7 @@ def main():
     # flow_rate_file = Path(args.folder) / args.flow_rate_file_name
 
     # Create spectrograms
-    create_spectrum(case_name, quantity, df, args.start_time, args.end_time, args.num_windows_per_sec,
+    create_spectrum(case_name, quantity, df, args.start_time, end_time, args.num_windows_per_sec,
                     args.overlap_frac, args.window, args.lowcut, args.thresh_val, args.max_plot, image_folder,
                     flow_rate_file=None, amplitude_file=None, power_scaled=False)
 

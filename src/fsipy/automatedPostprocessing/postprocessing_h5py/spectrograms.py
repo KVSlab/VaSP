@@ -8,7 +8,6 @@ This file contains helper functions for creating spectrograms.
 """
 
 import sys
-import timeit
 import configargparse
 import logging
 from pathlib import Path
@@ -19,6 +18,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import butter, filtfilt, spectrogram, periodogram
 from scipy.interpolate import RectBivariateSpline
+from tqdm import tqdm
 
 from fsipy.automatedPostprocessing.postprocessing_h5py.chroma_filters import normalize, chroma_filterbank
 from fsipy.automatedPostprocessing.postprocessing_h5py.postprocessing_common_h5py import create_transformed_matrix, \
@@ -177,13 +177,11 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
     Returns:
         tuple: (Processed data type, DataFrame, Case name, Image folder, Hi-pass visualization folder).
     """
-    start_time = timeit.default_timer()
-
     folder_path = Path(folder)
     case_name = folder_path.parent.name
     visualization_path = folder_path / "Visualization"
 
-    # 1. Get names of relevant directories, files
+    logging.info(f"--- Processing folder path {folder_path}\n")
 
     mesh_name_suffix = "" if save_deg == 1 else "_refined"
     mesh_path = Path(mesh_path)
@@ -201,39 +199,26 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
     output_file_name = f"{case_name}_{quantity}_{component}.npz"
     formatted_data_path = formatted_data_folder / output_file_name
 
-    elapsed_time = timeit.default_timer() - start_time
-
-    # 2. Prepare data
-
-    start_time = timeit.default_timer()
+    logging.info("--- Preparing data")
 
     # If the output file exists, don't re-make it
     if formatted_data_path.exists():
-        logging.info(f'Formatted data already exists at: {formatted_data_path}')
-    elif quantity == "wss":
-        create_transformed_matrix(visualization_separate_domain_folder, formatted_data_folder, mesh_path_fluid,
-                                  case_name, start_t, end_t, quantity, fluid_domain_id, solid_domain_id, stride)
+        logging.info(f'--- Formatted data already exists at: {formatted_data_path}\n')
     else:
-        # Make the output h5 files with quantity magnitudes
-        create_transformed_matrix(visualization_path, formatted_data_folder, mesh_path,
-                                  case_name, start_t, end_t, quantity, fluid_domain_id, solid_domain_id, stride)
+        if quantity == "wss":
+            create_transformed_matrix(visualization_separate_domain_folder, formatted_data_folder, mesh_path_fluid,
+                                      case_name, start_t, end_t, quantity, fluid_domain_id, solid_domain_id, stride)
+        else:
+            # Make the output h5 files with quantity magnitudes
+            create_transformed_matrix(visualization_path, formatted_data_folder, mesh_path,
+                                      case_name, start_t, end_t, quantity, fluid_domain_id, solid_domain_id, stride)
 
-    elapsed_time = timeit.default_timer() - start_time
-    logging.info(f"Made matrix in {elapsed_time:.6f} seconds")
-
-    # 3. Read data
-
-    start_time = timeit.default_timer()
+    logging.info("--- Reading data")
 
     # For spectrograms, we only want the magnitude
     df = read_npz_files(formatted_data_path)
 
-    elapsed_time = timeit.default_timer() - start_time
-    logging.info(f"Read matrix in {elapsed_time:.6f} seconds")
-
-    # 4. Process data and get ID's
-
-    start_time = timeit.default_timer()
+    logging.info("\n--- Processing data and getting ID's")
 
     # We want to find the points in the sac, so we use a sphere to roughly define the sac.
     x_sphere, y_sphere, z_sphere, r_sphere = fsi_region
@@ -280,19 +265,14 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
         # For pressure and velocity spectrogram, we need to take only the fluid IDs
         region_ids = fluid_ids
 
-    elapsed_time = timeit.default_timer() - start_time
-    logging.info(f"Got ID's in {elapsed_time:.6f} seconds")
-
-    # 5. Sample data (reduce compute time by random sampling)
-
-    start_time = timeit.default_timer()
+    logging.info(f"\n--- Sampling data using '{sampling_method}' sampling method")
 
     if sampling_method == "RandomPoint":
         idx_sampled = np.random.choice(region_ids, n_samples)
     elif sampling_method == "SinglePoint":
         idx_sampled = np.array([point_id])
         case_name = f"{case_name}_{sampling_method}_{point_id}"
-        logging.info(f"Single Point spectrogram for point: {point_id}")
+        logging.info(f"--- Single Point spectrogram for point: {point_id}")
     elif sampling_method == "Spatial":
         # See old code for implementation if needed
         raise NotImplementedError("Spatial sampling method is not implemented.")
@@ -300,16 +280,10 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
         raise ValueError(f"Invalid sampling method: {sampling_method}. Please choose from 'RandomPoint', "
                          "'SinglePoint', or 'Spatial'.")
 
-    elapsed_time = timeit.default_timer() - start_time
-    logging.info(f"Obtained sample points in {elapsed_time:.6f} seconds")
-
-    start_time = timeit.default_timer()
+    logging.info("--- Obtained sample points\n")
 
     df = df.iloc[idx_sampled]
     quantity = f"{quantity}_{component}_{n_samples}"
-
-    elapsed_time = timeit.default_timer() - start_time
-    logging.info(f"Sampled dataframe in {elapsed_time:.6f} seconds")
 
     return quantity, df, case_name, image_folder, visualization_hi_pass_folder
 
@@ -369,7 +343,7 @@ def get_psd(dfNearest: pd.DataFrame, fsamp: float, scaling: str = "density") -> 
     if dfNearest.shape[0] > 1:
         Pxx_matrix = np.zeros_like(periodogram(dfNearest.iloc[0], fs=fsamp, window='blackmanharris')[1])
 
-        for each in range(dfNearest.shape[0]):
+        for each in tqdm(range(dfNearest.shape[0]), desc="--- Calculating PSD", unit="row"):
             row = dfNearest.iloc[each]
             f, Pxx = periodogram(row, fs=fsamp, window='blackmanharris', scaling=scaling)
             Pxx_matrix += Pxx
@@ -406,11 +380,12 @@ def get_spectrogram(dfNearest: pd.DataFrame, fsamp: float, nWindow: int, overlap
     NFFT = shift_bit_length(int(dfNearest.shape[1] / nWindow))
 
     if dfNearest.shape[0] > 1:
-        for each in range(dfNearest.shape[0]):
+        Pxx_matrix = None  # Initialize Pxx_matrix
+        for each in tqdm(range(dfNearest.shape[0]), desc="--- Calculating spectrogram", unit="row"):
             row = dfNearest.iloc[each]
             freqs, bins, Pxx = spectrogram(row, fs=fsamp, nperseg=NFFT, noverlap=int(overlapFrac * NFFT),
                                            nfft=2 * NFFT, window=window, scaling=scaling)
-            if each == 0:
+            if Pxx_matrix is None:
                 Pxx_matrix = Pxx
             else:
                 Pxx_matrix = Pxx_matrix + Pxx
@@ -449,9 +424,8 @@ def spectrogram_scaling(Pxx_mean: np.ndarray, lower_thresh: float) -> tuple:
     Pxx_scaled = np.log(Pxx_mean)
     max_val = np.max(Pxx_scaled)
     min_val = np.min(Pxx_scaled)
-    logging.info(f"Pxx_scaled max: {max_val}")
-    logging.info(f"Pxx_scaled max: {min_val}")
-    logging.info(f"Pxx threshold: {lower_thresh}")
+    logging.info(f"--- Spectrogram Scaling: Max: {max_val}, Min: {min_val}, Threshold: {lower_thresh}")
+
     Pxx_threshold_indices = Pxx_scaled < lower_thresh
     Pxx_scaled[Pxx_threshold_indices] = lower_thresh
 
@@ -535,7 +509,7 @@ def filter_time_data(df: pd.DataFrame, fs: float, lowcut: float = 25.0, highcut:
     """
     df_filtered = df.copy()
 
-    for row in range(df.shape[0]):
+    for row in tqdm(range(df.shape[0]), desc="--- Filtering rows", unit="row"):
         df_filtered.iloc[row] = butter_bandpass_filter(df.iloc[row], lowcut=lowcut, highcut=highcut, fs=fs,
                                                        order=order, btype=btype)
 

@@ -51,12 +51,15 @@ def create_spectrogram_composite(case_name: str, quantity: str, df: pd.DataFrame
     num_windows = np.round(num_windows_per_sec * (end_t - start_t)) + 3
 
     # Get sampling constants
+    logging.info("--- Getting sampling constants\n")
     T, _, fs = spec.get_sampling_constants(df, start_t, end_t)
 
     # High-pass filter dataframe for spectrogram
+    logging.info("--- Filtering time data")
     df_filtered = spec.filter_time_data(df, fs, lowcut=lowcut, highcut=15000.0, order=6, btype='highpass')
 
     # PSD calculation
+    logging.info("\n--- Calculating power spectral density of filtered dataframe")
     Pxx_array, freq_array = spec.get_psd(df_filtered, fs)
 
     # Plot PSD
@@ -72,6 +75,7 @@ def create_spectrogram_composite(case_name: str, quantity: str, df: pd.DataFrame
     path_to_psd_figure = Path(image_folder) / (psd_filename + '.png')
 
     # Save the figure
+    logging.info(f"--- Saving PSD figure to {path_to_psd_figure}\n")
     plt.savefig(path_to_psd_figure)
 
     # Create composite figure
@@ -84,19 +88,24 @@ def create_spectrogram_composite(case_name: str, quantity: str, df: pd.DataFrame
     else:
         fig1, (ax2, ax3, ax4) = plt.subplots(3, sharex=True, gridspec_kw={'height_ratios': [3, 1, 1]})
 
-    # Spectrogram--------------------------------------------------------------
     fig1.set_size_inches(7.5, 9)
+
+    logging.info("--- Computing average spectrogram")
 
     # Specs with Reyynolds number
     bins, freqs, Pxx, max_val, min_val, lower_thresh = \
         spec.compute_average_spectrogram(df_filtered, fs, num_windows, overlap_frac, window, start_t, end_t, thresh_val,
                                          scaling="spectrum", filter_data=False, thresh_method="old")
+
     bins = bins + start_t  # Need to shift bins so that spectrogram timing is correct
     spec.plot_spectrogram(fig1, ax2, bins, freqs, Pxx, ylim, color_range=[thresh_val, max_plot])
 
     # Chromagram ------------------------------------------------------------
     n_fft = spec.shift_bit_length(int(df.shape[1] / num_windows)) * 2
     n_chroma = 24
+
+    logging.info("\n--- Recomputing average spectrogram without filter")
+
     # Recalculate spectrogram without filtering the data
     bins_raw, freqs_raw, Pxx_raw, max_val_raw, min_val_raw, lower_thresh_raw = \
         spec.compute_average_spectrogram(df, fs, num_windows, overlap_frac, window, start_t, end_t, thresh_val,
@@ -162,6 +171,7 @@ def create_spectrogram_composite(case_name: str, quantity: str, df: pd.DataFrame
         composite_figure_name += "_power_scaled"
 
     composite_figure_path = Path(image_folder) / (composite_figure_name + '.png')
+    logging.info(f"\n--- Saving composite figure to {composite_figure_path}\n")
     fig1.savefig(composite_figure_path)
 
     # create separate spectrogram figure
@@ -174,6 +184,7 @@ def create_spectrogram_composite(case_name: str, quantity: str, df: pd.DataFrame
     # Save data to files (spectrogram)
     spec_filename = f"{quantity}_{case_name}_{num_windows}_windows_thresh{thresh_val}_spectrogram"
     path_to_spec = Path(image_folder) / (spec_filename + '.png')
+    logging.info(f"--- Saving spectrogram figure to {path_to_spec}\n")
     fig2.savefig(path_to_spec)
 
     output_csv_path = path_to_spec.with_suffix('.csv')
