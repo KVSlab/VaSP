@@ -1,10 +1,13 @@
 """
-Problem file for tiny cylinder FSI simulation
+Problem file for predeforming mesh, i.e approximating a zero-pressure geometry.
+Here, we inflate the geometry to P_final and v_max final, representing the cycle-average
+pressure and centerline velocity in a pulsatile simulation. We then apply the reverse of
+this deformation as an approximate "zero-pressure" geometry, using "predeform_mesh.py"
 """
 import numpy as np
 from turtleFSI.problems import *
 from dolfin import HDF5File, Mesh, MeshFunction, assemble, UserExpression, FacetNormal, ds, \
-    DirichletBC, Measure, inner, parameters, SpatialCoordinate, Constant
+    DirichletBC, Measure, inner, parameters, SpatialCoordinate, Constant, facets, sqrt
 
 # set compiler arguments
 parameters["form_compiler"]["quadrature_degree"] = 6
@@ -26,10 +29,10 @@ def set_problem_parameters(default_variables, **namespace):
     default_variables.update(
         dict(
             # Temporal parameters
-            T=0.1,  # Simulation end time
+            T=0.3,  # Simulation end time
             dt=0.001,  # Time step size
             theta=0.501,  # Theta scheme (implicit/explicit time stepping)
-            save_step=1,  # Save frequency of files for visualisation
+            save_step=10,  # Save frequency of files for visualisation
             checkpoint_step=50,  # Save frequency of checkpoint files
             # Linear solver parameters
             linear_solver="mumps",
@@ -48,28 +51,37 @@ def set_problem_parameters(default_variables, **namespace):
             rho_f=1.025e3,  # Fluid density [kg/m3]
             mu_f=3.5e-3,  # Fluid dynamic viscosity [Pa.s]
             dx_f_id=1,  # ID of marker in the fluid domain. When reading the mesh, the fuid domain is assigned with a 1.
-            v_max_final=0.75,  # Steady state, maximum centerline velocity of parabolic profile
+            # Pre-deform parameters
+            v_max_final=0.75,  # Final max centerline velocity of parabolic profile
+            # should be the cycle-averaged average velocity for your main simulation
             P_final=10000,  # Steady State pressure applied to wall
+            # should be your cycle-averaged gage pressure for your main simulation
+            t_start_v=0.0,  # Start time for ramping up velocity
+            t_end_v=0.1,  # End time for ramping up velocity
+            t_start_p=0.1,  # Start time for ramping up pressure
+            t_end_p=0.2,  # End time for ramping up pressure (should be earlier than simulation end time)
             # Solid parameters
             rho_s=1.0e3,  # Solid density [kg/m3]
             mu_s=mu_s_val,  # Solid shear modulus or 2nd Lame Coef. [Pa]
             nu_s=nu_s_val,  # Solid Poisson ratio [-]
             lambda_s=lambda_s_val,  # Solid 1st Lame Coef. [Pa]
             dx_s_id=2,  # ID of marker in the solid domain
+            fsi_region=[0.0, 0.0, 0.0, 0.004],  # x, y, and z coordinate of FSI region center,
+                                                # and radius of FSI region sphere
             # mesh lifting parameters (see turtleFSI for options)
             extrapolation="laplace",  # laplace, elastic, biharmonic, no-extrapolation
             extrapolation_sub_type="constant",  # ["constant","small_constant","volume","volume_change","bc1","bc2"]
-            folder="cylinder_results",  # output folder generated for simulation
-            save_deg=1  # save_deg=1 saves corner nodes only, save_deg=2 saves corner + mid-point nodes for viz
+            folder="predeform_results",  # output folder generated for simulation
+            save_deg=1,  # save_deg=1 saves corner nodes only, save_deg=2 saves corner + mid-point nodes for viz
         )
     )
 
     return default_variables
 
 
-def get_mesh_domain_and_boundaries(mesh_path, **namespace):
-    if MPI.rank(MPI.comm_world) == 0:
-        print("Obtaining mesh, domains and boundaries...")
+def get_mesh_domain_and_boundaries(mesh_path, fsi_region, fsi_id, rigid_id, outer_wall_id, **namespace):
+
+    # Read mesh
     mesh = Mesh()
     hdf = HDF5File(mesh.mpi_comm(), mesh_path, "r")
     hdf.read(mesh, "/mesh", False)
@@ -78,13 +90,30 @@ def get_mesh_domain_and_boundaries(mesh_path, **namespace):
     domains = MeshFunction("size_t", mesh, 3)
     hdf.read(domains, "/domains")
 
+    # Only consider FSI in domain within this sphere
+    sph_x = fsi_region[0]
+    sph_y = fsi_region[1]
+    sph_z = fsi_region[2]
+    sph_rad = fsi_region[3]
+
+    i = 0
+    for submesh_facet in facets(mesh):
+        idx_facet = boundaries.array()[i]
+        if idx_facet == fsi_id or idx_facet == outer_wall_id:
+            mid = submesh_facet.midpoint()
+            dist_sph_center = sqrt((mid.x() - sph_x) ** 2 + (mid.y() - sph_y) ** 2 + (mid.z() - sph_z) ** 2)
+            if dist_sph_center > sph_rad:
+                boundaries.array()[i] = rigid_id  # changed "fsi" idx to "rigid wall" idx
+        i += 1
+
     return mesh, domains, boundaries
 
 
 class VelInPara(UserExpression):
-    def __init__(self, t, t_ramp, v_max_final, n, dsi, mesh, **kwargs):
+    def __init__(self, t, t_start, t_end, v_max_final, n, dsi, mesh, **kwargs):
         self.t = t
-        self.t_ramp = t_ramp
+        self.t_start = t_start
+        self.t_end = t_end
         self.v_max_final = v_max_final
         self.v = 0.0
         self.n = n
@@ -102,8 +131,10 @@ class VelInPara(UserExpression):
     def update(self, t):
         self.t = t
         # apply a sigmoid ramp to the pressure
-        if self.t < self.t_ramp:
-            ramp_factor = -0.5 * np.cos(np.pi * self.t / self.t_ramp) + 0.5
+        if self.t < self.t_start:
+            ramp_factor = 0.0
+        elif self.t < self.t_end and self.t > self.t_start:
+            ramp_factor = -0.5 * np.cos(np.pi * (self.t - self.t_start) / (self.t_end - self.t_start)) + 0.5
         else:
             ramp_factor = 1.0
         self.v = ramp_factor * self.v_max_final
@@ -126,9 +157,10 @@ class VelInPara(UserExpression):
 
 
 class InnerP(UserExpression):
-    def __init__(self, t, t_ramp, P_final, **kwargs):
+    def __init__(self, t, t_start, t_end, P_final, **kwargs):
         self.t = t
-        self.t_ramp = t_ramp
+        self.t_start = t_start
+        self.t_end = t_end
         self.P_final = P_final
         self.P = 0.0
         super().__init__(**kwargs)
@@ -136,8 +168,10 @@ class InnerP(UserExpression):
     def update(self, t):
         self.t = t
         # apply a sigmoid ramp to the pressure
-        if self.t < self.t_ramp:
-            ramp_factor = -0.5 * np.cos(np.pi * self.t / self.t_ramp) + 0.5
+        if self.t < self.t_start:
+            ramp_factor = 0.0
+        elif self.t < self.t_end and self.t > self.t_start:
+            ramp_factor = -0.5 * np.cos(np.pi * (self.t - self.t_start) / (self.t_end - self.t_start)) + 0.5
         else:
             ramp_factor = 1.0
         self.P = ramp_factor * self.P_final
@@ -152,15 +186,14 @@ class InnerP(UserExpression):
         return ()
 
 
-def create_bcs(DVP, mesh, boundaries, P_final, v_max_final, fsi_id, inlet_id,
-               inlet_outlet_s_id, rigid_id, psi, F_solid_linear, **namespace):
-
+def create_bcs(DVP, mesh, boundaries, t_start_v, t_end_v, t_start_p, t_end_p, P_final,
+               v_max_final, fsi_id, inlet_id, inlet_outlet_s_id, rigid_id, psi, F_solid_linear, **namespace):
     # Apply pressure at the fsi interface by modifying the variational form
-    p_out_bc_val = InnerP(t=0.0, t_ramp=0.1, P_final=P_final, degree=2)
+    p_out_bc_val = InnerP(t=0.0, t_start=t_start_p, t_end=t_end_p, P_final=P_final, degree=2)
     dSS = Measure("dS", domain=mesh, subdomain_data=boundaries)
     n = FacetNormal(mesh)
     # defined on the reference domain
-    F_solid_linear += (p_out_bc_val * inner(n("+"), psi("+")) * dSS(fsi_id))
+    F_solid_linear += p_out_bc_val * inner(n("+"), psi("+")) * dSS(fsi_id)
 
     # Fluid velocity BCs
     dsi = ds(inlet_id, domain=mesh, subdomain_data=boundaries)
@@ -171,10 +204,11 @@ def create_bcs(DVP, mesh, boundaries, P_final, v_max_final, fsi_id, inlet_id,
     normal = ni / n_len
 
     # Parabolic Inlet Velocity Profile
-    u_inflow_exp = VelInPara(t=0.0, t_ramp=0.1, v_max_final=v_max_final,
+    u_inflow_exp = VelInPara(t=0.0, t_start=t_start_v, t_end=t_end_v, v_max_final=v_max_final,
                              n=normal, dsi=dsi, mesh=mesh, degree=3)
     u_inlet = DirichletBC(DVP.sub(1), u_inflow_exp, boundaries, inlet_id)
-    u_inlet_s = DirichletBC(DVP.sub(1), ((0.0, 0.0, 0.0)), boundaries, inlet_outlet_s_id)
+    u_inlet_s = DirichletBC(
+        DVP.sub(1), ((0.0, 0.0, 0.0)), boundaries, inlet_outlet_s_id)
 
     # Solid Displacement BCs
     d_inlet = DirichletBC(DVP.sub(0), ((0.0, 0.0, 0.0)), boundaries, inlet_id)
