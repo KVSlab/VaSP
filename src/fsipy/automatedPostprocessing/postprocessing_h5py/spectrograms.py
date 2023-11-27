@@ -66,12 +66,6 @@ def read_command_line_spec() -> configargparse.Namespace:
     parser.add_argument('-q', '--quantity', type=str, default="v",
                         help="Quantity to postprocess. Choose 'v' for velocity, 'd' for displacement, 'p' for "
                              "pressure, or 'wss' for wall shear stress.")
-    parser.add_argument('--Re_a', type=float, default=0.0,
-                        help="Assuming linearly increasing Reynolds number: Re(t) = Re_a*t + Re_b. If both Re_a and "
-                             "Re_b are 0, the plot won't be against Reynolds number.")
-    parser.add_argument('--Re_b', type=float, default=0.0,
-                        help="Assuming linearly increasing Reynolds number: Re(t) = Re_a*t + Re_b. If both Re_a and "
-                             "Re_b are 0, the plot won't be against Reynolds number.")
     parser.add_argument('--interface-only', action='store_true',
                         help="Generate spectrogram only for the fluid-solid interface. If present, interface-only "
                              "spectrogram will be generated; otherwise, the volumetric spectrogram will include all "
