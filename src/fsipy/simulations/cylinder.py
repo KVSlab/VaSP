@@ -1,10 +1,10 @@
 """
-Propblem file for tiny cylinder FSI simulation
+Problem file for tiny cylinder FSI simulation
 """
 import numpy as np
 from turtleFSI.problems import *
 from dolfin import HDF5File, Mesh, MeshFunction, assemble, UserExpression, FacetNormal, ds, \
-    DirichletBC, Measure, inner, parameters
+    DirichletBC, Measure, inner, parameters, SpatialCoordinate, Constant
 
 # set compiler arguments
 parameters["form_compiler"]["quadrature_degree"] = 6
