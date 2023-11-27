@@ -53,7 +53,7 @@ def read_command_line_spec() -> configargparse.Namespace:
     parser.add_argument('--lowcut', type=float, default=25,
                         help="Cutoff frequency (Hz) for the high-pass filter.")
     parser.add_argument('--ylim', type=float, default=None,
-                        help="Set the y-limit of the spectrogram graph.")
+                        help="Set the y-limit of the spectrogram graph (Hz).")
     parser.add_argument('--sampling-region', type=str, default="sphere",
                         help="Specify the sampling region. Choose 'sphere' to sample within a sphere or 'domain' to "
                              "sample within a specified domain.")
