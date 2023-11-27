@@ -7,7 +7,7 @@ this deformation as an approximate "zero-pressure" geometry, using "predeform_me
 import numpy as np
 from turtleFSI.problems import *
 from dolfin import HDF5File, Mesh, MeshFunction, assemble, UserExpression, FacetNormal, ds, \
-    DirichletBC, Measure, inner, parameters, SpatialCoordinate, Constant
+    DirichletBC, Measure, inner, parameters, SpatialCoordinate, Constant, facets, sqrt
 
 # set compiler arguments
 parameters["form_compiler"]["quadrature_degree"] = 6
@@ -32,7 +32,7 @@ def set_problem_parameters(default_variables, **namespace):
             T=0.3,  # Simulation end time
             dt=0.001,  # Time step size
             theta=0.501,  # Theta scheme (implicit/explicit time stepping)
-            save_step=1,  # Save frequency of files for visualisation
+            save_step=10,  # Save frequency of files for visualisation
             checkpoint_step=50,  # Save frequency of checkpoint files
             # Linear solver parameters
             linear_solver="mumps",
@@ -59,13 +59,15 @@ def set_problem_parameters(default_variables, **namespace):
             t_start_v=0.0,  # Start time for ramping up velocity
             t_end_v=0.1,  # End time for ramping up velocity
             t_start_p=0.1,  # Start time for ramping up pressure
-            t_end_p=0.2,  # End time for ramping up pressure
+            t_end_p=0.2,  # End time for ramping up pressure (should be earlier than simulation end time)
             # Solid parameters
             rho_s=1.0e3,  # Solid density [kg/m3]
             mu_s=mu_s_val,  # Solid shear modulus or 2nd Lame Coef. [Pa]
             nu_s=nu_s_val,  # Solid Poisson ratio [-]
             lambda_s=lambda_s_val,  # Solid 1st Lame Coef. [Pa]
             dx_s_id=2,  # ID of marker in the solid domain
+            fsi_region=[0.0, 0.0, 0.0, 0.004],  # x, y, and z coordinate of FSI region center,
+                                                # and radius of FSI region sphere
             # mesh lifting parameters (see turtleFSI for options)
             extrapolation="laplace",  # laplace, elastic, biharmonic, no-extrapolation
             extrapolation_sub_type="constant",  # ["constant","small_constant","volume","volume_change","bc1","bc2"]
@@ -77,8 +79,9 @@ def set_problem_parameters(default_variables, **namespace):
     return default_variables
 
 
-def get_mesh_domain_and_boundaries(mesh_path, folder, **namespace):
-    print("Obtaining mesh, domains and boundaries...")
+def get_mesh_domain_and_boundaries(mesh_path, fsi_region, fsi_id, rigid_id, outer_wall_id, **namespace):
+
+    # Read mesh
     mesh = Mesh()
     hdf = HDF5File(mesh.mpi_comm(), mesh_path, "r")
     hdf.read(mesh, "/mesh", False)
@@ -86,6 +89,22 @@ def get_mesh_domain_and_boundaries(mesh_path, folder, **namespace):
     hdf.read(boundaries, "/boundaries")
     domains = MeshFunction("size_t", mesh, 3)
     hdf.read(domains, "/domains")
+
+    # Only consider FSI in domain within this sphere
+    sph_x = fsi_region[0]
+    sph_y = fsi_region[1]
+    sph_z = fsi_region[2]
+    sph_rad = fsi_region[3]
+
+    i = 0
+    for submesh_facet in facets(mesh):
+        idx_facet = boundaries.array()[i]
+        if idx_facet == fsi_id or idx_facet == outer_wall_id:
+            mid = submesh_facet.midpoint()
+            dist_sph_center = sqrt((mid.x() - sph_x) ** 2 + (mid.y() - sph_y) ** 2 + (mid.z() - sph_z) ** 2)
+            if dist_sph_center > sph_rad:
+                boundaries.array()[i] = rigid_id  # changed "fsi" idx to "rigid wall" idx
+        i += 1
 
     return mesh, domains, boundaries
 
@@ -167,7 +186,7 @@ class InnerP(UserExpression):
         return ()
 
 
-def create_bcs(dvp_, DVP, mesh, boundaries, t_start_v, t_end_v, t_start_p, t_end_p, P_final,
+def create_bcs(DVP, mesh, boundaries, t_start_v, t_end_v, t_start_p, t_end_p, P_final,
                v_max_final, fsi_id, inlet_id, inlet_outlet_s_id, rigid_id, psi, F_solid_linear, **namespace):
     # Apply pressure at the fsi interface by modifying the variational form
     p_out_bc_val = InnerP(t=0.0, t_start=t_start_p, t_end=t_end_p, P_final=P_final, degree=2)

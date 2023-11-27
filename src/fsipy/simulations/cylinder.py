@@ -67,8 +67,9 @@ def set_problem_parameters(default_variables, **namespace):
     return default_variables
 
 
-def get_mesh_domain_and_boundaries(mesh_path, folder, **namespace):
-    print("Obtaining mesh, domains and boundaries...")
+def get_mesh_domain_and_boundaries(mesh_path, **namespace):
+    if MPI.rank(MPI.comm_world) == 0:
+        print("Obtaining mesh, domains and boundaries...")
     mesh = Mesh()
     hdf = HDF5File(mesh.mpi_comm(), mesh_path, "r")
     hdf.read(mesh, "/mesh", False)
@@ -151,7 +152,7 @@ class InnerP(UserExpression):
         return ()
 
 
-def create_bcs(dvp_, DVP, mesh, boundaries, P_final, v_max_final, fsi_id, inlet_id,
+def create_bcs(DVP, mesh, boundaries, P_final, v_max_final, fsi_id, inlet_id,
                inlet_outlet_s_id, rigid_id, psi, F_solid_linear, **namespace):
 
     # Apply pressure at the fsi interface by modifying the variational form
