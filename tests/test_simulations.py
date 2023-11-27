@@ -63,4 +63,3 @@ def test_predeform_problem(input_mesh, tmpdir):
     print("Velocity: {}".format(velocity_at_inlet))
 
     assert np.isclose(velocity_at_inlet, expected_velocity), "Velocity does not match expected value."
-
