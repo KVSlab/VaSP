@@ -115,25 +115,25 @@ def get_domain_ids_specified_region(mesh_path: Union[str, Path], fluid_sampling_
     with h5py.File(mesh_path, "r") as vector_data:
         domains_loc = 'domains/values'
         domains = vector_data[domains_loc][:]  # Open domain array
-        id_wall = np.nonzero(domains == solid_sampling_domain_id)  # domain = 2 is the solid
+        id_solid = np.nonzero(domains == solid_sampling_domain_id)  # domain = 2 is the solid
         id_fluid = np.nonzero(domains == fluid_sampling_domain_id)  # domain = 1 is the fluid
 
         topology_loc = 'domains/topology'
         all_topology = vector_data[topology_loc][:, :]
-        wall_topology = all_topology[id_wall, :]
+        solid_topology = all_topology[id_solid, :]
         fluid_topology = all_topology[id_fluid, :]
 
-        wall_ids = np.unique(wall_topology)  # Unique node ID's in the wall topology, sorted in ascending order
+        solid_ids = np.unique(solid_topology)  # Unique node ID's in the solid topology, sorted in ascending order
         fluid_ids = np.unique(fluid_topology)  # Unique node ID's in the fluid topology, sorted in ascending order
         all_ids = np.unique(all_topology)
 
-    return fluid_ids, wall_ids, all_ids
+    return fluid_ids, solid_ids, all_ids
 
 
 def get_interface_ids(mesh_path: Union[str, Path], fluid_domain_id: Union[int, list[int]],
                       solid_domain_id: Union[int, list[int]]) -> np.ndarray:
     """
-    Get the interface node IDs between fluid and wall domains from the given mesh file.
+    Get the interface node ID's between fluid and solid domains from the given mesh file.
 
     Args:
         mesh_path (str or Path): Path to the mesh file.
@@ -143,10 +143,10 @@ def get_interface_ids(mesh_path: Union[str, Path], fluid_domain_id: Union[int, l
     Returns:
         np.ndarray: Array containing the interface node IDs.
     """
-    fluid_ids, wall_ids, _ = get_domain_ids(mesh_path, fluid_domain_id, solid_domain_id)
+    fluid_ids, solid_ids, _ = get_domain_ids(mesh_path, fluid_domain_id, solid_domain_id)
 
-    # Find the intersection of fluid and wall node IDs
-    interface_ids_set = set(fluid_ids) & set(wall_ids)
+    # Find the intersection of fluid and solid node ID's
+    interface_ids_set = set(fluid_ids) & set(solid_ids)
 
     # Convert the set to a NumPy array
     interface_ids = np.array(list(interface_ids_set))
@@ -234,7 +234,7 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
     # Get node ID's from input mesh. If save_deg=2, you can supply the original mesh to get the data for the
     # corner nodes, or supply a refined mesh to get the data for all nodes (very computationally intensive)
     if quantity in {"d", "v", "p"}:
-        fluid_ids, wall_ids, all_ids = get_domain_ids(mesh_path, fluid_domain_id, solid_domain_id)
+        fluid_ids, solid_ids, all_ids = get_domain_ids(mesh_path, fluid_domain_id, solid_domain_id)
         ids = all_ids
 
     # Get name of xdmf file

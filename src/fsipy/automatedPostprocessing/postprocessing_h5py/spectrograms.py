@@ -182,7 +182,7 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
     mesh_path = mesh_path.with_name(f"{mesh_path.stem}{mesh_name_suffix}{mesh_path.suffix}")
     mesh_path_fluid = mesh_path.with_name(f"{mesh_path.stem}_fluid.h5")  # Needed for formatting SPI data
 
-    formatted_data_folder_name = f”npz_{start_t}s_to_{end_t}s_stride_{stride}save_deg_{save_deg}"
+    formatted_data_folder_name = f"npz_{start_t}s_to_{end_t}s_stride_{stride}save_deg_{save_deg}"
     formatted_data_folder = folder_path / formatted_data_folder_name
     visualization_separate_domain_folder = folder_path / "Visualization_separate_domain"
     visualization_hi_pass_folder = folder_path / "Visualization_hi_pass"
@@ -225,23 +225,23 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
         coords = get_coords(mesh_path)
 
     if sampling_region == "sphere":
-        # Get wall and fluid ID's
-        fluid_ids, wall_ids, all_ids = get_domain_ids(mesh_path, fluid_domain_id, solid_domain_id)
+        # Get solid and fluid ID's
+        fluid_ids, solid_ids, all_ids = get_domain_ids(mesh_path, fluid_domain_id, solid_domain_id)
         interface_ids = get_interface_ids(mesh_path, fluid_domain_id, solid_domain_id)
         sphere_ids = find_points_in_sphere(sac_center, r_sphere, coords)
 
         # Get nodes in sac only
         all_ids = np.intersect1d(sphere_ids, all_ids)
         fluid_ids = np.intersect1d(sphere_ids, fluid_ids)
-        wall_ids = np.intersect1d(sphere_ids, wall_ids)
+        solid_ids = np.intersect1d(sphere_ids, solid_ids)
         interface_ids = np.intersect1d(sphere_ids, interface_ids)
     elif sampling_region == "domain":
         # To use this option, input a mesh with domain markers and indicate which domain represents the desired fluid
         # region for the spectrogram (fluid_sampling_domain_id) and which domain represents the desired solid region
         # (solid_sampling_domain_id).
-        fluid_ids, wall_ids, all_ids = \
+        fluid_ids, solid_ids, all_ids = \
             get_domain_ids_specified_region(mesh_path, fluid_sampling_domain_id, solid_sampling_domain_id)
-        interface_ids = np.intersect1d(fluid_ids, wall_ids)
+        interface_ids = np.intersect1d(fluid_ids, solid_ids)
     else:
         raise ValueError(f"Invalid sampling method '{sampling_region}'. Please specify 'sphere' or 'domain'.")
 
@@ -253,8 +253,8 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
         region_ids = interface_ids
         quantity = quantity + "_interface"
     elif quantity == "d":
-        # For displacement spectrogram, we need to take only the wall IDs
-        region_ids = wall_ids
+        # For displacement spectrogram, we need to take only the solid IDs
+        region_ids = solid_ids
     else:
         # For pressure and velocity spectrogram, we need to take only the fluid IDs
         region_ids = fluid_ids
