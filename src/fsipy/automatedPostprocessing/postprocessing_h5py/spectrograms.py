@@ -182,7 +182,7 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
     mesh_path = mesh_path.with_name(f"{mesh_path.stem}{mesh_name_suffix}{mesh_path.suffix}")
     mesh_path_fluid = mesh_path.with_name(f"{mesh_path.stem}_fluid.h5")  # Needed for formatting SPI data
 
-    formatted_data_folder_name = f"res_{case_name}_stride_{stride}t{start_t}_to_{end_t}save_deg_{save_deg}"
+    formatted_data_folder_name = f”npz_{start_t}s_to_{end_t}s_stride_{stride}save_deg_{save_deg}"
     formatted_data_folder = folder_path / formatted_data_folder_name
     visualization_separate_domain_folder = folder_path / "Visualization_separate_domain"
     visualization_hi_pass_folder = folder_path / "Visualization_hi_pass"
