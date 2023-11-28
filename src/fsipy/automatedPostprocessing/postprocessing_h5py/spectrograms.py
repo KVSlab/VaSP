@@ -40,6 +40,8 @@ def read_command_line_spec() -> configargparse.Namespace:
                         help="Path to simulation results")
     parser.add_argument('--mesh-path', type=Path, default=None,
                         help="Path to the mesh file (default: <folder_path>/Mesh/mesh.h5)")
+    parser.add_argument('-c', '--config', is_config_file=True,
+                        help='Path to configuration file')
     parser.add_argument('--save-deg', type=int, default=None,
                         help="Specify the save_deg used during the simulation, i.e., whether the intermediate P2 nodes "
                              "were saved. Entering save_deg=1 when the simulation was run with save_deg=2 will result "
@@ -90,12 +92,12 @@ def read_command_line_spec() -> configargparse.Namespace:
                              "Default is 'blackmanharris'.")
     parser.add_argument('--num-windows-per-sec', type=int, default=4,
                         help="Number of windows per second for spectrogram computation.")
-    parser.add_argument('--thresh-val', type=int, default=None,
-                        help="Threshold value for the spectrogram. Default is determined based on the 'quantity' "
-                             "argument: if 'd', default is -42; if 'v', default is -20; if 'p', default is -5; if "
-                             "'wss', default is -18.")
-    parser.add_argument('--max-plot', type=int, default=None,
-                        help="Maximum value for plotting the spectrogram. Default is determined based on the "
+    parser.add_argument('--min-color', type=int, default=None,
+                        help="Minimum color value for plotting the spectrogram. Default is determined based on the "
+                             "'quantity' argument: if 'd', default is -42; if 'v', default is -20; if 'p', default is "
+                             "-5; if 'wss', default is -18.")
+    parser.add_argument('--max-color', type=int, default=None,
+                        help="Maximum color value for plotting the spectrogram. Default is determined based on the "
                              "'quantity' argument: if 'd', default is -30; if 'v', default is -7; if 'p', default is "
                              "5; if 'wss', default is 0.")
     parser.add_argument('--amplitude-file-name', type=Path, default=None,
@@ -110,25 +112,25 @@ def read_command_line_spec() -> configargparse.Namespace:
     # Set default mesh path if not provided
     args.mesh_path = args.folder / "Mesh" / "mesh.h5" if args.mesh_path is None else args.mesh_path
 
-    # Set default thresh_val, max_plot and amplitude_file_name based in the quantity argument
+    # Set default min_color, max_color and amplitude_file_name based in the quantity argument
     if args.quantity == "d":
-        args.thresh_val = args.thresh_val if args.thresh_val is not None else -42
-        args.max_plot = args.max_plot if args.max_plot is not None else -30
+        args.min_color = args.min_color if args.min_color is not None else -42
+        args.max_color = args.max_color if args.max_color is not None else -30
         args.amplitude_file_name = args.amplitude_file_name if args.amplitude_file_name is not None \
             else f"displacement_amplitude_{args.lowcut}_to_100000.csv"
     elif args.quantity == "v":
-        args.thresh_val = args.thresh_val if args.thresh_val is not None else -20
-        args.max_plot = args.max_plot if args.max_plot is not None else -7
+        args.min_color = args.min_color if args.min_color is not None else -20
+        args.max_color = args.max_color if args.max_color is not None else -7
         args.amplitude_file_name = args.amplitude_file_name if args.amplitude_file_name is not None \
             else f"velocity_amplitude_{args.lowcut}_to_100000.csv"
     elif args.quantity == "p":
-        args.thresh_val = args.thresh_val if args.thresh_val is not None else -5
-        args.max_plot = args.max_plot if args.max_plot is not None else 5
+        args.min_color = args.min_color if args.min_color is not None else -5
+        args.max_color = args.max_color if args.max_color is not None else 5
         args.amplitude_file_name = args.amplitude_file_name if args.amplitude_file_name is not None \
             else f"pressure_amplitude_{args.lowcut}_to_100000.csv"
     elif args.quantity == "wss":
-        args.thresh_val = args.thresh_val if args.thresh_val is not None else -18
-        args.max_plot = args.max_plot if args.max_plot is not None else 0
+        args.min_color = args.min_color if args.min_color is not None else -18
+        args.max_color = args.max_color if args.max_color is not None else 0
         args.amplitude_file_name = args.amplitude_file_name if args.amplitude_file_name is not None \
             else f"wss_amplitude_{args.lowcut}_to_100000.csv"
     else:

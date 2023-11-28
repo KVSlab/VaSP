@@ -21,7 +21,7 @@ from fsipy.automatedPostprocessing.postprocessing_common import read_parameters_
 
 def create_spectrogram_composite(case_name: str, quantity: str, df: pd.DataFrame, start_t: float, end_t: float,
                                  num_windows_per_sec: float, overlap_frac: float, window: str, lowcut: float,
-                                 thresh_val: float, max_plot: float, image_folder: Union[str, Path],
+                                 min_color: float, max_color: float, image_folder: Union[str, Path],
                                  flow_rate_file: Optional[Union[str, Path]] = None,
                                  amplitude_file: Optional[Union[str, Path]] = None, power_scaled: bool = False,
                                  ylim: Optional[float] = None) -> None:
@@ -38,8 +38,8 @@ def create_spectrogram_composite(case_name: str, quantity: str, df: pd.DataFrame
         overlap_frac (float): Overlap fraction for windows.
         window (str): Type of window for spectrogram.
         lowcut (float): Lowcut frequency for high-pass filter.
-        thresh_val (float): Threshold value.
-        max_plot (float): Maximum plot value.
+        min_color (float): Minimum value for the color range.
+        max_color (float): Maximum value for the color range.
         image_folder (str or Path): Folder to save the images.
         flow_rate_file (str or Path, optional): File containing flow rate data.
         amplitude_file (str or Path, optional): File containing amplitude data.
@@ -94,11 +94,11 @@ def create_spectrogram_composite(case_name: str, quantity: str, df: pd.DataFrame
 
     # Specs with Reyynolds number
     bins, freqs, Pxx, max_val, min_val, lower_thresh = \
-        spec.compute_average_spectrogram(df_filtered, fs, num_windows, overlap_frac, window, start_t, end_t, thresh_val,
+        spec.compute_average_spectrogram(df_filtered, fs, num_windows, overlap_frac, window, start_t, end_t, min_color,
                                          scaling="spectrum", filter_data=False, thresh_method="old")
 
     bins = bins + start_t  # Need to shift bins so that spectrogram timing is correct
-    spec.plot_spectrogram(fig1, ax2, bins, freqs, Pxx, ylim, color_range=[thresh_val, max_plot])
+    spec.plot_spectrogram(fig1, ax2, bins, freqs, Pxx, ylim, color_range=[min_color, max_color])
 
     # Chromagram ------------------------------------------------------------
     n_fft = spec.shift_bit_length(int(df.shape[1] / num_windows)) * 2
@@ -108,7 +108,7 @@ def create_spectrogram_composite(case_name: str, quantity: str, df: pd.DataFrame
 
     # Recalculate spectrogram without filtering the data
     bins_raw, freqs_raw, Pxx_raw, max_val_raw, min_val_raw, lower_thresh_raw = \
-        spec.compute_average_spectrogram(df, fs, num_windows, overlap_frac, window, start_t, end_t, thresh_val,
+        spec.compute_average_spectrogram(df, fs, num_windows, overlap_frac, window, start_t, end_t, min_color,
                                          scaling="spectrum", filter_data=False, thresh_method="old")
     bins_raw = bins_raw + start_t  # Need to shift bins so that spectrogram timing is correct
     # Reverse the log of the data
@@ -120,7 +120,7 @@ def create_spectrogram_composite(case_name: str, quantity: str, df: pd.DataFrame
     norm = "sum"
     chroma = spec.chromagram_from_spectrogram(Pxx_raw, fs, n_fft, n_chroma=n_chroma, norm=norm)
     if power_scaled:
-        chroma_power = chroma * (Pxx.max(axis=0) - thresh_val)
+        chroma_power = chroma * (Pxx.max(axis=0) - min_color)
         spec.plot_chromagram(fig1, ax3, bins_raw, chroma_power)
     else:
         spec.plot_chromagram(fig1, ax3, bins_raw, chroma)
@@ -134,7 +134,7 @@ def create_spectrogram_composite(case_name: str, quantity: str, df: pd.DataFrame
     chroma_entropy = spec.calc_chroma_entropy(chroma, n_chroma)
     # Plot SBI
     if power_scaled:
-        chroma_entropy_power = chroma_entropy * (Pxx.max(axis=0) - thresh_val)
+        chroma_entropy_power = chroma_entropy * (Pxx.max(axis=0) - min_color)
         ax4.plot(bins, chroma_entropy_power)
     else:
         ax4.plot(bins, chroma_entropy)
@@ -166,7 +166,7 @@ def create_spectrogram_composite(case_name: str, quantity: str, df: pd.DataFrame
         ax4.set_xlabel('Time (s)')
 
     # Name composite figure and save
-    composite_figure_name = f"{quantity}_{case_name}_{num_windows}_windows_thresh{thresh_val}_composite_figure"
+    composite_figure_name = f"{quantity}_{case_name}_{num_windows}_windows_thresh{min_color}_composite_figure"
     if power_scaled:
         composite_figure_name += "_power_scaled"
 
@@ -179,10 +179,10 @@ def create_spectrogram_composite(case_name: str, quantity: str, df: pd.DataFrame
     fig2.set_size_inches(7.5, 5)
     title = f"Pxx max = {max_val:.2e}, Pxx min = {min_val:.2e}, threshold Pxx = {lower_thresh}"
     spec.plot_spectrogram(fig2, ax2_1, bins, freqs, Pxx, ylim, title=title,
-                          x_label="Time (s)", color_range=[thresh_val, max_plot])
+                          x_label="Time (s)", color_range=[min_color, max_color])
 
     # Save data to files (spectrogram)
-    spec_filename = f"{quantity}_{case_name}_{num_windows}_windows_thresh{thresh_val}_spectrogram"
+    spec_filename = f"{quantity}_{case_name}_{num_windows}_windows_thresh{min_color}_spectrogram"
     path_to_spec = Path(image_folder) / (spec_filename + '.png')
     logging.info(f"--- Saving spectrogram figure to {path_to_spec}\n")
     fig2.savefig(path_to_spec)
@@ -243,7 +243,7 @@ def main():
 
     # Create spectrograms
     create_spectrogram_composite(case_name, quantity, df, args.start_time, end_time, args.num_windows_per_sec,
-                                 args.overlap_frac, args.window, args.lowcut, args.thresh_val, args.max_plot,
+                                 args.overlap_frac, args.window, args.lowcut, args.min_color, args.max_color,
                                  image_folder, flow_rate_file=None, amplitude_file=None, power_scaled=False,
                                  ylim=args.ylim)
 

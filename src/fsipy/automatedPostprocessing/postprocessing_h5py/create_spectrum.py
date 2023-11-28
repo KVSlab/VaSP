@@ -18,7 +18,7 @@ from fsipy.automatedPostprocessing.postprocessing_common import read_parameters_
 
 
 def create_spectrum(case_name: str, quantity: str, df, start_t: float, end_t: float, num_windows_per_sec: float,
-                    overlap_frac: float, window: str, lowcut: float, thresh_val: float, max_plot: float,
+                    overlap_frac: float, window: str, lowcut: float, min_color: float, max_color: float,
                     image_folder: Union[str, Path], flow_rate_file: Optional[str] = None,
                     amplitude_file: Optional[str] = None, power_scaled: bool = False) -> None:
     """
@@ -34,8 +34,8 @@ def create_spectrum(case_name: str, quantity: str, df, start_t: float, end_t: fl
         overlap_frac (float): Fraction of overlap between consecutive windows.
         window (str): Type of window function to use.
         lowcut (float): Cutoff frequency for the high-pass filter.
-        thresh_val (float): Threshold value for the color range.
-        max_plot (float): Maximum value for the color range.
+        min_color (float): Minimum value for the color range.
+        max_color (float): Maximum value for the color range.
         image_folder (str or Path): Folder to save the spectrum image and CSV file.
         flow_rate_file (str): File name for flow rate data.
         amplitude_file (str): File name for amplitude data.
@@ -104,7 +104,7 @@ def main():
 
     # Create spectrograms
     create_spectrum(case_name, quantity, df, args.start_time, end_time, args.num_windows_per_sec,
-                    args.overlap_frac, args.window, args.lowcut, args.thresh_val, args.max_plot, image_folder,
+                    args.overlap_frac, args.window, args.lowcut, args.min_color, args.max_color, image_folder,
                     flow_rate_file=None, amplitude_file=None, power_scaled=False)
 
     if args.sampling_method == "SinglePoint":

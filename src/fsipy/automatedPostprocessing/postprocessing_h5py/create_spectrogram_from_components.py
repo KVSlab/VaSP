@@ -16,8 +16,8 @@ import matplotlib.pyplot as plt
 from fsipy.automatedPostprocessing.postprocessing_h5py import spectrograms as spec
 
 
-def create_spectrogram_from_components(folder: Union[str, Path], quantity: str, n_samples: int, thresh_val: float,
-                                       max_plot: float, ylim: Optional[float] = None) -> None:
+def create_spectrogram_from_components(folder: Union[str, Path], quantity: str, n_samples: int, min_color: float,
+                                       max_color: float, ylim: Optional[float] = None) -> None:
     """
     Create a composite spectrogram by averaging three component-wise spectrograms.
 
@@ -25,8 +25,8 @@ def create_spectrogram_from_components(folder: Union[str, Path], quantity: str, 
         folder (str or Path): Path to the case folder.
         quantity (str): Type of data to be processed.
         n_samples (int): Number of samples.
-        thresh_val (float): Threshold value for the color range.
-        max_plot (float): Maximum value for the color range.
+        min_color (float): Minimum value for the color range.
+        max_color (float): Maximum value for the color range.
         ylim (float, optional): Y-axis limit for the plot.
 
     Returns:
@@ -78,12 +78,12 @@ def create_spectrogram_from_components(folder: Union[str, Path], quantity: str, 
     logging.info("--- Creating separate spectrogram figure...")
     fig, ax = plt.subplots()
     fig.set_size_inches(7.5, 5)
-    title = f"threshold Pxx = {thresh_val}"
+    title = f"threshold Pxx = {min_color}"
 
     # Plot and save the spectrogram
     logging.info("--- Plotting and saving the spectrogram...")
     spec.plot_spectrogram(fig, ax, bins, freqs, Pxx, ylim, title=title, x_label="Time (s)",
-                          color_range=[thresh_val, max_plot])
+                          color_range=[min_color, max_color])
     fig.savefig(spec_path)
 
     # Save data as CSV
@@ -103,7 +103,7 @@ def main():
     logging.basicConfig(level=args.log_level, format="%(message)s")
 
     # Create spectrograms
-    create_spectrogram_from_components(args.folder, args.quantity, args.n_samples, args.thresh_val, args.max_plot,
+    create_spectrogram_from_components(args.folder, args.quantity, args.n_samples, args.min_color, args.max_color,
                                        ylim=args.ylim)
 
 
