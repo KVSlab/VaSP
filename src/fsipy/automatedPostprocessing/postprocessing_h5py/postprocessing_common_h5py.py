@@ -182,7 +182,6 @@ def read_npz_files(filepath: Union[str, Path]) -> pd.DataFrame:
 
     Args:
         filepath (str or Path): Path to the npz file.
-        filepath (str): Path to the npz file.
 
     Returns:
         pd.DataFrame: DataFrame containing the data.
@@ -371,8 +370,7 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
 
     for i, component_name in enumerate(tqdm(component_names, desc="--- Writing component files", unit="component")):
         # Create output path
-        component = f"{quantity}_{component_name}"
-        output_file_name = f"{case_name}_{component}.npz"
+        output_file_name = f"{quantity}_{component_name}.npz"
         output_path = output_folder / output_file_name
 
         # Remove old file path
