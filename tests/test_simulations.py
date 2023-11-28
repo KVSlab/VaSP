@@ -7,12 +7,13 @@ import numpy as np
 # Define the list of input geometrical data paths
 # Since we will run turtleFSI from src/fsipy/simulations/, we need to go up one level
 input_data_paths = [
-    "../../../tests/test_data/offset_stenosis/offset_stenosis.h5"
+    "../../../tests/test_data/offset_stenosis/offset_stenosis.h5",
+    "../../../tests/test_data/cylinder/cylinder.h5"
     # Add more paths here as needed
 ]
 
 
-@pytest.mark.parametrize("input_mesh", input_data_paths)
+@pytest.mark.parametrize("input_mesh", [input_data_paths[0]])
 def test_offset_stenosis_problem(input_mesh, tmpdir):
     """
     Test the offset stenosis problem.
@@ -40,3 +41,25 @@ def test_offset_stenosis_problem(input_mesh, tmpdir):
 
     assert np.isclose(velocity_last_time_step, expected_velocity).all(), "Velocity does not match expected value."
     assert np.isclose(pressure_last_time_step, expected_pressure), "Pressure does not match expected value."
+
+
+@pytest.mark.parametrize("input_mesh", [input_data_paths[1]])
+def test_predeform_problem(input_mesh, tmpdir):
+    """
+    Test the offset stenosis problem.
+    """
+    cmd = ("turtleFSI -p predeform -dt 0.01 -T 0.03 --verbose True" +
+           " --theta 0.51 --folder {} --sub-folder 1 --new-arguments mesh_path={}")
+    result = subprocess.check_output(cmd.format(tmpdir, input_mesh), shell=True, cwd="src/fsipy/simulations/")
+
+    output_re = r"v \(centerline, at inlet\) = (\d+\.\d+|\d+) m/s"
+    output_match = re.findall(output_re, str(result))
+
+    assert output_match is not None, "Regular expression did not match the output."
+
+    expected_velocity = 0.2591186271093947
+    velocity_at_inlet = float(output_match[-1])
+
+    print("Velocity: {}".format(velocity_at_inlet))
+
+    assert np.isclose(velocity_at_inlet, expected_velocity), "Velocity does not match expected value."
