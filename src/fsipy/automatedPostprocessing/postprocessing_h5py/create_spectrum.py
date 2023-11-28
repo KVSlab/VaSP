@@ -13,7 +13,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from fsipy.automatedPostprocessing.postprocessing_h5py import spectrograms as spec
-from fsipy.automatedPostprocessing.postprocessing_h5py.postprocessing_common_h5py import sonify_point
 from fsipy.automatedPostprocessing.postprocessing_common import read_parameters_from_file
 
 
@@ -108,8 +107,8 @@ def main():
                     flow_rate_file=None, amplitude_file=None, power_scaled=False)
 
     if args.sampling_method == "SinglePoint":
-        sonify_point(case_name, quantity, df, args.start_time, args.end_time, args.overlap_frac, args.lowcut,
-                     image_folder)
+        spec.sonify_point(case_name, quantity, df, args.start_time, args.end_time, args.overlap_frac, args.lowcut,
+                          image_folder)
 
 
 if __name__ == '__main__':

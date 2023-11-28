@@ -15,7 +15,6 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 from fsipy.automatedPostprocessing.postprocessing_h5py import spectrograms as spec
-from fsipy.automatedPostprocessing.postprocessing_h5py.postprocessing_common_h5py import sonify_point
 from fsipy.automatedPostprocessing.postprocessing_common import read_parameters_from_file
 
 
@@ -248,8 +247,8 @@ def main():
                                  ylim=args.ylim)
 
     if args.sampling_method == "SinglePoint":
-        sonify_point(case_name, quantity, df, args.start_time, end_time, args.overlap_frac, args.lowcut,
-                     image_folder)
+        spec.sonify_point(case_name, quantity, df, args.start_time, end_time, args.overlap_frac, args.lowcut,
+                          image_folder)
 
 
 if __name__ == '__main__':
