@@ -17,10 +17,8 @@ import pandas as pd
 import configargparse
 import numpy as np
 from numpy import linalg as LA
-from scipy.io import wavfile
 from tqdm import tqdm
 
-from fsipy.automatedPostprocessing.postprocessing_h5py import spectrograms as spec
 from fsipy.automatedPostprocessing.postprocessing_common import get_domain_ids, output_file_lists, \
     read_parameters_from_file
 
@@ -386,35 +384,3 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
     logging.info("--- Finished writing component files\n")
 
     return time_between_files
-
-
-def sonify_point(case_name: str, quantity: str, df, start_t: float, end_t: float, overlap_frac: float, lowcut: float,
-                 image_folder: str) -> None:
-    """
-    Sonify a point in the dataframe and save the resulting audio as a WAV file.
-
-    Args:
-        case_name (str): Name of the case.
-        quantity (str): Type of data to be sonified.
-        df (pd.DataFrame): Input DataFrame containing relevant data.
-        start_t (float): Start time for sonification.
-        end_t (float): End time for sonification.
-        overlap_frac (float): Fraction of overlap between consecutive segments.
-        lowcut (float): Cutoff frequency for the high-pass filter.
-        image_folder (str): Folder to save the sonified audio file.
-
-    Returns:
-        None: Saves the sonified audio file in WAV format.
-    """
-    # Get sampling constants
-    T, _, fs = spec.get_sampling_constants(df, start_t, end_t)
-
-    # High-pass filter dataframe for spectrogram
-    df_filtered = spec.filter_time_data(df, fs, lowcut=lowcut, highcut=15000.0, order=6, btype='highpass')
-
-    y2 = df_filtered.iloc[0] / np.max(df_filtered.iloc[0])
-
-    sound_filename = f"{quantity}_sound_{y2.name}_{case_name}.wav"
-    path_to_sound = Path(image_folder) / sound_filename
-
-    wavfile.write(path_to_sound, int(fs), y2)
