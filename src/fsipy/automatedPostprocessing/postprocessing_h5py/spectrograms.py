@@ -277,7 +277,7 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
     logging.info("--- Obtained sample points\n")
 
     df = df.iloc[idx_sampled]
-    quantity = f"{quantity}_{component}_{n_samples}"
+    quantity = f"{quantity}_{component}_n_samples_{n_samples}"
 
     return quantity, df, case_name, image_folder, visualization_hi_pass_folder
 
