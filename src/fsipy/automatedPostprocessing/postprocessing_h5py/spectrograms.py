@@ -192,7 +192,7 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
     image_folder = folder_path / "Spectrograms"
     image_folder.mkdir(parents=True, exist_ok=True)
 
-    output_file_name = f"{case_name}_{quantity}_{component}.npz"
+    output_file_name = f"{quantity}_{component}.npz"
     formatted_data_path = formatted_data_folder / output_file_name
 
     logging.info("--- Preparing data")
