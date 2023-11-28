@@ -109,8 +109,18 @@ def read_command_line_spec() -> configargparse.Namespace:
 
     args = parser.parse_args()
 
+    # Check if the specified folder exists
+    if not args.folder.exists():
+        logging.error(f"ERROR: The specified folder '{args.folder}' does not exist.")
+        sys.exit(-1)
+
     # Set default mesh path if not provided
     args.mesh_path = args.folder / "Mesh" / "mesh.h5" if args.mesh_path is None else args.mesh_path
+
+    # Check if the specified mesh path exists
+    if not args.mesh_path.exists():
+        logging.error(f"ERROR: The specified mesh path '{args.mesh_path}' does not exist.")
+        sys.exit(-1)
 
     # Set default min_color, max_color and amplitude_file_name based in the quantity argument
     if args.quantity == "d":
