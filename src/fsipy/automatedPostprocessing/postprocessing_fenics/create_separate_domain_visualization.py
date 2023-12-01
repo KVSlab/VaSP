@@ -1,16 +1,38 @@
 # Copyright (c) 2023 Simula Research Laboratory
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+"""
+This script loads displacement and velocity from .h5 file given by create_hdf5.py,
+converts and saves to .xdmf format for visualization (in e.g. ParaView).
+"""
+
 from pathlib import Path
 import json
+import argparse
 
 from dolfin import Mesh, HDF5File, VectorFunctionSpace, Function, MPI, parameters, XDMFFile
 from vampy.automatedPostprocessing.postprocessing_common import get_dataset_names
-from fsipy.automatedPostprocessing.postprocessing_fenics import postprocessing_fenics_common
 
 
 # set compiler arguments
 parameters["reorder_dofs_serial"] = False
+
+
+def parse_arguments() -> argparse.Namespace:
+    """
+    Parse command line arguments.
+
+    Returns:
+        argparse.Namespace: Parsed command-line arguments.
+    """
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("--folder", type=Path, help="Path to simulation results")
+    parser.add_argument('--mesh-path', type=Path, default=None,
+                        help="Path to the mesh file. If not given (None), " +
+                             "it will assume that mesh is located <folder_path>/Mesh/mesh.h5)")
+    parser.add_argument("--stride", type=int, default=1, help="Save frequency of simulation")
+
+    return parser.parse_args()
 
 
 def create_separate_domain_visualization(visualization_separate_domain_folder, mesh_path, stride=1):
@@ -127,18 +149,7 @@ def create_separate_domain_visualization(visualization_separate_domain_folder, m
 
 
 def main() -> None:
-    args = postprocessing_fenics_common.parse_arguments()
-
-    # Check if unused arguments are passed
-    if MPI.rank(MPI.comm_world) == 0:
-        if args.start_time is not None:
-            print("--- Warning: start_time is not used in this script. \n")
-        if args.end_time is not None:
-            print("--- Warning: end_time is not used in this script. \n")
-        if args.extract_solid_only:
-            print("--- Warning: extract_solid_only is not used in this script. \n")
-        if args.log_level != 20:
-            print("--- Warning: log_level is not used in this script. \n")
+    args = parse_arguments()
 
     if MPI.size(MPI.comm_world) == 1:
         print("--- Running in serial mode, you can use MPI to speed up the postprocessing. \n")
