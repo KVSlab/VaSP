@@ -42,7 +42,7 @@ class SurfaceProjector:
     """
     Project a function contains surface integral onto a function space V
     """
-    def __init__(self, V):
+    def __init__(self, V: FunctionSpace):
         """
         Initialize the surface projector
 
@@ -58,7 +58,7 @@ class SurfaceProjector:
         self.u_ = Function(V)
         self.solver = LUSolver(self.A)
 
-    def __call__(self, f):
+    def __call__(self, f: Function) -> Function:
         v = TestFunction(self.u_.function_space())
         self.b_proj = inner(f, v) * ds
         self.b = assemble(self.b_proj)
