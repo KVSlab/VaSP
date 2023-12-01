@@ -38,7 +38,7 @@ def parse_arguments():
     return args
 
 
-class SurfaceProject:
+class SurfaceProjector:
     """
     Project a function contains surface integral onto a function space V
     """
@@ -84,7 +84,7 @@ class Stress:
             velocity_degree (int): degree of velocity field
         """
         self.V = VectorFunctionSpace(mesh, 'DG', velocity_degree - 1)
-        self.projector = SurfaceProject(self.V)
+        self.projector = SurfaceProjector(self.V)
 
         sigma = (2 * mu * sym(grad(u)))
 
