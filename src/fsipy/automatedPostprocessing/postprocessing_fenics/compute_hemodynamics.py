@@ -73,7 +73,7 @@ class Stress:
     sigam = mu * (grad(u) + grad(u).T) + p * I but one can prove that the pressure term does not contribute to WSS.
     This is consitent with the other definition, tau = mu * grad(u) * n, which also does not contain pressure term.
     """
-    def __init__(self, u, mu, mesh, velocity_degree):
+    def __init__(self, u: Function, mu: float, mesh: Mesh, velocity_degree: int) -> None:
         """
         Initialize the stress object
 
@@ -96,7 +96,7 @@ class Stress:
         Fn = inner(F, n)  # scalar-valued
         self.Ft = F - (Fn * n)  # vector-valued
 
-    def __call__(self):
+    def __call__(self) -> Function:
         """compute stress for given velocity field u"""
         self.Ftv = self.projector(self.Ft)
 
