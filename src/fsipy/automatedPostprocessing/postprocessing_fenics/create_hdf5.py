@@ -198,8 +198,9 @@ def create_hdf5(visualization_path, mesh_path, save_time_step, stride, start_tim
         viz_d_file.write(d, "/displacement", time)
         viz_d_file.close()
 
-         # Update the information in the progress bar
-        progress_bar.set_postfix({"Timestep": index_list[file_counter], "Time": timevalue_list[file_counter], "File": h5file_name_list[file_counter]})
+        # Update the information in the progress bar
+        progress_bar.set_postfix({"Timestep": index_list[file_counter], "Time": timevalue_list[file_counter],
+                                 "File": h5file_name_list[file_counter]})
         progress_bar.update()
 
     progress_bar.close()
