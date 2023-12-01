@@ -26,11 +26,11 @@ parameters["reorder_dofs_serial"] = False
 
 def parse_arguments():
     """Read arguments from commandline"""
-    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     parser.add_argument('--folder', type=Path, help="Path to simulation results folder")
     parser.add_argument('--mesh-path', type=Path, default=None,
-                        help="Path to the mesh file. If not given (None)," +
+                        help="Path to the mesh file. If not given (None), " +
                              "it will assume that mesh is located <folder_path>/Mesh/mesh.h5)")
     parser.add_argument("--stride", type=int, default=1, help="Save frequency of output data")
     args = parser.parse_args()
@@ -103,7 +103,7 @@ class Stress:
         return self.Ftv
 
 
-def compute_hemodyanamics(visualization_separate_domain_path: Path, mesh_path: Path,
+def compute_hemodyanamics(visualization_separate_domain_folder: Path, mesh_path: Path,
                           mu: float, stride: int = 1) -> None:
     """
     Compute hemodynamic indices from velocity field
@@ -111,7 +111,7 @@ def compute_hemodyanamics(visualization_separate_domain_path: Path, mesh_path: P
         https://kvslab.github.io/VaMPy/quantities.html
 
     Args:
-        visualization_separate_domain_path (Path): Path to the folder containing u.h5
+        visualization_separate_domain_folder (Path): Path to the folder containing u.h5
         mesh_path (Path): Path to the mesh folder
         mu (float): Dynamic viscosity
         stride (int): Save frequency of output data
@@ -187,7 +187,7 @@ def compute_hemodyanamics(visualization_separate_domain_path: Path, mesh_path: P
     stress = Stress(u_p2, mu, mesh, velocity_degree=2)
 
     # Create XDMF files for saving indices
-    hemodynamic_indices_path = visualization_separate_domain_path.parent / "Hemodynamic_indices"
+    hemodynamic_indices_path = visualization_separate_domain_folder.parent / "Hemodynamic_indices"
     hemodynamic_indices_path.mkdir(parents=True, exist_ok=True)
     index_names = ["RRT", "OSI", "ECAP", "WSS", "TAWSS", "TWSSG"]
     index_variables = [RRT, OSI, ECAP, WSS, TAWSS, TWSSG]
@@ -289,8 +289,7 @@ def compute_hemodyanamics(visualization_separate_domain_path: Path, mesh_path: P
                 print(f"--- {name} is saved in {hemodynamic_indices_path}")
 
 
-if __name__ == '__main__':
-
+def main() -> None:
     if MPI.size(MPI.comm_world) == 1:
         print("--- Running in serial mode, you can use MPI to speed up the postprocessing. \n")
 
@@ -303,10 +302,12 @@ if __name__ == '__main__':
         "Please make sure to run create_hdf5.py first."
 
     parameters = read_parameters_from_file(args.folder)
-    save_deg = parameters["save_deg"]
-    assert save_deg == 2, "This script only works for save_deg = 2"
-
-    mu_f = parameters["mu_f"]
+    if parameters is None:
+        raise RuntimeError("Error reading parameters from file.")
+    else:
+        save_deg = parameters["save_deg"]
+        assert save_deg == 2, "This script only works for save_deg = 2"
+        mu_f = parameters["mu_f"]
 
     if isinstance(mu_f, list):
         if MPI.rank(MPI.comm_world) == 0:
@@ -325,3 +326,7 @@ if __name__ == '__main__':
         assert mesh_path.exists(), f"Mesh file {mesh_path} not found."
 
     compute_hemodyanamics(visualization_separate_domain_folder, mesh_path, mu, args.stride)
+
+
+if __name__ == "__main__":
+    main()
