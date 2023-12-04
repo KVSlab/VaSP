@@ -15,7 +15,7 @@ import argparse
 
 from dolfin import Mesh, HDF5File, VectorFunctionSpace, Function, MPI, parameters, XDMFFile, TrialFunction, \
     TestFunction, inner, ds, assemble, FacetNormal, sym, project, FunctionSpace, PETScDMCollection, grad, \
-    LUSolver
+    LUSolver, FunctionAssigner, BoundaryMesh
 from vampy.automatedPostprocessing.postprocessing_common import get_dataset_names
 from fsipy.automatedPostprocessing.postprocessing_common import read_parameters_from_file
 from fsipy.automatedPostprocessing.postprocessing_fenics.postprocessing_fenics_common import project_dg
@@ -38,11 +38,71 @@ def parse_arguments():
     return args
 
 
+class InterpolateDG:
+    """
+    interpolate DG function from the domain to the boundary. FEniCS built-in function interpolate does not work
+    with DG function spaces. This class is a workaround for this issue. Basically, for each facet, we find the
+    mapping between the dofs on the boundary and the dofs on the domain. Then, we copy the values of the dofs on the
+    domain to the dofs on the boundary. This is done for each subspaces of the DG vector function space.
+    """
+    def __init__(self, V: VectorFunctionSpace, V_sub: VectorFunctionSpace, mesh: Mesh, boundary_mesh: Mesh) -> None:
+        """
+        Initialize the interpolator
+
+        Args:
+            V (VectorFunctionSpace): function space on the domain
+            V_sub (VectorFunctionSpace): function space on the boundary
+            mesh (Mesh): whole mesh
+            boundary_mesh (Mesh): boundary mesh of the whole mesh
+        """
+        assert V.ufl_element().family() == "Discontinuous Lagrange", "V must be a DG space"
+        assert V_sub.ufl_element().family() == "Discontinuous Lagrange", "V_sub must be a DG space"
+        self.V = V
+        self.v_sub = Function(V_sub)
+        self.Ws = [V_sub.sub(i).collapse() for i in range(V_sub.num_sub_spaces())]
+        self.ws = [Function(Wi) for Wi in self.Ws]
+        self.w_sub_copy = [w_sub.vector().get_local() for w_sub in self.ws]
+        self.sub_dofmaps = [W_sub.dofmap() for W_sub in self.Ws]
+        self.sub_coords = [Wi.tabulate_dof_coordinates() for Wi in self.Ws]
+        self.mesh = mesh
+        self.sub_map = boundary_mesh.entity_map(self.mesh.topology().dim() - 1).array()
+        self.mesh.init(self.mesh.topology().dim() - 1, self.mesh.topology().dim())
+        self.f_to_c = self.mesh.topology()(self.mesh.topology().dim() - 1, self.mesh.topology().dim())
+        self.dof_coords = V.tabulate_dof_coordinates()
+        self.fa = FunctionAssigner(V_sub, self.Ws)
+
+    def __call__(self, u_vec: np.ndarray) -> Function:
+        """interpolate DG function from the domain to the boundary"""
+
+        for k, (coords_k, vec, sub_dofmap) in enumerate(zip(self.sub_coords, self.w_sub_copy, self.sub_dofmaps)):
+            for i, facet in enumerate(self.sub_map):
+                cells = self.f_to_c(facet)
+                # Get closure dofs on parent facet
+                sub_dofs = sub_dofmap.cell_dofs(i)
+                closure_dofs = self.V.sub(k).dofmap().entity_closure_dofs(
+                    self.mesh, self.mesh.topology().dim(), [cells[0]])
+                copy_dofs = np.empty(len(sub_dofs), dtype=np.int32)
+
+                for dof in closure_dofs:
+                    for j, sub_coord in enumerate(coords_k[sub_dofs]):
+                        if np.allclose(self.dof_coords[dof], sub_coord):
+                            copy_dofs[j] = dof
+                            break
+                sub_dofs = sub_dofmap.cell_dofs(i)
+                vec[sub_dofs] = u_vec[copy_dofs]
+
+            self.ws[k].vector().set_local(vec)
+
+        self.fa.assign(self.v_sub, self.ws)
+
+        return self.v_sub
+
+
 class SurfaceProjector:
     """
     Project a function contains surface integral onto a function space V
     """
-    def __init__(self, V: FunctionSpace):
+    def __init__(self, V: FunctionSpace) -> None:
         """
         Initialize the surface projector
 
@@ -73,7 +133,8 @@ class Stress:
     sigam = mu_f * (grad(u) + grad(u).T) + p * I but one can prove that the pressure term does not contribute to WSS.
     This is consitent with the other definition, tau = mu_f * grad(u) * n, which also does not contain pressure term.
     """
-    def __init__(self, u: Function, mu_f: float, mesh: Mesh, velocity_degree: int) -> None:
+    def __init__(self, u: Function, V_dg: VectorFunctionSpace, V_sub: VectorFunctionSpace, mu_f: float, mesh: Mesh,
+                 boundary_mesh: Mesh) -> None:
         """
         Initialize the stress object
 
@@ -83,8 +144,9 @@ class Stress:
             mesh (Mesh): mesh
             velocity_degree (int): degree of velocity field
         """
-        self.V = VectorFunctionSpace(mesh, 'DG', velocity_degree - 1)
-        self.projector = SurfaceProjector(self.V)
+        assert V_dg.ufl_element().family() == "Discontinuous Lagrange", "V_dg must be a DG space"
+        self.projector = SurfaceProjector(V_dg)
+        self.interpolator = InterpolateDG(V_dg, V_sub, mesh, boundary_mesh)
 
         sigma = (2 * mu_f * sym(grad(u)))
 
@@ -99,8 +161,9 @@ class Stress:
     def __call__(self) -> Function:
         """compute stress for given velocity field u"""
         self.Ftv = self.projector(self.Ft)
+        self.Ftv_bd = self.interpolator(self.Ftv.vector().get_local())
 
-        return self.Ftv
+        return self.Ftv_bd
 
 
 def compute_hemodyanamics(visualization_separate_domain_folder: Path, mesh_path: Path,
@@ -134,8 +197,11 @@ def compute_hemodyanamics(visualization_separate_domain_folder: Path, mesh_path:
     with HDF5File(MPI.comm_world, str(fluid_mesh_path), "r") as mesh_file:
         mesh_file.read(mesh, "mesh", False)
 
+    boundary_mesh = BoundaryMesh(mesh, "exterior")
+
     refined_mesh_path = mesh_path.parent / f"{mesh_name}_refined_fluid.h5"
     refined_mesh = Mesh()
+
     with HDF5File(MPI.comm_world, str(refined_mesh_path), "r") as mesh_file:
         mesh_file.read(refined_mesh, "mesh", False)
 
@@ -148,9 +214,12 @@ def compute_hemodyanamics(visualization_separate_domain_folder: Path, mesh_path:
     # Create function space for the velocity on the refined mesh with P2 elements
     Vv_non_refined = VectorFunctionSpace(mesh, "CG", 2)
 
+    # Create function space for the boundary mesh
+    Vv_boundary = VectorFunctionSpace(boundary_mesh, "DG", 1)
+    V_boundary = FunctionSpace(boundary_mesh, "DG", 1)
+
     # Create function space for hemodynamic indices with DG1 elements
     Vv = VectorFunctionSpace(mesh, "DG", 1)
-    V = FunctionSpace(mesh, "DG", 1)
 
     if MPI.rank(MPI.comm_world) == 0:
         print("--- Define functions")
@@ -164,28 +233,29 @@ def compute_hemodyanamics(visualization_separate_domain_folder: Path, mesh_path:
     u_transfer_matrix = PETScDMCollection.create_transfer_matrix(Vv_refined, Vv_non_refined)
 
     # Time-dependent wall shear stress
-    WSS = Function(Vv)
+    WSS = Function(Vv_boundary)
 
     # Relative residence time
-    RRT = Function(V)
+    RRT = Function(V_boundary)
 
     # Oscillatory shear index
-    OSI = Function(V)
+    OSI = Function(V_boundary)
 
     # Endothelial cell activation potential
-    ECAP = Function(V)
+    ECAP = Function(V_boundary)
 
     # Time averaged wall shear stress and mean WSS magnitude
-    TAWSS = Function(V)
-    WSS_mean = Function(Vv)
+    TAWSS = Function(V_boundary)
+    WSS_mean = Function(Vv_boundary)
 
     # Temporal wall shear stress gradient
-    TWSSG = Function(V)
-    twssg = Function(Vv)
-    tau_prev = Function(Vv)
+    TWSSG = Function(V_boundary)
+    twssg = Function(Vv_boundary)
+    tau_prev = Function(Vv_boundary)
 
     # Define stress object with P2 elements and non-refined mesh
-    stress = Stress(u_p2, mu_f, mesh, velocity_degree=2)
+    stress = Stress(u=u_p2, V_dg=Vv, V_sub=Vv_boundary, mu_f=mu_f,
+                    mesh=mesh, boundary_mesh=boundary_mesh)
 
     # Create XDMF files for saving indices
     hemodynamic_indices_path = visualization_separate_domain_folder.parent / "Hemodynamic_indices"
@@ -226,7 +296,7 @@ def compute_hemodyanamics(visualization_separate_domain_folder: Path, mesh_path:
         indices["WSS"].write_checkpoint(tau, "WSS", t, XDMFFile.Encoding.HDF5, append=True)
 
         # Compute time-averaged WSS by accumulating WSS magnitude
-        tawss = project(inner(tau, tau) ** (1 / 2), V)
+        tawss = project(inner(tau, tau) ** (1 / 2), V_boundary)
         TAWSS.vector().axpy(1, tawss.vector())
 
         # Simply accumulate WSS for computing OSI and ECAP later
@@ -235,7 +305,7 @@ def compute_hemodyanamics(visualization_separate_domain_folder: Path, mesh_path:
         # Compute TWSSG
         twssg.vector().set_local((tau.vector().get_local() - tau_prev.vector().get_local()) / dt)
         twssg.vector().apply("insert")
-        twssg_ = project_dg(inner(twssg, twssg) ** (1 / 2), V)
+        twssg_ = project_dg(inner(twssg, twssg) ** (1 / 2), V_boundary)
         TWSSG.vector().axpy(1, twssg_.vector())
 
         # Update tau
@@ -253,23 +323,13 @@ def compute_hemodyanamics(visualization_separate_domain_folder: Path, mesh_path:
     index_dict['TWSSG'].vector()[:] = index_dict['TWSSG'].vector()[:] / counter
     index_dict['TAWSS'].vector()[:] = index_dict['TAWSS'].vector()[:] / counter
     WSS_mean.vector()[:] = WSS_mean.vector()[:] / counter
-    wss_mean = project(inner(WSS_mean, WSS_mean) ** (1 / 2), V)
+    wss_mean = project(inner(WSS_mean, WSS_mean) ** (1 / 2), V_boundary)
     wss_mean_vec = wss_mean.vector().get_local()
     tawss_vec = index_dict['TAWSS'].vector().get_local()
-
     # Compute RRT, OSI, and ECAP based on mean and absolute WSS
-    # Note that we use np.divide because WSS is zero inside the domain and we want to avoid division by zero
-    rrt_divided = np.divide(np.ones_like(wss_mean_vec), wss_mean_vec,
-                            out=np.zeros_like(wss_mean_vec), where=wss_mean_vec != 0)
-    index_dict['RRT'].vector().set_local(rrt_divided)
-
-    wss_divied_by_tawss = np.divide(wss_mean_vec, tawss_vec, out=np.zeros_like(wss_mean_vec), where=tawss_vec != 0)
-    osi = 0.5 * (1 - wss_divied_by_tawss)
-    index_dict['OSI'].vector().set_local(osi)
-
-    ecap = np.divide(index_dict['OSI'].vector().get_local(), tawss_vec,
-                     out=np.zeros_like(wss_mean_vec), where=tawss_vec != 0)
-    index_dict['ECAP'].vector().set_local(ecap)
+    index_dict['RRT'].vector().set_local(1 / wss_mean_vec)
+    index_dict['OSI'].vector().set_local(0.5 * (1 - wss_mean_vec / tawss_vec))
+    index_dict['ECAP'].vector().set_local(index_dict['OSI'].vector().get_local() / tawss_vec)
 
     for index in ['RRT', 'OSI', 'ECAP']:
         index_dict[index].vector().apply("insert")
@@ -321,7 +381,7 @@ def main() -> None:
             print("--- Using user-defined mesh \n")
         assert mesh_path.exists(), f"Mesh file {mesh_path} not found."
     else:
-        mesh_path = folder_path / "Mesh"
+        mesh_path = folder_path / "Mesh" / "mesh.h5"
         if MPI.rank(MPI.comm_world) == 0:
             print("--- Using mesh from default turrtleFSI Mesh folder \n")
         assert mesh_path.exists(), f"Mesh file {mesh_path} not found."
