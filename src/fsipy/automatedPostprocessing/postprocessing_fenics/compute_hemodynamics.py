@@ -70,23 +70,23 @@ class Stress:
     """
     A class to compute wall shear stress from velocity field
     Here, we use cauchy stress tensor to compute WSS. Typically, cauchy stress tensor is defined as
-    sigam = mu * (grad(u) + grad(u).T) + p * I but one can prove that the pressure term does not contribute to WSS.
-    This is consitent with the other definition, tau = mu * grad(u) * n, which also does not contain pressure term.
+    sigam = mu_f * (grad(u) + grad(u).T) + p * I but one can prove that the pressure term does not contribute to WSS.
+    This is consitent with the other definition, tau = mu_f * grad(u) * n, which also does not contain pressure term.
     """
-    def __init__(self, u: Function, mu: float, mesh: Mesh, velocity_degree: int) -> None:
+    def __init__(self, u: Function, mu_f: float, mesh: Mesh, velocity_degree: int) -> None:
         """
         Initialize the stress object
 
         Args:
             u (Function): velocity field
-            mu (float): dynamic viscosity
+            mu_f (float): dynamic viscosity
             mesh (Mesh): mesh
             velocity_degree (int): degree of velocity field
         """
         self.V = VectorFunctionSpace(mesh, 'DG', velocity_degree - 1)
         self.projector = SurfaceProjector(self.V)
 
-        sigma = (2 * mu * sym(grad(u)))
+        sigma = (2 * mu_f * sym(grad(u)))
 
         # Compute stress on surface
         n = FacetNormal(mesh)
@@ -104,7 +104,7 @@ class Stress:
 
 
 def compute_hemodyanamics(visualization_separate_domain_folder: Path, mesh_path: Path,
-                          mu: float, stride: int = 1) -> None:
+                          mu_f: float, stride: int = 1) -> None:
     """
     Compute hemodynamic indices from velocity field
     Definition of hemodynamic indices can be found in:
@@ -113,7 +113,7 @@ def compute_hemodyanamics(visualization_separate_domain_folder: Path, mesh_path:
     Args:
         visualization_separate_domain_folder (Path): Path to the folder containing u.h5
         mesh_path (Path): Path to the mesh folder
-        mu (float): Dynamic viscosity
+        mu_f (float): Dynamic viscosity
         stride (int): Save frequency of output data
     """
 
@@ -184,7 +184,7 @@ def compute_hemodyanamics(visualization_separate_domain_folder: Path, mesh_path:
     tau_prev = Function(Vv)
 
     # Define stress object with P2 elements and non-refined mesh
-    stress = Stress(u_p2, mu, mesh, velocity_degree=2)
+    stress = Stress(u_p2, mu_f, mesh, velocity_degree=2)
 
     # Create XDMF files for saving indices
     hemodynamic_indices_path = visualization_separate_domain_folder.parent / "Hemodynamic_indices"
@@ -312,7 +312,7 @@ def main() -> None:
     if isinstance(mu_f, list):
         if MPI.rank(MPI.comm_world) == 0:
             print("--- two fluid regions are detected. Using the first fluid region for viscosity \n")
-        mu = mu_f[0]
+        mu_f = mu_f[0]
 
     if args.mesh_path:
         mesh_path = Path(args.mesh_path)
@@ -325,7 +325,7 @@ def main() -> None:
             print("--- Using mesh from default turrtleFSI Mesh folder \n")
         assert mesh_path.exists(), f"Mesh file {mesh_path} not found."
 
-    compute_hemodyanamics(visualization_separate_domain_folder, mesh_path, mu, args.stride)
+    compute_hemodyanamics(visualization_separate_domain_folder, mesh_path, mu_f, args.stride)
 
 
 if __name__ == "__main__":
