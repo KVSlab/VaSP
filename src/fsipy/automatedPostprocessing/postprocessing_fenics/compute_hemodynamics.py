@@ -127,13 +127,14 @@ def compute_hemodyanamics(visualization_separate_domain_folder: Path, mesh_path:
     # Read the original mesh and also the refined mesh
     if MPI.rank(MPI.comm_world) == 0:
         print("--- Read the original mesh and also the refined mesh \n")
+    mesh_name = mesh_path.stem
+    fluid_mesh_path = mesh_path.parent / f"{mesh_name}_fluid.h5"
 
-    fluid_mesh_path = mesh_path / "mesh_fluid.h5"
     mesh = Mesh()
     with HDF5File(MPI.comm_world, str(fluid_mesh_path), "r") as mesh_file:
         mesh_file.read(mesh, "mesh", False)
 
-    refined_mesh_path = mesh_path / "mesh_refined_fluid.h5"
+    refined_mesh_path = mesh_path.parent / f"{mesh_name}_refined_fluid.h5"
     refined_mesh = Mesh()
     with HDF5File(MPI.comm_world, str(refined_mesh_path), "r") as mesh_file:
         mesh_file.read(refined_mesh, "mesh", False)
