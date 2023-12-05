@@ -1,4 +1,4 @@
-# VaSP - Vascular Fluid-Structure Interaction Pipeline
+# VaSP - ***Va***scular Fluid-***S***tructure Interaction ***P***ipeline
 
 [![GPL-3.0](https://img.shields.io/github/license/KVSlab/VaSP)](LICENSE)
 [![codecov](https://codecov.io/gh/KVSlab/VaSP/graph/badge.svg?token=LNyRxL8Uyw)](https://codecov.io/gh/KVSlab/VaSP)
