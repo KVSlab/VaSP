@@ -1,9 +1,9 @@
-# Aneurysm_Workflow_FSI
+# VaSP - ***Va***scular Fluid-***S***tructure Interaction ***P***ipeline
 
-[![GPL-3.0](https://img.shields.io/github/license/KVSlab/Aneurysm_workflow_FSI)](LICENSE)
-[![codecov](https://codecov.io/gh/KVSlab/Aneurysm_Workflow_FSI/graph/badge.svg?token=LNyRxL8Uyw)](https://codecov.io/gh/KVSlab/Aneurysm_Workflow_FSI)
-[![CI](https://github.com/KVSlab/Aneurysm_Workflow_FSI/actions/workflows/check_and_test_package.yml/badge.svg)](https://github.com/KVSlab/Aneurysm_Workflow_FSI/actions/workflows/check_and_test_package.yml)
-[![GitHub pages](https://github.com/KVSlab/Aneurysm_Workflow_FSI/actions/workflows/build_docs.yml/badge.svg)](https://github.com/KVSlab/Aneurysm_Workflow_FSI/actions/workflows/build_docs.yml)
+[![GPL-3.0](https://img.shields.io/github/license/KVSlab/VaSP)](LICENSE)
+[![codecov](https://codecov.io/gh/KVSlab/VaSP/graph/badge.svg?token=LNyRxL8Uyw)](https://codecov.io/gh/KVSlab/VaSP)
+[![CI](https://github.com/KVSlab/VaSP/actions/workflows/check_and_test_package.yml/badge.svg)](https://github.com/KVSlab/VaSP/actions/workflows/check_and_test_package.yml)
+[![GitHub pages](https://github.com/KVSlab/VaSP/actions/workflows/build_docs.yml/badge.svg)](https://github.com/KVSlab/VaSP/actions/workflows/build_docs.yml)
 
 ## Description
 This package is a complete pipeline of performing vascular fluid-structure interaction (FSI) simulations.
@@ -17,7 +17,7 @@ conda env update --file environment.yml --name your_environment
 ```
 
 ## Documentation
-The documentation is hosted [here](https://kvslab.github.io/Aneurysm_Workflow_FSI/)
+The documentation is hosted [here](https://kvslab.github.io/VaSP/)
 
 ## Licence
 This software is licensed under the GNU GPL, version 3 or (at your option) any later version.
@@ -31,4 +31,4 @@ This software is licensed under the GNU GPL, version 3 or (at your option) any l
 ## Issues
 Please report bugs and other issues through the issue tracker at:
 
-https://github.com/KVSlab/Aneurysm_Workflow_FSI/issues
+https://github.com/KVSlab/VaSP/issues
