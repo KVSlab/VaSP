@@ -18,11 +18,12 @@ import numpy as np
 from numpy import linalg as LA
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+from turtleFSI.modules import get_eig
 
 from fsipy.automatedPostprocessing.postprocessing_common import read_parameters_from_file
 from fsipy.automatedPostprocessing.postprocessing_h5py.spectrograms import butter_bandpass_filter
 from fsipy.automatedPostprocessing.postprocessing_h5py.postprocessing_common_h5py import create_transformed_matrix, \
-    create_point_trace, create_xdmf_file, calculate_windowed_rms, get_eig
+    create_point_trace, create_xdmf_file, calculate_windowed_rms
 
 
 def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_path: Path, time_between_files: float,
@@ -234,7 +235,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
                         MPS = 0.0
                     else:
                         # Calculate Maximum Principal Strain (MPS)
-                        MPS = get_eig(strain_tensor)  # Instead of magnitude, we take Maximum Principal Strain
+                        MPS, _, _ = get_eig(strain_tensor)  # Instead of magnitude, we take Maximum Principal Strain
 
                     # Assign MPS to rms_magnitude
                     rms_magnitude[iel, idx] = MPS
