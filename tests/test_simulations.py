@@ -63,3 +63,70 @@ def test_predeform_problem(input_mesh, tmpdir):
     print("Velocity: {}".format(velocity_at_inlet))
 
     assert np.isclose(velocity_at_inlet, expected_velocity), "Velocity does not match expected value."
+
+
+@pytest.mark.parametrize("input_mesh", [input_data_paths[1]])
+def test_cylinder_problem(input_mesh, tmpdir):
+    """
+    Test the offset stenosis problem.
+    """
+    cmd = ("turtleFSI -p cylinder -dt 0.001 -T 0.004 --verbose True" +
+           " --folder {} --sub-folder 1 --new-arguments mesh_path={}")
+    result = subprocess.check_output(cmd.format(tmpdir, input_mesh), shell=True, cwd="src/fsipy/simulations/")
+
+    # check flow rate at inlet
+    output_flow_rate = r"Flow Rate at Inlet: (\d+(?:\.\d+)?(?:e-\d+)?)"
+
+    output_match_flow_rate = re.findall(output_flow_rate, str(result))
+    assert output_match_flow_rate is not None, "Regular expression did not match the output."
+
+    expected_flow_rate = 1.6913532412047225e-09
+    flow_rate_at_inlet = float(output_match_flow_rate[-1])
+
+    print(f"Flow rate: {flow_rate_at_inlet}")
+    assert np.isclose(flow_rate_at_inlet, expected_flow_rate), "Flow rate does not match expected value."
+
+    # check velocity mean, min, max in the domain
+    ourput_velocity = (r"Velocity \(mean, min, max\): (\d+(?:\.\d+)?(?:e-\d+)?)\s*,\s*(\d+(?:\.\d+)?(?:e-\d+)?)\s*,"
+                       r"\s*(\d+(?:\.\d+)?(?:e-\d+)?)")
+
+    output_match_velocity = re.findall(ourput_velocity, str(result))
+    assert output_match_velocity is not None, "Regular expression did not match the output."
+
+    expected_velocity_mean_min_max = [0.0015175903693111237, 2.83149082127162e-06, 0.004025814882456499]
+    velocity_mean_min_max = [float(output_match_velocity[-1][0]), float(output_match_velocity[-1][1]),
+                             float(output_match_velocity[-1][2])]
+
+    print(f"Velocity mean, min, max: {velocity_mean_min_max}")
+    assert np.isclose(velocity_mean_min_max, expected_velocity_mean_min_max).all(), \
+        "Velocity mean, min, max does not match expected value."
+
+    # check CFL number
+    output_cfl_number = (r"CFL \(mean, min, max\): (\d+(?:\.\d+)?(?:e-\d+)?)\s*,\s*(\d+(?:\.\d+)?(?:e-\d+)?)\s*,"
+                         r"\s*(\d+(?:\.\d+)?(?:e-\d+)?)")
+
+    output_match_cfl_number = re.findall(output_cfl_number, str(result))
+    assert output_match_cfl_number is not None, "Regular expression did not match the output."
+
+    expected_cfl_number = [0.008465020210929876, 1.5793871333017697e-05, 0.022455733137609308]
+    cfl_number_mean_min_max = [float(output_match_cfl_number[-1][0]), float(output_match_cfl_number[-1][1]),
+                               float(output_match_cfl_number[-1][2])]
+
+    print(f"CFL number mean, min, max: {cfl_number_mean_min_max}")
+    assert np.isclose(cfl_number_mean_min_max, expected_cfl_number).all(), \
+        "CFL number mean, min, max does not match expected value."
+
+    # Check Reynolds number
+    output_re_number = (r"Reynolds Numbers \(mean, min, max\): (\d+(?:\.\d+)?(?:e-\d+)?)\s*,"
+                        r"\s*(\d+(?:\.\d+)?(?:e-\d+)?)\s*,\s*(\d+(?:\.\d+)?(?:e-\d+)?)")
+
+    output_match_re_number = re.findall(output_re_number, str(result))
+    assert output_match_re_number is not None, "Regular expression did not match the output."
+
+    expected_re_number = [0.4304434011992387, 0.0008031129903162388, 1.1418663992904048]
+    reynolds_number_mean_min_max = [float(output_match_re_number[-1][0]), float(output_match_re_number[-1][1]),
+                                    float(output_match_re_number[-1][2])]
+
+    print(f"Reynolds number mean, min, max: {reynolds_number_mean_min_max}")
+    assert np.isclose(reynolds_number_mean_min_max, expected_re_number).all(), \
+        "Reynolds number mean, min, max does not match expected value."
