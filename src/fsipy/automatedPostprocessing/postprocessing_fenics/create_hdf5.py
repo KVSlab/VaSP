@@ -34,7 +34,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--folder", type=Path, help="Path to simulation results")
     parser.add_argument('--mesh-path', type=Path, default=None,
                         help="Path to the mesh file. If not given (None), " +
-                             "it will assume that mesh is located <folder_path>/Mesh/mesh.h5)")
+                             "it will assume that mesh is located <folder>/Mesh/mesh.h5)")
     parser.add_argument("--stride", type=int, default=1, help="Save frequency of simulation")
     parser.add_argument("-st", "--start-time", type=float, default=None, help="Desired start time for postprocessing")
     parser.add_argument("-et", "--end-time", type=float, default=None, help="Desired end time for postprocessing")
