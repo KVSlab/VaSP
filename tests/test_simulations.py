@@ -19,8 +19,8 @@ def test_offset_stenosis_problem(input_mesh, tmpdir):
     Test the offset stenosis problem.
     """
     cmd = ("turtleFSI -p offset_stenosis -dt 0.01 -T 0.04 --verbose True" +
-           " --theta 0.51 --folder {} --sub-folder 1 --new-arguments mesh_path={}")
-    result = subprocess.check_output(cmd.format(tmpdir, input_mesh), shell=True, cwd="src/fsipy/simulations/")
+           f" --theta 0.51 --folder {tmpdir} --sub-folder 1 --new-arguments mesh_path={input_mesh}")
+    result = subprocess.check_output(cmd, shell=True, cwd="src/fsipy/simulations/")
 
     # Here we check the velocity and pressure at the last time step from Probe point 5
     target_probe_point = 5
@@ -46,11 +46,11 @@ def test_offset_stenosis_problem(input_mesh, tmpdir):
 @pytest.mark.parametrize("input_mesh", [input_data_paths[1]])
 def test_predeform_problem(input_mesh, tmpdir):
     """
-    Test the offset stenosis problem.
+    Test the predeform problem.
     """
     cmd = ("turtleFSI -p predeform -dt 0.01 -T 0.03 --verbose True" +
-           " --theta 0.51 --folder {} --sub-folder 1 --new-arguments mesh_path={}")
-    result = subprocess.check_output(cmd.format(tmpdir, input_mesh), shell=True, cwd="src/fsipy/simulations/")
+           f" --theta 0.51 --folder {tmpdir} --sub-folder 1 --new-arguments mesh_path={input_mesh}")
+    result = subprocess.check_output(cmd, shell=True, cwd="src/fsipy/simulations/")
 
     output_re = r"v \(centerline, at inlet\) = (\d+\.\d+|\d+) m/s"
     output_match = re.findall(output_re, str(result))
@@ -68,12 +68,11 @@ def test_predeform_problem(input_mesh, tmpdir):
 @pytest.mark.parametrize("input_mesh", [input_data_paths[1]])
 def test_cylinder_problem(input_mesh, tmpdir):
     """
-    Test the offset stenosis problem.
+    Test the cylinder problem.
     """
-    cmd = ("turtleFSI -p cylinder -dt 0.001 -T 0.004 --verbose True" +
-           " --folder {} --sub-folder 1 --new-arguments mesh_path={}")
-    result = subprocess.check_output(cmd.format(tmpdir, input_mesh), shell=True, cwd="src/fsipy/simulations/")
-
+    cmd = ("turtleFSI -p cylinder -dt 0.001 -T 0.004 --verbose True " +
+           f"--folder {tmpdir} --sub-folder 1 --new-arguments mesh_path={input_mesh}")
+    result = subprocess.check_output(cmd, shell=True, cwd="src/fsipy/simulations/")
     # check flow rate at inlet
     output_flow_rate = r"Flow Rate at Inlet: (\d+(?:\.\d+)?(?:e-\d+)?)"
 
