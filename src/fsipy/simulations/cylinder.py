@@ -6,6 +6,8 @@ from turtleFSI.problems import *
 from dolfin import HDF5File, Mesh, MeshFunction, assemble, UserExpression, FacetNormal, ds, \
     DirichletBC, Measure, inner, parameters, SpatialCoordinate, Constant
 
+from fsipy.simulations.simulation_common import calculate_and_print_flow_properties
+
 # set compiler arguments
 parameters["form_compiler"]["quadrature_degree"] = 6
 parameters["form_compiler"]["optimize"] = True
@@ -184,8 +186,12 @@ def create_bcs(DVP, mesh, boundaries, P_final, v_max_final, fsi_id, inlet_id,
     # Assemble boundary conditions
     bcs = [u_inlet, d_inlet, u_inlet_s, d_inlet_s, d_rigid]
 
+    # Create inlet subdomain for computing the flow rate inside post_solve
+    dsi = ds(inlet_id, domain=mesh, subdomain_data=boundaries)
+    inlet_area = assemble(1.0 * dsi)
+
     return dict(bcs=bcs, u_inflow_exp=u_inflow_exp, p_out_bc_val=p_out_bc_val,
-                F_solid_linear=F_solid_linear)
+                F_solid_linear=F_solid_linear, dsi=dsi, inlet_area=inlet_area, n=n)
 
 
 def pre_solve(t, u_inflow_exp, p_out_bc_val, **namespace):
@@ -193,3 +199,9 @@ def pre_solve(t, u_inflow_exp, p_out_bc_val, **namespace):
     u_inflow_exp.update(t)
     p_out_bc_val.update(t)
     return dict(u_inflow_exp=u_inflow_exp, p_out_bc_val=p_out_bc_val)
+
+
+def post_solve(dvp_, dt, mesh, inlet_area, mu_f, rho_f, n, dsi, **namespace):
+
+    v = dvp_["n"].sub(1, deepcopy=True)
+    calculate_and_print_flow_properties(dt, mesh, v, inlet_area, mu_f, rho_f, n, dsi)
