@@ -25,6 +25,7 @@ fsipy-create-separate-domain-viz = "fsipy.automatedPostprocessing.postprocessing
 fsipy-create-spectrograms-chromagrams = "fsipy.automatedPostprocessing.postprocessing_h5py.create_spectrograms_chromagrams:main"
 fsipy-create-spectrogram-from-components = "fsipy.automatedPostprocessing.postprocessing_h5py.create_spectrogram_from_components:main"
 fsipy-create-spectrum = "fsipy.automatedPostprocessing.postprocessing_h5py.create_spectrum:main"
+fsipy-create-hi-pass-viz = "fsipy.automatedPostprocessing.postprocessing_h5py.create_hi_pass_viz:main"
 
 [project.optional-dependencies]
 test = [

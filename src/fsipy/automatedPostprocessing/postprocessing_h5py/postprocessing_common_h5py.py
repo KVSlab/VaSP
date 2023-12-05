@@ -8,62 +8,21 @@
 This file contains helper functions for creating visualizations outside of FEniCS.
 """
 
+import os
 import logging
 from pathlib import Path
-from typing import Tuple, Union
+from typing import Tuple, Union, List
 
 import h5py
 import pandas as pd
-import configargparse
 import numpy as np
 from numpy import linalg as LA
 from tqdm import tqdm
+from scipy import signal
+import matplotlib.pyplot as plt
 
 from fsipy.automatedPostprocessing.postprocessing_common import get_domain_ids, output_file_lists, \
     read_parameters_from_file
-
-
-def read_command_line() -> configargparse.Namespace:
-    """
-    Read arguments from the command line.
-
-    Returns:
-        Namespace: Parsed command line arguments.
-    """
-    parser = configargparse.ArgumentParser()
-
-    parser.add_argument('--folder', type=Path, required=True, default=None,
-                        help="Path to simulation results")
-    parser.add_argument('--mesh-path', type=Path, default=None,
-                        help="Path to the mesh file (default: <folder_path>/Mesh/mesh.h5)")
-    parser.add_argument('--save-deg', type=int, default=2,
-                        help="Specify the save_deg used during the simulation, i.e. whether the intermediate P2 nodes "
-                             "were saved. Entering save_deg=1 when the simulation was run with save_deg=2 will result "
-                             "in using only the corner nodes in postprocessing.")
-    parser.add_argument('--stride', type=int, default=1,
-                        help="Desired frequency of output data (i.e. to output every second step, use stride=2)")
-    parser.add_argument('--dt', type=float, default=0.001,
-                        help="Time step of simulation (s)")
-    parser.add_argument('--start-time', type=float, default=0.0,
-                        help="Start time of simulation (s)")
-    parser.add_argument('--end-time', type=float, default=0.05,
-                        help="End time of simulation (s)")
-    parser.add_argument('-q', '--quantity', type=str, default="v",
-                        help="Quantity to postprocess. Choose 'v' for velocity, 'd' for displacement, 'p' for pressure,"
-                             " or 'wss' for wall shear stress.")
-    parser.add_argument('--bands', default="25,100000",
-                        help="Input lower and upper band for band-pass filtered displacement, in a list of pairs. For "
-                             "example: --bands '100 150 175 200' gives you band-pass filtered visualization for the "
-                             "band between 100 and 150, and another visualization for the band between 175 and 200.")
-    parser.add_argument('--points', default="0,1",
-                        help="Input list of points")
-
-    args = parser.parse_args()
-
-    # Set default mesh path if not provided
-    args.mesh_path = args.folder / "Mesh" / "mesh.h5" if args.mesh_path is None else args.mesh_path
-
-    return args
 
 
 def get_coords(mesh_path: Union[str, Path]) -> np.ndarray:
@@ -384,3 +343,305 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
     logging.info("--- Finished writing component files\n")
 
     return time_between_files
+
+
+def create_point_trace(formatted_data_folder: str, output_folder: str, point_ids: List[int], save_deg: bool,
+                       time_between_files: float, start_t: float, dvp: str) -> None:
+    """
+    Create point traces for specified point IDs and save the results in CSV and PNG files.
+
+    Args:
+        formatted_data_folder (str): Path to the folder containing formatted data.
+        output_folder (str): Path to the folder where output files will be saved.
+        point_ids (List[int]): List of point IDs for which traces will be created.
+        save_deg (bool): A boolean indicating whether to save the degree symbol in the plot title.
+        time_between_files (float): Time between files in seconds.
+        start_t (float): Start time of the simulation.
+        dvp (str): Type of visualization ('v' for velocity, 'd' for displacement, 'p' for pressure).
+
+    Returns:
+        None
+    """
+
+    # Get input data
+    components_data = []
+    component_names = ["mag", "x", "y", "z"]
+
+    for i, component_name in enumerate(tqdm(component_names, desc="--- Loading data")):
+        if dvp == "p" and i > 0:
+            break
+
+        file_str = f"{dvp}_{component_name}.npz"
+        matching_files = [file for file in os.listdir(formatted_data_folder) if file_str in file]
+
+        if not matching_files:
+            raise FileNotFoundError(f"No file found for {file_str}")
+
+        component_file = matching_files[0]
+        component_data = np.load(Path(formatted_data_folder) / component_file)['component']
+        components_data.append(component_data)
+
+    # Create name for output file, define output path
+    if dvp == "v":
+        viz_type = 'velocity'
+    elif dvp == "d":
+        viz_type = 'displacement'
+    elif dvp == "p":
+        viz_type = 'pressure'
+    else:
+        raise ValueError("Input 'd', 'v' or 'p' for dvp")
+
+    num_ts = components_data[0].shape[1]
+    time_plot = np.arange(start_t, num_ts * time_between_files + start_t, time_between_files)
+
+    # Create output directory
+    output_path = Path(output_folder)
+
+    if output_path.exists():
+        logging.debug(f"--- Output folder '{output_path}' already exists.")
+    else:
+        output_path.mkdir(parents=True, exist_ok=True)
+        logging.debug(f"--- Output folder '{output_path}' created.")
+
+    print(f"--- Processing point IDs: {point_ids}")
+    for point_id in point_ids:
+        output_string = f"{viz_type}_point_id_{point_id}"  # Base filename
+        num_columns = 2 if dvp == "p" else 5
+        output_data = np.zeros((num_ts, num_columns))
+        output_data[:, 0] = time_plot
+
+        for i in range(1, num_columns):
+            output_data[:, i] = components_data[i - 1][point_id, :]
+
+        point_trace_file = output_path / f"{output_string}.csv"
+        point_trace_graph_file = output_path / f"{output_string}.png"
+
+        header = "time (s), Magnitude" if dvp == "p" else "time (s), Magnitude, X Component, Y Component, Z Component"
+        np.savetxt(point_trace_file, output_data, delimiter=",", header=header)
+
+        # Plot and Save
+        plt.plot(output_data[:, 0], output_data[:, 1], label="Mag")
+        if dvp != "p":
+            plt.plot(output_data[:, 0], output_data[:, 2], label="X")
+            plt.plot(output_data[:, 0], output_data[:, 3], label="Y")
+            plt.plot(output_data[:, 0], output_data[:, 4], label="Z")
+
+        plt.title(f'Point # {point_id}')
+        if dvp == "p":
+            plt.ylabel("Pressure (Pa) Not including 80-120 perfusion pressure")
+        elif dvp == "v":
+            plt.ylabel("Velocity (m/s)")
+        elif dvp == "d":
+            plt.ylabel("Displacement (m)")
+
+        plt.xlabel('Simulation Time (s)')
+        plt.legend()
+
+        plt.savefig(point_trace_graph_file)
+        plt.close()
+
+    print(f"--- Point traces saved at: {output_folder}")
+
+
+def create_xdmf_file(num_ts: int, time_between_files: float, start_t: float, n_elements: int,
+                     n_nodes: int, att_type: str, viz_type: str, output_folder: Path) -> None:
+    """
+    Create an XDMF file for a time series visualization.
+
+    Args:
+        num_ts (int): Number of time steps.
+        time_between_files (float): Time interval between files.
+        start_t (float): Starting time.
+        n_elements (int): Number of elements.
+        n_nodes (int): Number of nodes.
+        att_type (str): Type of attribute - "Scalar", "Vector", or "Tensor".
+        viz_type (str): Visualization type.
+        output_folder (Path): Path to the output folder.
+
+    Returns:
+        None
+
+    Raises:
+        ValueError: If an unsupported attribute type is provided.
+    """
+    # Create strings
+    num_el = str(n_elements)
+    num_nodes = str(n_nodes)
+    if att_type == "Scalar":
+        n_dim = '1'
+    elif att_type == "Tensor":
+        n_dim = '9'
+    elif att_type == "Vector":
+        n_dim = '3'
+    else:
+        raise ValueError("Attribute type must be one of 'Scalar', 'Vector', or 'Tensor'.")
+
+    # Write lines of xdmf file
+    lines = f'''<?xml version="1.0"?>
+<!DOCTYPE Xdmf SYSTEM "Xdmf.dtd" []>
+<Xdmf Version="3.0" xmlns:xi="http://www.w3.org/2001/XInclude">
+  <Domain>
+    <Grid Name="TimeSeries_{viz_type}" GridType="Collection" CollectionType="Temporal">
+      <Grid Name="mesh" GridType="Uniform">
+        <Topology NumberOfElements="{num_el}" TopologyType="Tetrahedron" NodesPerElement="4">
+          <DataItem Dimensions="{num_el} 4" NumberType="UInt" Format="HDF">{viz_type}.h5:/Mesh/0/mesh/topology</DataItem>
+        </Topology>
+        <Geometry GeometryType="XYZ">
+          <DataItem Dimensions="{num_nodes} 3" Format="HDF">{viz_type}.h5:/Mesh/0/mesh/geometry</DataItem>
+        </Geometry>
+'''  # noqa
+
+    for idx in range(num_ts):
+        time_value = str(idx * time_between_files + start_t)
+        lines += f'''\
+        <Time Value="{time_value}" />
+        <Attribute Name="{viz_type}" AttributeType="{att_type}" Center="Node">
+          <DataItem Dimensions="{num_nodes} {n_dim}" Format="HDF">{viz_type}.h5:/VisualisationVector/{idx}</DataItem>
+        </Attribute>
+      </Grid>
+'''
+
+        if idx == num_ts - 1:
+            break
+
+        lines += f'''\
+      <Grid>
+        <xi:include xpointer="xpointer(//Grid[@Name=&quot;TimeSeries_{viz_type}&quot;]/Grid[1]/*[self::Topology or self::Geometry])" />
+'''  # noqa
+
+    lines += '''\
+    </Grid>
+  </Domain>
+</Xdmf>
+'''
+
+    # Writing lines to file
+    xdmf_path = output_folder / f'{viz_type}.xdmf'
+
+    # Remove old file if it exists
+    if xdmf_path.exists():
+        logging.debug(f'--- Removing existing file at: {xdmf_path}')
+        xdmf_path.unlink()
+
+    with open(xdmf_path, 'w') as xdmf_file:
+        logging.debug(f'--- Writing XDMF file: {xdmf_path}')
+        xdmf_file.write(lines)
+
+
+def calculate_windowed_rms(signal_array: np.ndarray, window_size: int, window_type: str = "flat") -> np.ndarray:
+    """
+    Calculate the windowed root mean squared (RMS) amplitude of a signal.
+
+    Args:
+        signal_array (numpy.ndarray): Input signal.
+        window_size (int): Size of the window in number of timesteps.
+        window_type (str, optional): Type of window function to use. Default is "flat".
+            Supported window types: "flat", "tukey", "hann", "blackmanharris", "flattop".
+
+    Returns:
+        numpy.ndarray: Windowed RMS amplitudes.
+
+    References:
+         https://stackoverflow.com/questions/8245687/numpy-root-mean-squared-rms-smoothing-of-a-signal
+         https://stackoverflow.com/questions/47484899/moving-average-produces-array-of-different-length
+    """
+    # Calculate squared amplitudes of the signal
+    signal_squared = np.power(signal_array, 2)
+
+    # Define window functions for different types
+    window_functions = {
+        "flat": np.ones(window_size) / float(window_size),
+        "tukey": signal.windows.tukey(window_size) / float(window_size),
+        "hann": signal.windows.hann(window_size) / float(window_size),
+        "blackmanharris": signal.windows.blackmanharris(window_size) / float(window_size),
+        "flattop": signal.windows.flattop(window_size) / float(window_size),
+    }
+
+    # Select the appropriate window function based on the specified window type
+    window = window_functions.get(window_type, np.ones(window_size) / float(window_size))
+
+    # Calculate the RMS using convolution
+    RMS = np.sqrt(np.convolve(signal_squared, window, mode="valid"))
+
+    len_RMS = len(RMS)
+    len_signal_squared = len(signal_squared)
+    pad_length = int((len_signal_squared - len_RMS) / 2)
+
+    # Pad the RMS array to match the length of the original signal
+    RMS_padded = np.zeros(len_signal_squared)
+    for i in range(len_signal_squared):
+        if pad_length <= i < len_RMS + pad_length:
+            RMS_padded[i] = RMS[i - pad_length]
+
+    return RMS_padded
+
+
+def get_eig(T: np.ndarray) -> float:
+    """
+    Analytically calculate eigenvalues for a three-dimensional tensor T with a
+    characteristic polynomial equation of the form
+
+                lambda^3 - I1*lambda^2 + I2*lambda - I3 = 0   .
+
+    Since the characteristic polynomial is in its normal form , the eigenvalues
+    can be determined using Cardanos formula. This algorithm is based on:
+    "Efficient numerical diagonalization of hermitian 3 by 3 matrices" by
+    J.Kopp, eqn 21-34, with coefficients: c2=-I1, c1 = I2, c3 = -I3).
+
+    NOTE:
+    The method implemented here, implicitly assumes that the polynomial has
+    only real roots, since imaginary ones should not occur in this use case.
+
+    In order to ensure eigenvalues with algebraic multiplicity of 1, the idea
+    of numerical perturbations is adopted from "Computation of isotropic tensor
+    functions" by C. Miehe (1993). Since direct comparisons with conditionals
+    have proven to be very slow, not the eigenvalues but the coefficients
+    occuring during the calculation of them are perturbated to get distinct
+    values.
+
+    Args:
+        T (np.ndarray): Three-dimensional tensor.
+
+    Returns:
+        float: First eigenvalue.
+
+    References:
+        https://fenicsproject.discourse.group/t/hyperelastic-model-problems-on-plotting-stresses/3130/6
+    """
+    # Determine perturbation from tolerance
+    tol1 = 1e-16
+    pert1 = 2 * tol1
+    tol2 = 1e-24
+    pert2 = 2 * tol2
+    tol3 = 1e-40
+    pert3 = 2 * tol3
+
+    # Get required invariants
+    I1 = np.trace(T)
+    I2 = 0.5 * (np.trace(T) ** 2 - np.tensordot(T, T))
+    I3 = np.linalg.det(T)
+
+    # Determine terms p and q according to the paper
+    p = I1 ** 2 - 3 * I2
+    if p < tol1:
+        logging.info(f"--- perturbation applied to p: p = {p}")
+        p = np.abs(p) + pert1
+
+    q = 27 / 2 * I3 + I1 ** 3 - 9 / 2 * I1 * I2
+    if abs(q) < tol2:
+        logging.info(f"--- perturbation applied to q: q = {q}")
+        q = q + np.sign(q) * pert2
+
+    # Determine angle phi for calculation of roots
+    phi_nom2 = 27 * (1 / 4 * I2 ** 2 * (p - I2) + I3 * (27 / 4 * I3 - q))
+    if phi_nom2 < tol3:
+        logging.info(f"--- perturbation applied to phi_nom2: phi_nom2 = {phi_nom2}")
+        phi_nom2 = np.abs(phi_nom2) + pert3
+
+    phi = 1 / 3 * np.arctan2(np.sqrt(phi_nom2), q)
+
+    # Calculate polynomial roots
+    lambda1 = 1 / 3 * (np.sqrt(p) * 2 * np.cos(phi) + I1)
+
+    # Return polynomial roots (eigenvalues)
+    return lambda1
