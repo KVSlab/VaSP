@@ -209,7 +209,7 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
         raise ValueError("Invalid value for quantity. Please use 'd', 'v', 'p', 'wss', 'mps', or 'strain'.")
 
     # Get information about h5 files associated with xdmf file and also information about the timesteps
-    logging.info("--- Getting information about h5 files")
+    logging.info("--- Getting information about h5 files...")
     h5_ts, time_ts, index_ts = output_file_lists(xdmf_path)
 
     # Calculate the time between files from the xdmf file

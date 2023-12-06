@@ -339,7 +339,9 @@ def parse_command_line_args() -> Tuple[Path, Path, int, int, float, float, str, 
 
     Returns:
         Tuple[Path, Path, int, int, float, float, str, List[int], List[int], str, bool, int]:
-        Parsed command line arguments.
+        Parsed command line arguments in the following order:
+        (folder, mesh_path, save_deg, stride, start_time, end_time, quantity, bands, point_ids,
+        filter_type, overwrite, log_level)
     """
     parser = configargparse.ArgumentParser(description=__doc__,
                                            formatter_class=configargparse.RawDescriptionHelpFormatter)
@@ -354,7 +356,8 @@ def parse_command_line_args() -> Tuple[Path, Path, int, int, float, float, str, 
                         help="Specify the save_deg used during the simulation, i.e., whether the intermediate P2 nodes "
                              "were saved. Entering save_deg=1 when the simulation was run with save_deg=2 will result "
                              "in using only the corner nodes in postprocessing. If not provided, the default value "
-                             "will be read from the parameters file in the simulation folder.")
+                             "will be read from the parameters file in the simulation folder. For quantity 'p' "
+                             "(pressure), the default will be 1.")
     parser.add_argument("--stride", type=int, default=1,
                         help="Desired frequency of output data (i.e. to output every second step, use stride=2). "
                              "Default is 1.")
@@ -416,7 +419,7 @@ def main():
     # Extract parameters
     dt = parameters["dt"]
     end_time = end_time if end_time is not None else parameters["T"]
-    save_deg = save_deg if save_deg is not None else parameters["save_deg"]
+    save_deg = save_deg if save_deg is not None else (1 if quantity == 'p' else parameters["save_deg"])
     fluid_domain_id = parameters["dx_f_id"]
     solid_domain_id = parameters["dx_s_id"]
 
