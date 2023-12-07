@@ -257,7 +257,7 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
     # Initialize variables
     tol = 1e-8  # temporal spacing tolerance
     idx_zeroed = 0  # Output index for formatted data
-    h5_file_prev = ""
+    h5_file_prev = None
 
     # Set start and stop timesteps
     if parameters is not None:
