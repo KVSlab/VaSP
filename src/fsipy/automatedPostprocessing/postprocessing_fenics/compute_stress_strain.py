@@ -1,3 +1,7 @@
+# Copyright (c) 2023 David Bruneau
+# Modified by Kei Yamamoto 2023
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 from pathlib import Path
 import argparse
 from dolfin import MPI, TensorFunctionSpace, VectorFunctionSpace, FunctionSpace, \
@@ -24,7 +28,7 @@ def parse_arguments():
     parser.add_argument("--folder", type=Path, help="Path to simulation results folder")
     parser.add_argument('--mesh-path', type=Path, default=None,
                         help="Path to the mesh file. If not given (None), " +
-                             "it will assume that mesh is located <folder_path>/Mesh/mesh.h5)")
+                             "it will assume that mesh is located <folder>/Mesh/mesh.h5)")
     parser.add_argument("--stride", type=int, default=1, help="Save frequency of output data")
     args = parser.parse_args()
 
@@ -172,7 +176,7 @@ def compute_stress(visualization_separate_domain_folder: Path, mesh_path: Path, 
     # Create XDMF files for saving stress and strain
     stress_strain_path = visualization_separate_domain_folder.parent / "StressStrain"
     stress_strain_path.mkdir(parents=True, exist_ok=True)
-    stress_strain_names = ["TrueStress", "Green-Lagrange-strain", "MaxPrincipalStress", "MaxPrincipalStrain"]
+    stress_strain_names = ["TrueStress", "GreenLagrangeStrain", "MaxPrincipalStress", "MaxPrincipalStrain"]
     stress_strain_variables = [TS, GLS, MPStress, MPStrain]
     stress_strain_dict = dict(zip(stress_strain_names, stress_strain_variables))
     xdmf_paths = [stress_strain_path / f"{name}.xdmf" for name in stress_strain_names]
@@ -201,7 +205,7 @@ def compute_stress(visualization_separate_domain_folder: Path, mesh_path: Path, 
         deformationF = common.F_(d_p2)
 
         # Compute Green-Lagrange strain tensor
-        green_lagrance_strain = common.E(d_p2)
+        green_lagrange_strain = common.E(d_p2)
 
         L_sigma = 0
         L_epsilon = 0
@@ -212,7 +216,7 @@ def compute_stress(visualization_separate_domain_folder: Path, mesh_path: Path, 
             # Form for True (Cauchy) stress
             cauchy_stress = (1 / common.J_(d_p2)) * deformationF * PiolaKirchoff2 * deformationF.T
             L_sigma += inner(cauchy_stress, v) * dx_s[solid_region]
-            L_epsilon += inner(green_lagrance_strain, v) * dx_s[solid_region]
+            L_epsilon += inner(green_lagrange_strain, v) * dx_s[solid_region]
 
         # Here, we add almost zero values to the fluid regions if displacement is for the entire domain
         if not solid_only and isinstance(dx_f_id_list, list) and isinstance(dx_f, dict):
