@@ -198,9 +198,9 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
         'd': 'displacement.xdmf',
         'v': 'velocity.xdmf',
         'p': 'pressure.xdmf',
-        'wss': 'WSS_ts.xdmf',
+        'wss': 'WSS.xdmf',
         'mps': 'MaxPrincipalStrain.xdmf',
-        'strain': 'InfinitesimalStrain.xdmf'
+        'strain': 'Green-Lagrange-strain.xdmf'
     }
 
     if quantity in xdmf_files:
@@ -219,10 +219,22 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
     first_h5_file = input_path / h5_ts[0]
     vector_data = h5py.File(first_h5_file, 'r')
 
-    if quantity in {"wss", "mps", "strain"}:
-        ids = np.arange(len(vector_data['VisualisationVector/0'][:]))
+    # Define a dictionary with format strings for array names
+    quantity_to_array = {
+        "wss": "WSS/WSS_{}/vector",
+        "mps": "MaxPrincipalStrain/MaxPrincipalStrain_{}/vector",
+        "strain": "Green-Lagrange-strain/Green-Lagrange-strain_{}/vector"
+    }
 
-    vector_array_all = vector_data['VisualisationVector/0'][:, :]
+    # Get the format string from the dictionary based on the quantity
+    format_string = quantity_to_array.get(quantity, 'VisualisationVector/{}')
+
+    array_name = format_string.format(0)
+
+    if quantity in {"wss", "mps", "strain"}:
+        ids = np.arange(len(vector_data[array_name][:]))
+
+    vector_array_all = vector_data[array_name][:, :]
     vector_array = vector_array_all[ids, :]
 
     num_ts = int(len(time_ts))  # Total amount of timesteps in original file
@@ -278,7 +290,7 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
         # If the timestep falls within the desired timeframe and has the correct stride
         if start_t <= time_file <= end_t and i % stride == 0:
             # Open Vector Array from h5 file
-            array_name = 'VisualisationVector/' + str(index_ts[i])
+            array_name = format_string.format(index_ts[i])
             vector_array_full = vector_data[array_name][:, :]
 
             try:

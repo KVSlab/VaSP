@@ -91,7 +91,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
     elif quantity == "mps":
         viz_type = "MaxPrincipalStrain"
     elif quantity == "strain":
-        viz_type = "InfinitesimalStrain"  # Change?
+        viz_type = "Green-Lagrange-strain"
     else:
         raise ValueError("Input 'd', 'v', 'p', 'mps', 'strain', or 'wss' for quantity")
 
@@ -260,7 +260,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
     if amplitude:
         logging.info("--- Saving amplitude percentiles to file...")
 
-        # 3. Save average amplitude, 95th percentile amplitude, and maximum amplitude
+        # Save average amplitude, 95th percentile amplitude, and maximum amplitude
         output_amplitudes = np.zeros((num_ts, 13))
 
         for idx in tqdm(range(num_ts), desc="--- Saving data", unit=" timestep"):
@@ -308,7 +308,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
             logging.info("--- Saving MPS amplitude to file...")
 
             # Save MPS amplitude to file
-            viz_type = viz_type.replace("InfinitesimalStrain", "MaxPrincipalHiPassStrain")
+            viz_type = viz_type.replace("MaxPrincipalStrain", "MaxPrincipalHiPassStrain")
             output_path = Path(output_folder) / f"{viz_type}.h5"
 
             # Remove old file path
@@ -467,6 +467,12 @@ def main():
     # Visualization folder for separate domains
     visualization_separate_domain_folder = folder / "Visualization_separate_domain"
 
+    # Visualization folder for hemodynamic indices
+    visualization_hemo_folder = folder / "Hemodynamic_indices"
+
+    # Visualization folder for stress and strain
+    visualization_stress_strain_folder = folder / "StressStrain"
+
     # Visualization folder for high-pass filtered results
     visualization_hi_pass_folder = folder / "Visualization_hi_pass"
 
@@ -487,11 +493,11 @@ def main():
             mesh_path_fluid, mesh_path_solid = mesh_path_fluid_sd1, mesh_path_solid_sd1
 
         if quantity == "wss":
-            create_transformed_matrix(visualization_separate_domain_folder, formatted_data_folder,
+            create_transformed_matrix(visualization_hemo_folder, formatted_data_folder,
                                       mesh_path_fluid, case_name, start_time, end_time, quantity,
                                       fluid_domain_id, solid_domain_id, stride)
         elif quantity in {"mps", "strain"}:
-            create_transformed_matrix(visualization_separate_domain_folder, formatted_data_folder,
+            create_transformed_matrix(visualization_stress_strain_folder, formatted_data_folder,
                                       mesh_path_solid, case_name, start_time, end_time, quantity,
                                       fluid_domain_id, solid_domain_id, stride)
         else:
@@ -535,13 +541,13 @@ def main():
                                time_between_output_files, start_time, quantity, lower_freq, higher_freq,
                                amplitude=True, filter_type="multiband", pass_stop_list=pass_stop_list,
                                overwrite=overwrite)
-    elif quantity == "strain":
-        logging.info("--- Creating high-pass visualizations for strain quantity")
+    elif quantity in {"mps", "strain"}:
+        logging.info(f"--- Creating high-pass visualizations for {quantity}...")
         for i in range(len(lower_freq)):
-            create_hi_pass_viz(formatted_data_folder, visualization_hi_pass_folder, mesh_path_solid_sd1,
+            create_hi_pass_viz(formatted_data_folder, visualization_hi_pass_folder, mesh_path_solid,
                                time_between_output_files, start_time, quantity, lower_freq[i], higher_freq[i],
                                overwrite=overwrite)
-            create_hi_pass_viz(formatted_data_folder, visualization_hi_pass_folder, mesh_path_solid_sd1,
+            create_hi_pass_viz(formatted_data_folder, visualization_hi_pass_folder, mesh_path_solid,
                                time_between_output_files, start_time, quantity, lower_freq[i], higher_freq[i],
                                amplitude=True, overwrite=overwrite)
 
