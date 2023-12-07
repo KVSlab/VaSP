@@ -7,11 +7,6 @@ This script creates a refined mesh with domain markers from a specified mesh. Ho
 same as the output file with save_deg = 2, so the node numbering is corrected to match the output files.
 Currently, it only runs in serial (not parallel) due to the "adapt" function used in fenics.
 This mesh is later used in  the "postprocessing_h5" and "postprocessing_fenics" scripts.
-See:
-https://fenicsproject.discourse.group/t/why-are-boundary-and-surface-markers-not-carried-over-to-the-refined-mesh/5822/2
-   TO DO:
-   -Add boundary creation other meshing scripts (look into "adapt()" for boundaries)
-   -Add domain creation in other meshing scripts
 """
 
 import numpy as np
