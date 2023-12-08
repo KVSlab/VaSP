@@ -268,8 +268,10 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
         create_xdmf_file(num_ts, time_between_files, start_t, n_elements_fsi,
                          n_nodes_fsi, att_type, viz_type, output_folder)
     elif quantity == "strain":
+        assert dof_info is not None
+        n_nodes = dof_info["mesh/geometry"].shape[0]
         create_checkpoint_xdmf_file(num_ts, time_between_files, start_t, n_elements_fsi,
-                                    n_nodes_fsi, att_type, viz_type, output_folder)
+                                    n_nodes, att_type, viz_type, output_folder)
     else:
         NotImplementedError(f"Quantity {quantity} not implemented.")
 
@@ -353,8 +355,10 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
                 create_xdmf_file(num_ts, time_between_files, start_t, n_elements_fsi,
                                  n_nodes_fsi, att_type, viz_type, output_folder)
             elif quantity == "strain":
+                assert dof_info is not None
+                n_nodes = dof_info["mesh/geometry"].shape[0]
                 create_checkpoint_xdmf_file(num_ts, time_between_files, start_t, n_elements_fsi,
-                                            n_nodes_fsi, att_type, viz_type, output_folder)
+                                            n_nodes, att_type, viz_type, output_folder)
 
 
 def parse_command_line_args() -> Tuple[Path, Path, int, int, float, float, str, List[int], List[int], str, bool, int]:
