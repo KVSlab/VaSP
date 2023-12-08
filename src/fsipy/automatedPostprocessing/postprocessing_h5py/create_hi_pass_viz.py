@@ -18,18 +18,18 @@ import numpy as np
 from numpy import linalg as LA
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-from turtleFSI.modules import get_eig
 
 from fsipy.automatedPostprocessing.postprocessing_common import read_parameters_from_file
 from fsipy.automatedPostprocessing.postprocessing_h5py.spectrograms import butter_bandpass_filter
 from fsipy.automatedPostprocessing.postprocessing_h5py.postprocessing_common_h5py import create_transformed_matrix, \
-    create_point_trace, create_xdmf_file, calculate_windowed_rms
+    create_point_trace, create_xdmf_file, calculate_windowed_rms, get_eig, create_checkpoint_xdmf_file
 
 
 def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_path: Path, time_between_files: float,
-                       start_t: float, quantity: str, lowcut: Union[float, List[float]] = 0,
-                       highcut: Union[float, List[float]] = 100000, amplitude: bool = False,
-                       filter_type: str = "bandpass", pass_stop_list: List[str] = [], overwrite: bool = False) -> None:
+                       dof_info: Union[dict, None], start_t: float, quantity: str,
+                       lowcut: Union[float, List[float]] = 0, highcut: Union[float, List[float]] = 100000,
+                       amplitude: bool = False, filter_type: str = "bandpass", pass_stop_list: List[str] = [],
+                       overwrite: bool = False) -> None:
     """
     Create high-pass visualization data.
 
@@ -38,6 +38,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
         output_folder (Path): Path to the folder where the output will be saved.
         mesh_path (Path): Path to the mesh file.
         time_between_files (float): Time between files.
+        dof_info (Union[dict, None]): Dictionary containing the information about the degrees of freedom.
         start_t (float): Start time.
         quantity (str): Type of data (e.g., 'd', 'v', 'strain').
         lowcut (Union[int, List[int]]): Low-cut frequency or list of low-cut frequencies for multi-band filtering.
@@ -76,7 +77,6 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
 
         progress_bar.set_postfix({"Component": component_name})
         progress_bar.update()
-
     progress_bar.close()
 
     # Create name for output file, define output path
@@ -121,6 +121,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
 
         n_nodes_fsi = coord_array_fsi.shape[0]
         n_elements_fsi = topo_array_fsi.shape[0]
+        n_cells_fsi = int(n_elements_fsi / 8)
 
         # Get number of timesteps
         num_ts = components_data[0].shape[1]
@@ -152,11 +153,11 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
     #    - Alternative method: Modify the mesh topology, excluding nodes associated with solid elements.
     #    - For save_deg=2, consider using FEniCS to create a refined mesh with fluid and solid elements marked.
     #      This approach aims to maintain consistent node numbering with turtleFSI.
-
-    geo_array = vector_data.create_dataset("Mesh/0/mesh/geometry", (n_nodes_fsi, 3))
-    geo_array[...] = coord_array_fsi
-    topo_array = vector_data.create_dataset("Mesh/0/mesh/topology", (n_elements_fsi, 4), dtype="i")
-    topo_array[...] = topo_array_fsi
+    if quantity in {"d", "v", "p"}:
+        geo_array = vector_data.create_dataset("Mesh/0/mesh/geometry", (n_nodes_fsi, 3))
+        geo_array[...] = coord_array_fsi
+        topo_array = vector_data.create_dataset("Mesh/0/mesh/topology", (n_elements_fsi, 4), dtype="i")
+        topo_array[...] = topo_array_fsi
 
     for idy in tqdm(range(n_nodes_fsi), desc="--- Filtering nodes", unit=" node"):
         if filter_type == "multiband":
@@ -187,7 +188,8 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
 
     # If amplitude is selected, calculate moving RMS amplitude for the results
     if amplitude:
-        rms_magnitude = np.zeros((n_nodes_fsi, num_ts))
+        rms_magnitude = np.zeros((n_nodes_fsi, num_ts)) if quantity != "strain" else \
+            np.zeros((int(n_cells_fsi * 4), num_ts))
         window_size = 250  # This is approximately 1/4th of the value used in the spectrograms (992)
         for idy in tqdm(range(n_nodes_fsi), desc="--- Calculating amplitude", unit=" node"):
             for component_index, component_data in enumerate(components_data):
@@ -196,7 +198,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
 
     # 2. Loop through elements and load in the data
     for idx in tqdm(range(num_ts), desc="--- Saving data", unit=" timestep"):
-        array_name = f"VisualisationVector/{idx}"
+        array_name = f"VisualisationVector/{idx}" if quantity in {"d", "v"} else f"{viz_type}/{viz_type}_{idx}"
 
         if quantity in {"p", "wss", "mps"}:
             v_array = vector_data.create_dataset(array_name, (n_nodes_fsi, 1))
@@ -207,7 +209,13 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
                 rms_magnitude[:, idx] = components_data[0][:, idx]
 
         elif quantity == "strain":
-            v_array = vector_data.create_dataset(array_name, (n_nodes_fsi, 9))
+            # first open dof_info (dict)
+            assert dof_info is not None
+            for name, data in dof_info.items():
+                dof_array = vector_data.create_dataset(f"{array_name}/{name}", data=data)
+                dof_array[:] = data
+
+            v_array = np.zeros((int(n_cells_fsi * 4), 9))
             v_array[:, 0] = components_data[0][:, idx]  # 11
             v_array[:, 1] = components_data[1][:, idx]  # 12
             v_array[:, 2] = components_data[5][:, idx]  # 31
@@ -217,11 +225,14 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
             v_array[:, 6] = components_data[5][:, idx]  # 31
             v_array[:, 7] = components_data[3][:, idx]  # 23
             v_array[:, 8] = components_data[4][:, idx]  # 33
+            # flatten the array
+            v_array_flat = vector_data.create_dataset(f"{array_name}/vector", (int(n_cells_fsi * 4 * 9), 1))
+            v_array_flat[:, 0] = v_array.flatten()
             att_type = "Tensor"
 
             if amplitude:
                 logging.info(f"--- Calculating eigenvalues for timestep #{idx}...")
-                for iel in range(n_nodes_fsi):
+                for iel in range(int(n_cells_fsi * 4)):
                     # Create the strain tensor
                     strain_tensor = np.array([
                         [components_data[0][iel, idx], components_data[1][iel, idx], components_data[5][iel, idx]],
@@ -235,7 +246,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
                         MPS = 0.0
                     else:
                         # Calculate Maximum Principal Strain (MPS)
-                        MPS, _, _ = get_eig(strain_tensor)  # Instead of magnitude, we take Maximum Principal Strain
+                        MPS = get_eig(strain_tensor)  # Instead of magnitude, we take Maximum Principal Strain
 
                     # Assign MPS to rms_magnitude
                     rms_magnitude[iel, idx] = MPS
@@ -253,8 +264,14 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
     vector_data.close()
 
     # 3. Create xdmf file for visualization
-    create_xdmf_file(num_ts, time_between_files, start_t, n_elements_fsi,
-                     n_nodes_fsi, att_type, viz_type, output_folder)
+    if quantity in {"d", "v", "p"}:
+        create_xdmf_file(num_ts, time_between_files, start_t, n_elements_fsi,
+                         n_nodes_fsi, att_type, viz_type, output_folder)
+    elif quantity == "strain":
+        create_checkpoint_xdmf_file(num_ts, time_between_files, start_t, n_elements_fsi,
+                                    n_nodes_fsi, att_type, viz_type, output_folder)
+    else:
+        NotImplementedError(f"Quantity {quantity} not implemented.")
 
     # If amplitude is selected, save the percentiles of magnitude of RMS amplitude to file
     if amplitude:
@@ -317,20 +334,27 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
 
             # Create H5 file
             with h5py.File(output_path, "a") as vector_data:
-                geo_array = vector_data.create_dataset("Mesh/0/mesh/geometry", data=coord_array_fsi)
-                topo_array = vector_data.create_dataset("Mesh/0/mesh/topology", data=topo_array_fsi)
-
                 logging.info("--- Saving data for each timestep...")
                 # Loop through elements and load in the data
                 for idx in tqdm(range(num_ts), desc="--- Saving data", unit=" timestep"):
-                    array_name = f"VisualisationVector/{idx}"
-                    v_array = vector_data.create_dataset(array_name, (n_nodes_fsi, 1))
+                    array_name = f"{viz_type}/{viz_type}_{idx}"
+                    assert dof_info is not None
+                    for name, data in dof_info.items():
+                        dof_array = vector_data.create_dataset(f"{array_name}/{name}", data=data)
+                        dof_array[:] = data
+
+                    v_array = vector_data.create_dataset(f"{array_name}/vector", (n_cells_fsi * 4, 1))
                     v_array[:, 0] = rms_magnitude[:, idx]
-                    att_type = "Scalar"
+
+            att_type = "Scalar"
 
             # Create xdmf for visualization
-            create_xdmf_file(num_ts, time_between_files, start_t, n_elements_fsi,
-                             n_nodes_fsi, att_type, viz_type, output_folder)
+            if quantity in {"d", "v", "p"}:
+                create_xdmf_file(num_ts, time_between_files, start_t, n_elements_fsi,
+                                 n_nodes_fsi, att_type, viz_type, output_folder)
+            elif quantity == "strain":
+                create_checkpoint_xdmf_file(num_ts, time_between_files, start_t, n_elements_fsi,
+                                            n_nodes_fsi, att_type, viz_type, output_folder)
 
 
 def parse_command_line_args() -> Tuple[Path, Path, int, int, float, float, str, List[int], List[int], str, bool, int]:
@@ -484,7 +508,7 @@ def main():
     logging.info(f"--- Start time: {start_time}; End time: {end_time}\n")
 
     logging.info("--- Preparing data...")
-
+    dof_info = None
     if formatted_data_path.exists():
         logging.info(f"--- Formatted data already exists at: {formatted_data_path}\n")
     else:
@@ -497,9 +521,9 @@ def main():
                                       mesh_path_fluid, case_name, start_time, end_time, quantity,
                                       fluid_domain_id, solid_domain_id, stride)
         elif quantity in {"mps", "strain"}:
-            create_transformed_matrix(visualization_stress_strain_folder, formatted_data_folder,
-                                      mesh_path_solid, case_name, start_time, end_time, quantity,
-                                      fluid_domain_id, solid_domain_id, stride)
+            _, dof_info = create_transformed_matrix(visualization_stress_strain_folder, formatted_data_folder,
+                                                    mesh_path_solid, case_name, start_time, end_time, quantity,
+                                                    fluid_domain_id, solid_domain_id, stride)
         else:
             # Make the output h5 files with quantity magnitudes
             create_transformed_matrix(visualization_path, formatted_data_folder, mesh_path, case_name, start_time,
@@ -521,34 +545,34 @@ def main():
         for low_freq, high_freq in zip(lower_freq, higher_freq):
             logging.info(f"\n--- Creating high-pass visualization {low_freq}-{high_freq} without amplitude...")
             create_hi_pass_viz(formatted_data_folder, visualization_hi_pass_folder, mesh_path,
-                               time_between_output_files, start_time, quantity, low_freq, high_freq,
+                               time_between_output_files, dof_info, start_time, quantity, low_freq, high_freq,
                                overwrite=overwrite)
 
             logging.info(f"\n--- Creating high-pass visualization {low_freq}-{high_freq} with amplitude...")
             create_hi_pass_viz(formatted_data_folder, visualization_hi_pass_folder, mesh_path,
-                               time_between_output_files, start_time, quantity, low_freq, high_freq,
+                               time_between_output_files, dof_info, start_time, quantity, low_freq, high_freq,
                                amplitude=True, overwrite=overwrite)
 
         # Create multiband high-pass visualizations
         if filter_type == "multiband":
             logging.info("\n--- Creating multiband high-pass visualization without amplitude...")
             create_hi_pass_viz(formatted_data_folder, visualization_hi_pass_folder, mesh_path,
-                               time_between_output_files, start_time, quantity, lower_freq, higher_freq,
+                               time_between_output_files, dof_info, start_time, quantity, lower_freq, higher_freq,
                                filter_type="multiband", pass_stop_list=pass_stop_list, overwrite=overwrite)
 
             logging.info("\n--- Creating multiband high-pass visualization with amplitude...")
             create_hi_pass_viz(formatted_data_folder, visualization_hi_pass_folder, mesh_path,
-                               time_between_output_files, start_time, quantity, lower_freq, higher_freq,
+                               time_between_output_files, dof_info, start_time, quantity, lower_freq, higher_freq,
                                amplitude=True, filter_type="multiband", pass_stop_list=pass_stop_list,
                                overwrite=overwrite)
     elif quantity in {"mps", "strain"}:
         logging.info(f"--- Creating high-pass visualizations for {quantity}...")
         for i in range(len(lower_freq)):
             create_hi_pass_viz(formatted_data_folder, visualization_hi_pass_folder, mesh_path_solid,
-                               time_between_output_files, start_time, quantity, lower_freq[i], higher_freq[i],
+                               time_between_output_files, dof_info, start_time, quantity, lower_freq[i], higher_freq[i],
                                overwrite=overwrite)
             create_hi_pass_viz(formatted_data_folder, visualization_hi_pass_folder, mesh_path_solid,
-                               time_between_output_files, start_time, quantity, lower_freq[i], higher_freq[i],
+                               time_between_output_files, dof_info, start_time, quantity, lower_freq[i], higher_freq[i],
                                amplitude=True, overwrite=overwrite)
 
     logging.info(f"\n--- High-pass visualizations saved at: {visualization_hi_pass_folder}\n")

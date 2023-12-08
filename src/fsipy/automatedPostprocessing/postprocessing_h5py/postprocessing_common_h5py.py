@@ -154,7 +154,7 @@ def read_npz_files(filepath: Union[str, Path]) -> pd.DataFrame:
 def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union[str, Path],
                               mesh_path: Union[str, Path], case_name: str, start_t: float, end_t: float, quantity: str,
                               fluid_domain_id: Union[int, list[int]], solid_domain_id: Union[int, list[int]],
-                              stride: int = 1) -> float:
+                              stride: int = 1) -> Tuple[float, dict[str, np.ndarray]]:
     """
     Create a transformed matrix from simulation data.
 
@@ -190,7 +190,7 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
     # Get node ID's from input mesh. If save_deg=2, you can supply the original mesh to get the data for the
     # corner nodes, or supply a refined mesh to get the data for all nodes (very computationally intensive)
     if quantity in {"d", "v", "p"}:
-        fluid_ids, solid_ids, all_ids = get_domain_ids(mesh_path, fluid_domain_id, solid_domain_id)
+        _, _, all_ids = get_domain_ids(mesh_path, fluid_domain_id, solid_domain_id)
         ids = all_ids
 
     # Get name of xdmf file
@@ -226,24 +226,46 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
         "strain": "Green-Lagrange-strain/Green-Lagrange-strain_{}/vector"
     }
 
+    # In case of wss, mps, strain, we need to get the more information from h5 file
+    name_of_quantity_in_h5 = list(vector_data.keys())[0]
+    first_data = name_of_quantity_in_h5 + "/" + name_of_quantity_in_h5 + "_0"
+    dof_info_bame = [
+        "cell_dofs",
+        "cells",
+        "mesh/geometry",
+        "mesh/topology",
+        "x_cell_dofs",
+    ]
+    dof_info = [first_data + "/" + name for name in dof_info_bame]
+
+    # get information about dofs
+    if quantity in {"wss", "mps", "strain"}:
+        dof_info = {name: vector_data[key][:] for name, key in zip(dof_info_bame, dof_info)}
+
     # Get the format string from the dictionary based on the quantity
     format_string = quantity_to_array.get(quantity, 'VisualisationVector/{}')
-
     array_name = format_string.format(0)
 
     if quantity in {"wss", "mps", "strain"}:
         ids = np.arange(len(vector_data[array_name][:]))
 
-    vector_array_all = vector_data[array_name][:, :]
-    vector_array = vector_array_all[ids, :]
+    vector_array = vector_data[array_name][:, :]
+    if quantity == "strain":
+        reshaped_num_rows = int((vector_array.shape[0]) / 9)
+        vector_array = vector_array.reshape((reshaped_num_rows, 9))
 
+    # For wss/mps/strain, there is no need to get the ids from the mesh file
+    # vector_array = vector_array_all[ids, :]
     num_ts = int(len(time_ts))  # Total amount of timesteps in original file
 
     logging.info(f"--- Total number of timesteps: {num_ts}")
 
     # Get shape of output data
     num_rows = vector_array.shape[0]
-    num_cols = int((end_t - start_t) / (time_between_files * stride)) - 1
+    if quantity in {"d", "v", "p"}:
+        num_cols = int((end_t - start_t) / (time_between_files * stride)) - 1
+    elif quantity in {"wss", "mps", "strain"}:
+        num_cols = num_ts
 
     # Pre-allocate the arrays for the formatted data
     if quantity in {"v", "d"}:
@@ -267,10 +289,14 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
     else:
         start = 0
         stop = num_ts
+    # In case of post-processed data, start-t and end-t are depend on how the user run `create_hdf5.py`
+    # Therefore, we need to set start and stop based on the number of timesteps in the h5 files
+    if quantity in {"wss", "mps", "strain"}:
+        start = 0
+        stop = num_ts
 
     # Initialize tqdm with the total number of iterations
     progress_bar = tqdm(total=stop - start, desc="--- Transferring timestep", unit="step")
-
     for i in range(start, stop):
         time_file = time_ts[i]
 
@@ -286,7 +312,6 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
             vector_data = h5py.File(h5_file, 'r')
 
         h5_file_prev = h5_file
-
         # If the timestep falls within the desired timeframe and has the correct stride
         if start_t <= time_file <= end_t and i % stride == 0:
             # Open Vector Array from h5 file
@@ -298,7 +323,10 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
                 if quantity in {"p", "wss", "mps"}:
                     quantity_magnitude[:, idx_zeroed] = vector_array_full[ids, 0]
                 elif quantity == "strain":
+                    # NOTE: here vector array is just one-d array and that's why we need to reshape it
+                    # h5 file is strcutured in a different way than the other quantities
                     vector_array = vector_array_full[ids, :]
+                    vector_array = vector_array.reshape((reshaped_num_rows, 9))
                     quantity_11[:, idx_zeroed] = vector_array[:, 0]
                     quantity_12[:, idx_zeroed] = vector_array[:, 1]
                     quantity_22[:, idx_zeroed] = vector_array[:, 4]
@@ -326,7 +354,6 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
 
     vector_data.close()
     logging.info("--- Finished reading h5 files")
-
     # Create output h5 file
     if quantity in {"d", "v"}:
         formatted_data = [quantity_magnitude, quantity_x, quantity_y, quantity_z]
@@ -353,8 +380,7 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
             np.savez_compressed(output_path, component=quantity_magnitude)
 
     logging.info("--- Finished writing component files\n")
-
-    return time_between_files
+    return time_between_files, dof_info
 
 
 def create_point_trace(formatted_data_folder: str, output_folder: str, point_ids: List[int], save_deg: bool,
@@ -540,6 +566,92 @@ def create_xdmf_file(num_ts: int, time_between_files: float, start_t: float, n_e
         xdmf_file.write(lines)
 
 
+def create_checkpoint_xdmf_file(num_ts: int, time_between_files: float, start_t: float, n_elements: int,
+                                att_type: str, viz_type: str, output_folder: Path) -> None:
+    """
+    Create an XDMF file for a time series visualization.
+
+    Args:
+        num_ts (int): Number of time steps.
+        time_between_files (float): Time interval between files.
+        start_t (float): Starting time.
+        n_elements (int): Number of elements.
+        n_nodes (int): Number of nodes.
+        att_type (str): Type of attribute - "Scalar", "Vector", or "Tensor".
+        viz_type (str): Visualization type.
+        output_folder (Path): Path to the output folder.
+
+    Returns:
+        None
+
+    Raises:
+        ValueError: If an unsupported attribute type is provided.
+    """
+    if att_type == "Scalar":
+        n_dim = 1
+    elif att_type == "Tensor":
+        n_dim = 9
+    elif att_type == "Vector":
+        n_dim = 3
+    else:
+        raise ValueError("Attribute type must be one of 'Scalar', 'Vector', or 'Tensor'.")
+
+    # Create strings
+    num_dof_per_cell = 4
+    num_tetrachedra = int(n_elements / 8)
+    total_num_dof = num_tetrachedra * num_dof_per_cell * n_dim
+    total_num_dof = str(total_num_dof)
+    num_x_cell_dof = num_tetrachedra + 1
+    num_x_cell_dof = str(num_x_cell_dof)
+    num_tetrachedra = str(num_tetrachedra)
+    n_dim = str(n_dim)
+    # Write lines of xdmf file
+    lines = f'''<?xml version="1.0"?>
+<Xdmf Version="3.0">
+  <Domain>
+    <Grid GridType="Collection" CollectionType="Temporal" Name="{viz_type}">
+'''  # noqa
+
+    for idx in range(num_ts):
+        time_value = str(idx * time_between_files + start_t)
+        lines += f'''\
+      <Grid Name="{viz_type}_{idx}" GridType="Uniform">
+        <Topology NumberOfElements="{num_tetrachedra}" TopologyType="Tetrahedron" NodesPerElement="4">
+          <DataItem Dimensions="{num_tetrachedra} 4" NumberType="UInt" Format="HDF">{viz_type}.h5:{viz_type}/{viz_type}_{idx}/mesh/topology</DataItem>
+        </Topology>
+        <Geometry GeometryType="XYZ">
+          <DataItem Dimensions="1156 3" Format="HDF">{viz_type}.h5:{viz_type}/{viz_type}_0/mesh/geometry</DataItem>
+        </Geometry>
+         <Time Value="{time_value}" />
+        <Attribute ItemType="FiniteElementFunction" ElementFamily="DG" ElementDegree="1" ElementCell="tetrahedron" Name="{viz_type}" Center="Other" AttributeType="{att_type}">
+          <DataItem Dimensions="{total_num_dof} 1" NumberType="UInt" Format="HDF">{viz_type}.h5:{viz_type}/{viz_type}_{idx}/cell_dofs</DataItem>
+          <DataItem Dimensions="{total_num_dof} 1" NumberType="Float" Format="HDF">{viz_type}.h5:{viz_type}/{viz_type}_{idx}/vector</DataItem>
+          <DataItem Dimensions="{num_x_cell_dof} 1" NumberType="UInt" Format="HDF">{viz_type}.h5:{viz_type}/{viz_type}_{idx}/x_cell_dofs</DataItem>
+          <DataItem Dimensions="{num_tetrachedra} 1" NumberType="UInt" Format="HDF">{viz_type}.h5:{viz_type}/{viz_type}_{idx}/cells</DataItem>
+        </Attribute>
+      </Grid>
+'''   # noqa
+        if idx == num_ts - 1:
+            break
+    lines += '''\
+    </Grid>
+  </Domain>
+</Xdmf>
+'''
+
+    # Writing lines to file
+    xdmf_path = output_folder / f'{viz_type}.xdmf'
+
+    # Remove old file if it exists
+    if xdmf_path.exists():
+        logging.debug(f'--- Removing existing file at: {xdmf_path}')
+        xdmf_path.unlink()
+
+    with open(xdmf_path, 'w') as xdmf_file:
+        logging.debug(f'--- Writing XDMF file: {xdmf_path}')
+        xdmf_file.write(lines)
+
+
 def calculate_windowed_rms(signal_array: np.ndarray, window_size: int, window_type: str = "flat") -> np.ndarray:
     """
     Calculate the windowed root mean squared (RMS) amplitude of a signal.
@@ -586,3 +698,74 @@ def calculate_windowed_rms(signal_array: np.ndarray, window_size: int, window_ty
             RMS_padded[i] = RMS[i - pad_length]
 
     return RMS_padded
+
+
+def get_eig(T: np.ndarray) -> float:
+    """
+    Analytically calculate eigenvalues for a three-dimensional tensor T with a
+    characteristic polynomial equation of the form
+
+                lambda^3 - I1*lambda^2 + I2*lambda - I3 = 0   .
+
+    Since the characteristic polynomial is in its normal form , the eigenvalues
+    can be determined using Cardanos formula. This algorithm is based on:
+    "Efficient numerical diagonalization of hermitian 3 by 3 matrices" by
+    J.Kopp, eqn 21-34, with coefficients: c2=-I1, c1 = I2, c3 = -I3).
+
+    NOTE:
+    The method implemented here, implicitly assumes that the polynomial has
+    only real roots, since imaginary ones should not occur in this use case.
+
+    In order to ensure eigenvalues with algebraic multiplicity of 1, the idea
+    of numerical perturbations is adopted from "Computation of isotropic tensor
+    functions" by C. Miehe (1993). Since direct comparisons with conditionals
+    have proven to be very slow, not the eigenvalues but the coefficients
+    occuring during the calculation of them are perturbated to get distinct
+    values.
+
+    Args:
+        T (np.ndarray): Three-dimensional tensor.
+
+    Returns:
+        float: First eigenvalue.
+
+    References:
+        https://fenicsproject.discourse.group/t/hyperelastic-model-problems-on-plotting-stresses/3130/6
+    """
+    # Determine perturbation from tolerance
+    tol1 = 1e-16
+    pert1 = 2 * tol1
+    tol2 = 1e-24
+    pert2 = 2 * tol2
+    tol3 = 1e-40
+    pert3 = 2 * tol3
+
+    # Get required invariants
+    I1 = np.trace(T)
+    I2 = 0.5 * (np.trace(T) ** 2 - np.tensordot(T, T))
+    I3 = np.linalg.det(T)
+
+    # Determine terms p and q according to the paper
+    p = I1 ** 2 - 3 * I2
+    if p < tol1:
+        logging.info(f"--- perturbation applied to p: p = {p}")
+        p = np.abs(p) + pert1
+
+    q = 27 / 2 * I3 + I1 ** 3 - 9 / 2 * I1 * I2
+    if abs(q) < tol2:
+        logging.info(f"--- perturbation applied to q: q = {q}")
+        q = q + np.sign(q) * pert2
+
+    # Determine angle phi for calculation of roots
+    phi_nom2 = 27 * (1 / 4 * I2 ** 2 * (p - I2) + I3 * (27 / 4 * I3 - q))
+    if phi_nom2 < tol3:
+        logging.info(f"--- perturbation applied to phi_nom2: phi_nom2 = {phi_nom2}")
+        phi_nom2 = np.abs(phi_nom2) + pert3
+
+    phi = 1 / 3 * np.arctan2(np.sqrt(phi_nom2), q)
+
+    # Calculate polynomial roots
+    lambda1 = 1 / 3 * (np.sqrt(p) * 2 * np.cos(phi) + I1)
+
+    # Return polynomial roots (eigenvalues)
+    return lambda1
