@@ -240,7 +240,7 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
 
     # get information about dofs
     if quantity in {"wss", "mps", "strain"}:
-        dof_info = {name: vector_data[key][:] for name, key in zip(dof_info_bame, dof_info)}
+        dof_info_dict = {name: vector_data[key][:] for name, key in zip(dof_info_bame, dof_info)}
 
     # Get the format string from the dictionary based on the quantity
     format_string = quantity_to_array.get(quantity, 'VisualisationVector/{}')
@@ -380,7 +380,7 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
             np.savez_compressed(output_path, component=quantity_magnitude)
 
     logging.info("--- Finished writing component files\n")
-    return time_between_files, dof_info
+    return time_between_files, dof_info_dict
 
 
 def create_point_trace(formatted_data_folder: str, output_folder: str, point_ids: List[int], save_deg: bool,
@@ -567,9 +567,10 @@ def create_xdmf_file(num_ts: int, time_between_files: float, start_t: float, n_e
 
 
 def create_checkpoint_xdmf_file(num_ts: int, time_between_files: float, start_t: float, n_elements: int,
-                                att_type: str, viz_type: str, output_folder: Path) -> None:
+                                n_nodes: int, att_type: str, viz_type: str, output_folder: Path) -> None:
     """
     Create an XDMF file for a time series visualization.
+    This function is specifically for the data genearted by FEniCS `write_checkpoint` function.
 
     Args:
         num_ts (int): Number of time steps.
@@ -586,6 +587,10 @@ def create_checkpoint_xdmf_file(num_ts: int, time_between_files: float, start_t:
 
     Raises:
         ValueError: If an unsupported attribute type is provided.
+
+    Note
+    ----
+    We assume that the function is discontinuous Galerkin and the element degree is 1.
     """
     if att_type == "Scalar":
         n_dim = 1
@@ -600,11 +605,11 @@ def create_checkpoint_xdmf_file(num_ts: int, time_between_files: float, start_t:
     num_dof_per_cell = 4
     num_tetrachedra = int(n_elements / 8)
     total_num_dof = num_tetrachedra * num_dof_per_cell * n_dim
-    total_num_dof = str(total_num_dof)
     num_x_cell_dof = num_tetrachedra + 1
-    num_x_cell_dof = str(num_x_cell_dof)
-    num_tetrachedra = str(num_tetrachedra)
-    n_dim = str(n_dim)
+    total_num_dof_str = str(total_num_dof)
+    num_x_cell_dof_str = str(num_x_cell_dof)
+    num_tetrachedra_str = str(num_tetrachedra)
+    num_nodes_str = str(n_nodes)
     # Write lines of xdmf file
     lines = f'''<?xml version="1.0"?>
 <Xdmf Version="3.0">
@@ -616,18 +621,18 @@ def create_checkpoint_xdmf_file(num_ts: int, time_between_files: float, start_t:
         time_value = str(idx * time_between_files + start_t)
         lines += f'''\
       <Grid Name="{viz_type}_{idx}" GridType="Uniform">
-        <Topology NumberOfElements="{num_tetrachedra}" TopologyType="Tetrahedron" NodesPerElement="4">
-          <DataItem Dimensions="{num_tetrachedra} 4" NumberType="UInt" Format="HDF">{viz_type}.h5:{viz_type}/{viz_type}_{idx}/mesh/topology</DataItem>
+        <Topology NumberOfElements="{num_tetrachedra_str}" TopologyType="Tetrahedron" NodesPerElement="4">
+          <DataItem Dimensions="{num_tetrachedra_str} 4" NumberType="UInt" Format="HDF">{viz_type}.h5:{viz_type}/{viz_type}_{idx}/mesh/topology</DataItem>
         </Topology>
         <Geometry GeometryType="XYZ">
-          <DataItem Dimensions="1156 3" Format="HDF">{viz_type}.h5:{viz_type}/{viz_type}_0/mesh/geometry</DataItem>
+          <DataItem Dimensions="{num_nodes_str} 3" Format="HDF">{viz_type}.h5:{viz_type}/{viz_type}_0/mesh/geometry</DataItem>
         </Geometry>
          <Time Value="{time_value}" />
         <Attribute ItemType="FiniteElementFunction" ElementFamily="DG" ElementDegree="1" ElementCell="tetrahedron" Name="{viz_type}" Center="Other" AttributeType="{att_type}">
-          <DataItem Dimensions="{total_num_dof} 1" NumberType="UInt" Format="HDF">{viz_type}.h5:{viz_type}/{viz_type}_{idx}/cell_dofs</DataItem>
-          <DataItem Dimensions="{total_num_dof} 1" NumberType="Float" Format="HDF">{viz_type}.h5:{viz_type}/{viz_type}_{idx}/vector</DataItem>
-          <DataItem Dimensions="{num_x_cell_dof} 1" NumberType="UInt" Format="HDF">{viz_type}.h5:{viz_type}/{viz_type}_{idx}/x_cell_dofs</DataItem>
-          <DataItem Dimensions="{num_tetrachedra} 1" NumberType="UInt" Format="HDF">{viz_type}.h5:{viz_type}/{viz_type}_{idx}/cells</DataItem>
+          <DataItem Dimensions="{total_num_dof_str} 1" NumberType="UInt" Format="HDF">{viz_type}.h5:{viz_type}/{viz_type}_{idx}/cell_dofs</DataItem>
+          <DataItem Dimensions="{total_num_dof_str} 1" NumberType="Float" Format="HDF">{viz_type}.h5:{viz_type}/{viz_type}_{idx}/vector</DataItem>
+          <DataItem Dimensions="{num_x_cell_dof_str} 1" NumberType="UInt" Format="HDF">{viz_type}.h5:{viz_type}/{viz_type}_{idx}/x_cell_dofs</DataItem>
+          <DataItem Dimensions="{num_tetrachedra_str} 1" NumberType="UInt" Format="HDF">{viz_type}.h5:{viz_type}/{viz_type}_{idx}/cells</DataItem>
         </Attribute>
       </Grid>
 '''   # noqa
