@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 
+# Copyright (c) 2023 Simula Research Laboratory
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 import argparse
 import sys
 from os import remove, path
