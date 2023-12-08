@@ -123,6 +123,7 @@ class MeshInfo(NamedTuple):
         interface_outer_id (int): ID for the outer interface.
         volume_id_fluid (int): ID for the fluid volume.
         volume_id_solid (int): ID for the solid volume.
+        branch_ids_offset (int): Offset solid mesh IDs when extracting a branch.
     """
     id_in: List[int]
     id_out: List[int]
@@ -135,6 +136,7 @@ class MeshInfo(NamedTuple):
     solid_outer_wall_id: int
     fluid_volume_id: int
     solid_volume_id: int
+    branch_ids_offset: int
 
 
 def load_mesh_info(mesh_path: Union[str, Path]) -> MeshInfo:
@@ -170,9 +172,10 @@ def load_mesh_info(mesh_path: Union[str, Path]) -> MeshInfo:
     solid_outer_wall_id = info["solid_outer_wall_id"]
     fluid_volume_id = info["fluid_volume_id"]
     solid_volume_id = info["solid_volume_id"]
+    branch_ids_offset = info["branch_ids_offset"]
 
     return MeshInfo(id_in, id_out, id_wall, Q_mean, area_ratio, area_inlet, solid_side_wall_id, interface_fsi_id,
-                    solid_outer_wall_id, fluid_volume_id, solid_volume_id)
+                    solid_outer_wall_id, fluid_volume_id, solid_volume_id, branch_ids_offset)
 
 
 def load_probe_points(mesh_path: Union[str, Path]) -> np.ndarray:

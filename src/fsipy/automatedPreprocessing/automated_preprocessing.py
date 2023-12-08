@@ -34,7 +34,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
                        region_points, compress_mesh, scale_factor, scale_factor_h5, resampling_step, meshing_parameters,
                        remove_all, solid_thickness, solid_thickness_parameters, mesh_format, flow_rate_factor,
                        solid_side_wall_id, interface_fsi_id, solid_outer_wall_id, fluid_volume_id, solid_volume_id,
-                       mesh_generation_retries, no_solid):
+                       mesh_generation_retries, no_solid, extract_branch, branch_group_ids, branch_ids_offset):
     """
     Automatically generate mesh of surface model in .vtu and .xml format, including prescribed
     flow rates at inlet and outlet based on flow network model.
@@ -76,6 +76,9 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
         solid_volume_id (int): ID for the solid volume
         mesh_generation_retries (int): Number of mesh generation retries before trying alternative method
         no_solid (bool): Generate mesh without solid
+        extract_branch (bool): Enable extraction of a specific branch, marking solid mesh IDs with an offset.
+        branch_group_ids (list): Specify group IDs to extract for the branch.
+        branch_ids_offset (int): Set offset for marking solid mesh IDs when extracting a branch.
     """
     # Get paths
     case_name = input_model.rsplit(path.sep, 1)[-1].rsplit('.')[0]
@@ -434,13 +437,14 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
     if not path.isfile(file_name_vtu_mesh):
         print("--- Generating FSI mesh\n")
 
-        def try_generate_mesh(distance_to_sphere, number_of_sublayers_fluid,
-                              number_of_sublayers_solid, solid_thickness, solid_thickness_parameters):
+        def try_generate_mesh(distance_to_sphere, number_of_sublayers_fluid, number_of_sublayers_solid,
+                              solid_thickness, solid_thickness_parameters, centerlines):
             try:
                 return generate_mesh(distance_to_sphere, number_of_sublayers_fluid,
                                      number_of_sublayers_solid, solid_thickness, solid_thickness_parameters,
-                                     solid_side_wall_id, interface_fsi_id, solid_outer_wall_id, fluid_volume_id,
-                                     solid_volume_id, no_solid)
+                                     centerlines, solid_side_wall_id, interface_fsi_id, solid_outer_wall_id,
+                                     fluid_volume_id, solid_volume_id, no_solid, extract_branch, branch_group_ids,
+                                     branch_ids_offset)
             except RuntimeError:
                 return None
 
@@ -448,7 +452,8 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
 
         for i in range(mesh_generation_retries + 1):
             mesh_and_surface = try_generate_mesh(distance_to_sphere, number_of_sublayers_fluid,
-                                                 number_of_sublayers_solid, solid_thickness, solid_thickness_parameters)
+                                                 number_of_sublayers_solid, solid_thickness,
+                                                 solid_thickness_parameters, centerlines)
             if mesh_and_surface:
                 mesh, remeshed_surface = mesh_and_surface
                 mesh_generation_failed = False
@@ -459,7 +464,8 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
                   "Trying to remesh with an alternative method.")
             distance_to_sphere = mesh_alternative(distance_to_sphere)
             mesh_and_surface = try_generate_mesh(distance_to_sphere, number_of_sublayers_fluid,
-                                                 number_of_sublayers_solid, solid_thickness, solid_thickness_parameters)
+                                                 number_of_sublayers_solid, solid_thickness,
+                                                 solid_thickness_parameters, centerlines)
             if mesh_and_surface:
                 mesh, remeshed_surface = mesh_and_surface
             else:
@@ -487,6 +493,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
         parameters["solid_outer_wall_id"] = solid_outer_wall_id
         parameters["fluid_volume_id"] = fluid_volume_id
         parameters["solid_volume_id"] = solid_volume_id
+        parameters["branch_ids_offset"] = branch_ids_offset
         write_parameters(parameters, base_path)
     else:
         mesh = read_polydata(file_name_vtu_mesh)
@@ -781,6 +788,19 @@ def read_command_line(input_path=None):
                           default=False,
                           help="Generate mesh without solid.")
 
+    extract_branch = parser.add_mutually_exclusive_group(required=False)
+    extract_branch.add_argument('-eb', '--extract-branch', action="store_true", default=False,
+                                help="Enable extraction of a specific branch, marking solid mesh IDs with an offset. "
+                                     "The offset can be controlled by the --branch-ids-offset option. This option is "
+                                     "relevant for marking specific branches, such as arteries and veins, in an AVF.")
+
+    parser.add_argument('-bg', '--branch-group-ids', type=int, nargs="+", default=[],
+                        help="Specify the group IDs to extract for the branch. If not used, an interactive window will "
+                             "prompt the user to select the group IDs for marking.")
+
+    parser.add_argument('-bo', '--branch-ids-offset', default=1000, type=int,
+                        help="Set the offset for marking solid mesh IDs when extracting a branch.")
+
     # Parse path to get default values
     if required:
         args = parser.parse_args()
@@ -825,7 +845,8 @@ def read_command_line(input_path=None):
                 solid_side_wall_id=args.solid_side_wall_id, interface_fsi_id=args.interface_fsi_id,
                 solid_outer_wall_id=args.solid_outer_wall_id, fluid_volume_id=args.fluid_volume_id,
                 solid_volume_id=args.solid_volume_id, mesh_generation_retries=args.mesh_generation_retries,
-                no_solid=args.no_solid)
+                no_solid=args.no_solid, extract_branch=args.extract_branch,
+                branch_group_ids=args.branch_group_ids, branch_ids_offset=args.branch_ids_offset)
 
 
 def main_meshing():

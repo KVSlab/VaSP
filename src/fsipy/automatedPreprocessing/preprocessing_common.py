@@ -12,7 +12,6 @@ from morphman import vmtkscripts, write_polydata
 
 from fsipy.automatedPreprocessing.vmtkmeshgeneratorfsi import vmtkMeshGeneratorFsi
 
-
 # Global array names
 distanceToSpheresArrayName = "DistanceToSpheres"
 distanceToSpheresArrayNameSolid = "Thickness"
@@ -105,9 +104,10 @@ def dist_sphere_spheres(surface: vtkPolyData, save_path: str,
 
 
 def generate_mesh(surface: vtkPolyData, number_of_sublayers_fluid: int, number_of_sublayers_solid: int,
-                  solid_thickness: str, solid_thickness_parameters: list,
+                  solid_thickness: str, solid_thickness_parameters: list, centerlines: vtkPolyData,
                   solid_side_wall_id: int = 11, interface_fsi_id: int = 22, solid_outer_wall_id: int = 33,
-                  fluid_volume_id: int = 0, solid_volume_id: int = 1, no_solid: bool = False) -> tuple:
+                  fluid_volume_id: int = 0, solid_volume_id: int = 1, no_solid: bool = False,
+                  extract_branch: bool = False, branch_group_ids: list = [], branch_ids_offset: int = 1000) -> tuple:
     """
     Generates a mesh suitable for FSI from an input surface model.
 
@@ -117,12 +117,16 @@ def generate_mesh(surface: vtkPolyData, number_of_sublayers_fluid: int, number_o
         number_of_sublayers_solid (int): Number of sublayers for solid.
         solid_thickness (str): Type of solid thickness ('variable' or 'constant').
         solid_thickness_parameters (list): List of parameters for solid thickness.
+        centerlines (vtkPolyData): Centerlines of input model.
         solid_side_wall_id (int, optional): ID for solid side wall. Default is 11.
         interface_fsi_id (int, optional): ID for the FSI interface. Default is 22.
         solid_outer_wall_id (int, optional): ID for solid outer wall. Default is 33.
         fluid_volume_id (int, optional): ID for the fluid volume. Default is 0.
         solid_volume_id (int, optional): ID for the solid volume. Default is 1.
-        no_solid (bool, optional): Generate mesh without solid
+        no_solid (bool, optional): Generate mesh without solid.
+        extract_branch (bool, optional): Enable extraction of a specific branch, marking solid mesh IDs with an offset.
+        branch_group_ids (list, optional): Specify group IDs to extract for the branch.
+        branch_ids_offset (int): Set offset for marking solid mesh IDs when extracting a branch.
 
     Returns:
         tuple: A tuple containing the generated mesh (vtkUnstructuredGrid) and the remeshed surface (vtkPolyData).
@@ -147,6 +151,10 @@ def generate_mesh(surface: vtkPolyData, number_of_sublayers_fluid: int, number_o
     meshGenerator.Tetrahedralize = 1
     meshGenerator.VolumeElementScaleFactor = 0.8
     meshGenerator.EndcapsEdgeLengthFactor = 1.0
+    meshGenerator.Centerlines = centerlines
+    meshGenerator.ExtractBranch = extract_branch
+    meshGenerator.BranchGroupIds = branch_group_ids
+    meshGenerator.BranchIdsOffset = branch_ids_offset
 
     # Solid thickness handling
     if solid_thickness == 'variable':

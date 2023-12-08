@@ -15,7 +15,9 @@
 
 # This class is a modified versions of vmtkmeshgenerator.
 # For Fluid-Structure Interaction mesh generation.
-# Modification by: Alban Souche, Simula Research Laboratory, Fornebu (October 2018)
+# Modifications by:
+#   Alban Souche, Simula Research Laboratory, Fornebu (October 2018)
+#   Johannes Ring, Simula Research Laboratory, Oslo (2022-2023)
 
 from __future__ import absolute_import  # NEEDS TO STAY AS TOP LEVEL MODULE FOR Py2-3 COMPATIBILITY
 import vtk
@@ -74,8 +76,10 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
         self.FluidVolumeId = 0  # (keep to 0)
         self.SolidVolumeId = 1
 
-        self.isAVF = False
-        self.VeinIdsOffset = 1000
+        self.ExtractBranch = False
+        self.BranchGroupIds = []
+        self.BranchIdsOffset = 1000
+        self.Centerlines = None
 
         self.Mesh = None
         self.RemeshedSurface = None
@@ -119,8 +123,10 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
             ['RemeshCapsOnly', 'remeshcapsonly', 'bool', 1, ''],
             ['BoundaryLayerOnCaps', 'boundarylayeroncaps', 'bool', 1, ''],
             ['Tetrahedralize', 'tetrahedralize', 'bool', 1, ''],
-            ['VeinIdsOffset', 'veinidsoffset', 'int', 1000, '(0,)'],
-            ['IsAVF', 'isAVF', 'bool', 0, ''],
+            ['ExtractBranch', 'extractbranch', 'bool', 0, ''],
+            ['BranchGroupIds', 'branchgroupids', 'int', -1, ''],
+            ['BranchIdsOffset', 'tbranchidsoffset', 'int', 1000, '(0,)'],
+            ['Centerlines', 'centerlines', 'vtkPolyData', 1, '', '', 'vmtksurfacereader'],
         ])
         self.SetOutputMembers([
             ['Mesh', 'o', 'vtkUnstructuredGrid', 1, '', 'the output mesh', 'vmtkmeshwriter'],
@@ -246,73 +252,68 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
 
             innerSurface = meshToSurface.Surface
 
-            # FIXME: Not sure when this should be used
-            if self.isAVF:
-                self.PrintLog("Generating centerlines.")
-                centerlinesExtract = vmtkscripts.vmtkCenterlines()
-                centerlinesExtract.Surface = innerSurface
-                centerlinesExtract.SeedSelectorName = "carotidprofiles"
-                centerlinesExtract.Execute()
+            if self.ExtractBranch and self.Centerlines is not None:
+                self.PrintLog("Branch extraction enabled. Marking solid mesh IDs of the selected branch with an "
+                              f"offset of {self.BranchIdsOffset}.")
 
+                # Extract branch groups from the centerlines
                 extractGroups = vmtkscripts.vmtkBranchExtractor()
-                extractGroups.Centerlines = centerlinesExtract.Centerlines
-                extractGroups.RadiusArrayName = centerlinesExtract.RadiusArrayName
-                extractGroups.GroupIdsArrayName = 'GroupIds'
+                extractGroups.Centerlines = self.Centerlines
                 extractGroups.Execute()
 
-                clipVein = vmtkscripts.vmtkMeshBranchClipper()
-                clipVein.Mesh = boundaryLayer2.Mesh
-                clipVein.Centerlines = extractGroups.Centerlines
-                clipVein.GroupIdsArrayName = extractGroups.GroupIdsArrayName
-                clipVein.RadiusArrayName = extractGroups.RadiusArrayName
-                clipVein.BlankingArrayName = extractGroups.BlankingArrayName
-                clipVein.Interactive = 1
-                clipVein.Execute()
+                # Clip the mesh using the extracted branch groups
+                clipBranch = vmtkscripts.vmtkMeshBranchClipper()
+                clipBranch.Mesh = boundaryLayer2.Mesh
+                clipBranch.Centerlines = extractGroups.Centerlines
 
+                # Determine whether to use specified group IDs or interactive selection
+                if self.BranchGroupIds:
+                    clipBranch.Interactive = 0
+                    clipBranch.GroupIds = self.BranchGroupIds
+                else:
+                    clipBranch.Interactive = 1
+                clipBranch.Execute()
+
+                # Create cell locators for the solid mesh and the clipped mesh
                 solidCellLocator = vtk.vtkCellLocator()
-                veinCellLocator = vtk.vtkCellLocator()
+                branchCellLocator = vtk.vtkCellLocator()
 
+                # Build locators for efficient cell searches
                 solidCellLocator.SetDataSet(boundaryLayer2.Mesh)
                 solidCellLocator.BuildLocator()
 
-                veinCellLocator.SetDataSet(clipVein.Mesh)
-                veinCellLocator.BuildLocator()
+                branchCellLocator.SetDataSet(clipBranch.Mesh)
+                branchCellLocator.BuildLocator()
 
-                solidCellIds = boundaryLayer2.Mesh.GetCellData().GetScalars("CellEntityIds")
+                # Get the solid cell ID's from the original mesh
+                solidCellIds = boundaryLayer2.Mesh.GetCellData().GetScalars(self.CellEntityIdsArrayName)
 
+                # Find solid cells in the original mesh that are within the bounds of the clipped mesh
                 vtkIdList = vtk.vtkIdList()
-                solidCellLocator.FindCellsWithinBounds(clipVein.Mesh.GetBounds(), vtkIdList)
+                solidCellLocator.FindCellsWithinBounds(clipBranch.Mesh.GetBounds(), vtkIdList)
                 ids = np.array([vtkIdList.GetId(i) for i in range(vtkIdList.GetNumberOfIds())])
 
+                # Initialize variables for finding the closest point in the clipped branch to the current solid cell
                 cell = [0.0, 0.0, 0.0]
                 cellId = vtk.mutable(0)
                 subId = vtk.mutable(0)
                 dist = vtk.mutable(0.0)
 
-                for id in ids:
-                    point = boundaryLayer2.Mesh.GetCell(id).GetPoints().GetPoint(0)
-                    veinCellLocator.FindClosestPoint(point, cell, cellId, subId, dist)
+                # Iterate through found solid cells within the bounds of the clipped branch
+                for solidCellId in ids:
+                    # Extract the coordinates of the first point of the current solid cell in the original mesh
+                    point = boundaryLayer2.Mesh.GetCell(solidCellId).GetPoints().GetPoint(0)
+
+                    # Find the closest point in the clipped branch to the current cell in the original mesh
+                    branchCellLocator.FindClosestPoint(point, cell, cellId, subId, dist)
+
+                    # If the distance is zero, indicating the current solid cell is part of the clipped branch
                     if dist == 0:
-                        solidCellIds.SetValue(id, solidCellIds.GetValue(id) + self.VeinIdsOffset)
+                        # Mark the solid mesh ID of the current cell with an offset
+                        solidCellIds.SetValue(solidCellId, solidCellIds.GetValue(solidCellId) + self.BranchIdsOffset)
 
+                # Update the cell data in the original mesh
                 boundaryLayer2.Mesh.GetCellData().Update()
-
-                # clipArtery = vmtkscripts.vmtkMeshBranchClipper()
-                # clipArtery.Mesh = boundaryLayer2.Mesh
-                # clipArtery.Centerlines = extractGroups.Centerlines
-                # clipArtery.GroupIds = clipVein.GroupIds
-                # clipArtery.GroupIdsArrayName = extractGroups.GroupIdsArrayName
-                # clipArtery.RadiusArrayName = extractGroups.RadiusArrayName
-                # clipArtery.BlankingArrayName = extractGroups.BlankingArrayName
-                # clipArtery.InsideOut = 1
-                # clipArtery.Execute()
-
-                # mergeSolid = vmtkscripts.vmtkMeshMerge()
-                # mergeSolid.Mesh1 = clipVein.Mesh
-                # mergeSolid.Mesh2 = clipArtery.Mesh
-                # mergeSolid.CellEntityIdOffset1 = int(1000)
-                # mergeSolid.CellEntityIdOffset2 = 0
-                # mergeSolid.Execute()
 
             if not self.BoundaryLayerOnCaps:
 
