@@ -1,8 +1,10 @@
 # Copyright (c) 2023 Simula Research Laboratory
 # SPDX-License-Identifier: GPL-3.0-or-later
 """common functions for postprocessing-fenics scripts"""
+
 import argparse
 from pathlib import Path
+from dolfin import TestFunction, TrialFunction, inner, Function, LocalSolver, dx, FunctionSpace
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -24,3 +26,29 @@ def parse_arguments() -> argparse.Namespace:
                         help="Specify the log level (default is 20, which is INFO)")
 
     return parser.parse_args()
+
+
+def project_dg(f: Function, V: FunctionSpace) -> Function:
+    """
+    Project a function v into a DG space V.
+    It perfomrs the same operation as dolfin.project, but it is more efficient
+    since we use local_solver which is possible since we use DG spaces.
+
+    Args:
+        v (Function): Function to be projected
+        V (FunctionSpace): DG space
+
+    Returns:
+        Function: Projected function
+    """
+    assert V.ufl_element().family() == "Discontinuous Lagrange", "V must be a DG space"
+    v = TestFunction(V)
+    u = TrialFunction(V)
+    a = inner(u, v) * dx
+    L = inner(f, v) * dx
+    u_ = Function(V)
+    solver = LocalSolver(a, L)
+    solver.factorize()
+    solver.solve_local_rhs(u_)
+
+    return u_
