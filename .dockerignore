@@ -1,0 +1,3 @@
+# Don't include the .git in the image.
+.git
+.github
