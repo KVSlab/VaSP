@@ -2,19 +2,47 @@
 # Modified by Kei Yamamoto 2023
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+"""
+This script reads the displacement and velocity data from turtleFSI output and reformats the data so that it can be read
+in fenics. The output files are saved in the Visualization_separate_domain folder.
+"""
+
 import numpy as np
 import h5py
 from pathlib import Path
 import json
 import logging
+import argparse
+from tqdm import tqdm
 
-from fsipy.automatedPostprocessing.postprocessing_fenics import postprocessing_fenics_common
 from fsipy.automatedPostprocessing.postprocessing_common import get_domain_ids, output_file_lists
 from dolfin import Mesh, HDF5File, VectorFunctionSpace, Function, MPI, parameters
 
 
 # set compiler arguments
 parameters["reorder_dofs_serial"] = False
+
+
+def parse_arguments() -> argparse.Namespace:
+    """
+    Parse command line arguments.
+
+    Returns:
+        argparse.Namespace: Parsed command-line arguments.
+    """
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("--folder", type=Path, help="Path to simulation results")
+    parser.add_argument('--mesh-path', type=Path, default=None,
+                        help="Path to the mesh file. If not given (None), " +
+                             "it will assume that mesh is located <folder>/Mesh/mesh.h5)")
+    parser.add_argument("--stride", type=int, default=1, help="Save frequency of simulation")
+    parser.add_argument("-st", "--start-time", type=float, default=None, help="Desired start time for postprocessing")
+    parser.add_argument("-et", "--end-time", type=float, default=None, help="Desired end time for postprocessing")
+    parser.add_argument("--extract-solid-only", action="store_true", help="Extract solid displacement only")
+    parser.add_argument("--log-level", type=int, default=20,
+                        help="Specify the log level (default is 20, which is INFO)")
+
+    return parser.parse_args()
 
 
 def create_hdf5(visualization_path, mesh_path, save_time_step, stride, start_time, end_time, extract_solid_only,
@@ -116,10 +144,12 @@ def create_hdf5(visualization_path, mesh_path, save_time_step, stride, start_tim
     start_time_index = int(start_time / save_time_step) - 1
     end_time_index = int(end_time / save_time_step) + 1
 
+    # Initialize tqdm with the total number of iterations
+    progress_bar = tqdm(total=end_time_index - start_time_index, desc="--- Converting data:", unit="step")
+
     for file_counter in range(start_time_index, end_time_index, stride):
 
         time = timevalue_list[file_counter]
-        logging.info(f"--- Reading data at time: {time}")
 
         if file_counter > start_time_index:
             if np.abs(time - timevalue_list[file_counter - 1] - save_time_step) > 1e-8:
@@ -151,12 +181,10 @@ def create_hdf5(visualization_path, mesh_path, save_time_step, stride, start_tim
         # Flatten the vector array and insert into the function
         vector_np_flat = vector_array.flatten('F')
         u.vector().set_local(vector_np_flat)
-        logging.info("Saved data in u.h5")
 
         # Flatten the vector array and insert into the function
         vector_np_flat_d = vector_array_d.flatten('F')
         d.vector().set_local(vector_np_flat_d)
-        logging.info("Saved data in d.h5")
 
         file_mode = "a" if file_counter > start_time_index else "w"
 
@@ -170,6 +198,13 @@ def create_hdf5(visualization_path, mesh_path, save_time_step, stride, start_tim
         viz_d_file.write(d, "/displacement", time)
         viz_d_file.close()
 
+        # Update the information in the progress bar
+        progress_bar.set_postfix({"Timestep": index_list[file_counter], "Time": timevalue_list[file_counter],
+                                 "File": h5file_name_list[file_counter]})
+        progress_bar.update()
+
+    progress_bar.close()
+
     logging.info("--- Finished reading solutions")
     logging.info(f"--- Saved u.h5 and d.h5 in {visualization_separate_domain_folder.absolute()}")
 
@@ -178,7 +213,7 @@ def main() -> None:
 
     assert MPI.size(MPI.comm_world) == 1, "This script only runs in serial."
 
-    args = postprocessing_fenics_common.parse_arguments()
+    args = parse_arguments()
 
     logging.basicConfig(level=args.log_level, format="%(message)s")
 
