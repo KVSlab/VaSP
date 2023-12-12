@@ -121,6 +121,7 @@ def test_load_mesh_info(temporary_hdf5_file):
     expected_solid_outer_wall_id = 33
     expected_fluid_volume_id = 0
     expected_solid_volume_id = 1
+    expected_branch_ids_offset = 1000
 
     # Test the load_mesh_info function with the temporary JSON info file
     mesh_info = load_mesh_info(temporary_hdf5_file)
@@ -150,6 +151,9 @@ def test_load_mesh_info(temporary_hdf5_file):
         f"Actual fluid_volume_id: {mesh_info.fluid_volume_id}, Expected fluid_volume_id: {expected_fluid_volume_id}"
     assert mesh_info.solid_volume_id == expected_solid_volume_id, \
         f"Actual solid_volume_id: {mesh_info.solid_volume_id}, Expected solid_volume_id: {expected_solid_volume_id}"
+    assert mesh_info.branch_ids_offset == expected_branch_ids_offset, \
+        f"Actual branch_ids_offset: {mesh_info.branch_ids_offset}, " + \
+        f"Expected branch_ids_offset: {expected_branch_ids_offset}"
 
 
 def test_print_mesh_summary(temporary_hdf5_file):
