@@ -383,7 +383,7 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
     return time_between_files, dof_info_dict
 
 
-def create_point_trace(formatted_data_folder: str, output_folder: str, point_ids: List[int], save_deg: bool,
+def create_point_trace(formatted_data_folder: str, output_folder: str, point_ids: List[int],
                        time_between_files: float, start_t: float, dvp: str) -> None:
     """
     Create point traces for specified point IDs and save the results in CSV and PNG files.
@@ -392,7 +392,6 @@ def create_point_trace(formatted_data_folder: str, output_folder: str, point_ids
         formatted_data_folder (str): Path to the folder containing formatted data.
         output_folder (str): Path to the folder where output files will be saved.
         point_ids (List[int]): List of point IDs for which traces will be created.
-        save_deg (bool): A boolean indicating whether to save the degree symbol in the plot title.
         time_between_files (float): Time between files in seconds.
         start_t (float): Start time of the simulation.
         dvp (str): Type of visualization ('v' for velocity, 'd' for displacement, 'p' for pressure).
@@ -690,6 +689,7 @@ def calculate_windowed_rms(signal_array: np.ndarray, window_size: int, window_ty
     window = window_functions.get(window_type, np.ones(window_size) / float(window_size))
 
     # Calculate the RMS using convolution
+    # TODO: consider using scipy.signal.fftconvolve for faster computation
     RMS = np.sqrt(np.convolve(signal_squared, window, mode="valid"))
 
     len_RMS = len(RMS)
