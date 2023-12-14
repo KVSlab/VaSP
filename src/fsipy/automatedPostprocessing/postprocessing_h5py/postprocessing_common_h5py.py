@@ -753,18 +753,18 @@ def get_eig(T: np.ndarray) -> float:
     # Determine terms p and q according to the paper
     p = I1 ** 2 - 3 * I2
     if p < tol1:
-        logging.info(f"--- perturbation applied to p: p = {p}")
+        # logging.info(f"--- perturbation applied to p: p = {p}")
         p = np.abs(p) + pert1
 
     q = 27 / 2 * I3 + I1 ** 3 - 9 / 2 * I1 * I2
     if abs(q) < tol2:
-        logging.info(f"--- perturbation applied to q: q = {q}")
+        # logging.info(f"--- perturbation applied to q: q = {q}")
         q = q + np.sign(q) * pert2
 
     # Determine angle phi for calculation of roots
     phi_nom2 = 27 * (1 / 4 * I2 ** 2 * (p - I2) + I3 * (27 / 4 * I3 - q))
     if phi_nom2 < tol3:
-        logging.info(f"--- perturbation applied to phi_nom2: phi_nom2 = {phi_nom2}")
+        # logging.info(f"--- perturbation applied to phi_nom2: phi_nom2 = {phi_nom2}")
         phi_nom2 = np.abs(phi_nom2) + pert3
 
     phi = 1 / 3 * np.arctan2(np.sqrt(phi_nom2), q)
