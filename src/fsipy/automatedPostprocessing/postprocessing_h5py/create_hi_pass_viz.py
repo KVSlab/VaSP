@@ -86,19 +86,19 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
         viz_type = "displacement"
     elif quantity == "p":
         viz_type = "pressure"
-    elif quantity == "wss":
-        viz_type = "WallShearStress"
-    elif quantity == "mps":
-        viz_type = "MaxPrincipalStrain"
     elif quantity == "strain":
         viz_type = "Green-Lagrange-strain"
     else:
-        raise ValueError("Input 'd', 'v', 'p', 'mps', 'strain', or 'wss' for quantity")
+        raise ValueError("Input 'd', 'v', 'p', 'strain', or for quantity")
 
-    if amplitude:
-        viz_type = f"{viz_type}_amplitude"
+    if amplitude and quantity != "strain":
+        viz_type_amplitude = f"{viz_type}_amplitude"
+    elif amplitude and quantity == "strain":
+        viz_type_amplitude = f"{viz_type}_max-principal-amplitude"
 
     if filter_type == "multiband":
+        assert len(lowcut_list) > 1 and len(highcut_list) > 1 and len(pass_stop_list) > 1, \
+            "For multiband filtering, lowcut and highcut must be lists of length > 1."
         for low_freq, high_freq, pass_stop in zip(lowcut_list, highcut_list, pass_stop_list):
             viz_type = f"{viz_type}_{pass_stop}_{int(np.rint(low_freq))}_to_{int(np.rint(high_freq))}"
     else:
@@ -107,10 +107,14 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
     output_file_name = f"{viz_type}.h5"
     output_path = Path(output_folder) / output_file_name
 
+    if amplitude:
+        output_file_name_amplitude = f"{viz_type_amplitude}.h5"
+        output_path_amplitude = Path(output_folder) / output_file_name_amplitude
+
     if output_folder.exists():
         logging.debug(f"--- The output path '{output_folder}' already exists.")
     else:
-        logging.debug(f"--- Creating the output folder at '{output_path}'.")
+        logging.debug(f"--- Creating the output folder at '{output_folder}'.")
         output_folder.mkdir(parents=True, exist_ok=True)
 
     # Read in the mesh (for mps, this needs to be the wall only mesh):
@@ -126,11 +130,6 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
         # Get number of timesteps
         num_ts = components_data[0].shape[1]
 
-    # The following lines have been commented out as they are not used in the current section
-    # fluid_topology, wall_topology, all_topology = get_domain_topology(mesh_path)
-    # fluid_ids, wall_ids, all_ids = get_domain_ids(mesh_path)
-    # coord_array_fluid = fsi_mesh['mesh/coordinates'][fluid_ids, :]
-
     logging.debug(f"--- Nodes: {n_nodes_fsi}, Elements: {n_elements_fsi}, Timesteps: {num_ts}")
 
     if output_path.exists() and not overwrite:
@@ -142,9 +141,20 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
     if output_path.exists():
         logging.debug(f"--- The file at {output_path} already exists; overwriting.")
         output_path.unlink()
-
+    
+    if amplitude:
+        if output_path_amplitude.exists() and not overwrite:
+            logging.info(f"--- The file at {output_path_amplitude} already exists; not overwriting. "
+                         "Set overwrite=True to overwrite this file.")
+            return
+        if output_path_amplitude.exists():
+            logging.debug(f"--- The file at {output_path_amplitude} already exists; overwriting.")
+            output_path_amplitude.unlink()
+    
     # Create H5 file
     vector_data = h5py.File(output_path, "a")
+    vector_data_amplitude = h5py.File(output_path_amplitude, "a") if amplitude else None
+    vector_data_mps_amplitude = h5py.File(output_path, "a") if quantity == "strain" and amplitude else None
 
     logging.info("--- Creating mesh arrays for visualization...")
 
@@ -190,22 +200,26 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
     if amplitude:
         rms_magnitude = np.zeros((n_nodes_fsi, num_ts)) if quantity != "strain" else \
             np.zeros((int(n_cells_fsi * 4), num_ts))
+        components_data_amplitude = np.zeros_like(components_data)
         window_size = 250  # This is approximately 1/4th of the value used in the spectrograms (992)
-        for idy in tqdm(range(n_nodes_fsi), desc="--- Calculating amplitude", unit=" node"):
-            for component_index, component_data in enumerate(components_data):
-                components_data[component_index][idy, :] = \
-                    calculate_windowed_rms(component_data[idy, :], window_size)
+        if quantity != "strain":
+            for idy in tqdm(range(n_nodes_fsi), desc="--- Calculating amplitude", unit=" node"):
+                for component_index, component_data in enumerate(components_data):
+                    components_data_amplitude[component_index][idy, :] = \
+                        calculate_windowed_rms(component_data[idy, :], window_size)
 
     # 2. Loop through elements and load in the data
     for idx in tqdm(range(num_ts), desc="--- Saving data", unit=" timestep"):
         array_name = f"VisualisationVector/{idx}" if quantity in {"d", "v"} else f"{viz_type}/{viz_type}_{idx}"
 
-        if quantity in {"p", "wss", "mps"}:
+        if quantity == "p":
             v_array = vector_data.create_dataset(array_name, (n_nodes_fsi, 1))
             v_array[:, 0] = components_data[0][:, idx]
             att_type = "Scalar"
 
             if amplitude:
+                v_array_amplitude = vector_data_amplitude.create_dataset(array_name, (n_nodes_fsi, 1))
+                v_array_amplitude[:, 0] = components_data_amplitude[0][:, idx]
                 rms_magnitude[:, idx] = components_data[0][:, idx]
 
         elif quantity == "strain":
@@ -213,7 +227,9 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
             assert dof_info is not None
             for name, data in dof_info.items():
                 dof_array = vector_data.create_dataset(f"{array_name}/{name}", data=data)
+                dof_array_amplitude = vector_data_amplitude.create_dataset(f"{array_name}/{name}", data=data)
                 dof_array[:] = data
+                dof_array_amplitude[:] = data
 
             v_array = np.zeros((int(n_cells_fsi * 4), 9))
             v_array[:, 0] = components_data[0][:, idx]  # 11
@@ -225,13 +241,13 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
             v_array[:, 6] = components_data[5][:, idx]  # 31
             v_array[:, 7] = components_data[3][:, idx]  # 23
             v_array[:, 8] = components_data[4][:, idx]  # 33
-            # flatten the array
+            # flatten the array because strain is saved with `write_checkpoint` as one-dimensional array
             v_array_flat = vector_data.create_dataset(f"{array_name}/vector", (int(n_cells_fsi * 4 * 9), 1))
             v_array_flat[:, 0] = v_array.flatten()
             att_type = "Tensor"
 
             if amplitude:
-                logging.info(f"--- Calculating eigenvalues for timestep #{idx}...")
+                # logging.info(f"--- Calculating eigenvalues for timestep #{idx}...")
                 for iel in range(int(n_cells_fsi * 4)):
                     # Create the strain tensor
                     strain_tensor = np.array([
@@ -245,11 +261,13 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
                     if np.all(np.abs(strain_tensor) < 1e-8):
                         MPS = 0.0
                     else:
-                        # Calculate Maximum Principal Strain (MPS)
-                        MPS = get_eig(strain_tensor)  # Instead of magnitude, we take Maximum Principal Strain
+                        # Calculate Maximum Principal Strain (MPS) for filtered strain tensor
+                        MPS = get_eig(strain_tensor)
 
                     # Assign MPS to rms_magnitude
-                    rms_magnitude[iel, idx] = MPS
+                    v_array_amplitude = vector_data.create_dataset(f"{array_name}/vector", (n_cells_fsi * 4, 1))
+                    v_array_amplitude[:, 0] = MPS
+
         else:
             v_array = vector_data.create_dataset(array_name, (n_nodes_fsi, 3))
             v_array[:, 0] = components_data[1][:, idx]
@@ -267,7 +285,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
     if quantity in {"d", "v", "p"}:
         create_xdmf_file(num_ts, time_between_files, start_t, n_elements_fsi,
                          n_nodes_fsi, att_type, viz_type, output_folder)
-    elif quantity == "strain":
+    elif quantity == "strain" and not amplitude:
         assert dof_info is not None
         n_nodes = dof_info["mesh/geometry"].shape[0]
         create_checkpoint_xdmf_file(num_ts, time_between_files, start_t, n_elements_fsi,
@@ -316,26 +334,19 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
         plt.plot(output_amplitudes[:, 0], output_amplitudes[:, 5], label="50th percentile amplitude")
         plt.title("Amplitude Percentiles")
         plt.ylabel("Amplitude (units depend on d, v or p)")
-        plt.xlabel("Simulation Time (s)")
+        plt.xlabel("Simulation Time (s) - Start Time (s)")
         plt.legend()
 
         logging.info(f"--- Saving amplitude figure at: {amp_graph_file}")
         plt.savefig(amp_graph_file)
         plt.close()
 
+        # NOTE: should be strain?
         if att_type == "Tensor":
             logging.info("--- Saving MPS amplitude to file...")
 
-            # Save MPS amplitude to file
-            viz_type = viz_type.replace("MaxPrincipalStrain", "MaxPrincipalHiPassStrain")
-            output_path = Path(output_folder) / f"{viz_type}.h5"
-
-            # Remove old file path
-            if output_path.exists():
-                output_path.unlink()
-
             # Create H5 file
-            with h5py.File(output_path, "a") as vector_data:
+            with h5py.File(output_path, "w") as vector_data:
                 logging.info("--- Saving data for each timestep...")
                 # Loop through elements and load in the data
                 for idx in tqdm(range(num_ts), desc="--- Saving data", unit=" timestep"):
@@ -351,12 +362,14 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
             att_type = "Scalar"
 
             # Create xdmf for visualization
+            # NOTE: This does not make any sense
             if quantity in {"d", "v", "p"}:
                 create_xdmf_file(num_ts, time_between_files, start_t, n_elements_fsi,
                                  n_nodes_fsi, att_type, viz_type, output_folder)
             elif quantity == "strain":
                 assert dof_info is not None
                 n_nodes = dof_info["mesh/geometry"].shape[0]
+                # NOTE: this is for max-principal strain
                 create_checkpoint_xdmf_file(num_ts, time_between_files, start_t, n_elements_fsi,
                                             n_nodes, att_type, viz_type, output_folder)
 
@@ -390,12 +403,16 @@ def parse_command_line_args() -> Tuple[Path, Path, int, int, float, float, str, 
                         help="Desired frequency of output data (i.e. to output every second step, use stride=2). "
                              "Default is 1.")
     parser.add_argument("--start-time", type=float, default=0.0,
-                        help="Start time of simulation (in seconds). Default is 0.")
+                        help="Start time of simulation (in seconds). Default is 0. For strain, do not provide a "
+                                "start time since the user has already specified the start time when creating the "
+                                "h5 file for the displacement.")
     parser.add_argument("--end-time", type=float, default=None,
-                        help="End time of simulation (in seconds). Default is to end at the last time step.")
+                        help="End time of simulation (in seconds). Default is to end at the last time step."
+                                "For strain, do not provide an end time since the user has already specified the end "
+                                "time when creating the h5 file for the displacement.")
     parser.add_argument("-q", "--quantity", type=str, default="v",
                         help="Quantity to postprocess. Choose 'v' for velocity, 'd' for displacement, 'p' for pressure,"
-                             " or 'wss' for wall shear stress. Default is 'v'.")
+                             " or 'strain' for strain. Default is 'v'.")
     parser.add_argument("--bands", nargs="+", type=int, default=[25, 100000],
                         help="Input lower and upper band for band-pass filtered displacement, in a list of pairs. For "
                              "example: --bands 100 150 175 200, gives you band-pass filtered visualization for the "
@@ -480,13 +497,11 @@ def main():
 
     # Updated mesh paths
     mesh_path = mesh_path.with_name(f"{mesh_path.stem}{mesh_name_suffix}{mesh_path.suffix}")
-    mesh_path_fluid = mesh_path.with_name(f"{mesh_path.stem}_fluid.h5")  # Needed for wss
-    mesh_path_solid = mesh_path.with_name(f"{mesh_path.stem}_solid.h5")  # Needed for mps
+    mesh_path_solid = mesh_path.with_name(f"{mesh_path.stem}_solid.h5")  # Needed for strain
 
     # Paths for corner-node input mesh (save_deg=1)
     mesh_path_sd1 = original_mesh_path
-    mesh_path_fluid_sd1 = mesh_path_sd1.with_name(f"{mesh_path_sd1.stem}_fluid.h5")  # Needed for wss
-    mesh_path_solid_sd1 = mesh_path_sd1.with_name(f"{mesh_path_sd1.stem}_solid.h5")  # Needed for mps
+    mesh_path_solid_sd1 = mesh_path_sd1.with_name(f"{mesh_path_sd1.stem}_solid.h5")  # Needed for strain
 
     # Create a formatted data folder name based on parameters
     formatted_data_folder_name = f"npz_{start_time}s_to_{end_time}s_stride_{stride}_save_deg_{save_deg}"
@@ -495,8 +510,15 @@ def main():
     # Visualization folder for separate domains
     visualization_separate_domain_folder = folder / "Visualization_separate_domain"
 
-    # Visualization folder for hemodynamic indices
-    visualization_hemo_folder = folder / "Hemodynamic_indices"
+    try:
+        file_path_d = visualization_separate_domain_folder / "d_solid.h5"
+        assert file_path_d.exists(), f"Displacement file {file_path_d} not found."
+        logging.info("--- displacement is for the solid domain only \n")
+    except AssertionError:
+        file_path_d = visualization_separate_domain_folder / "d.h5"
+        assert file_path_d.exists(), f"Displacement file {file_path_d} not found."
+        logging.info("--- displacement is for the entire domain \n")
+        mesh_path_solid = mesh_path
 
     # Visualization folder for stress and strain
     visualization_stress_strain_folder = folder / "StressStrain"
@@ -518,13 +540,9 @@ def main():
     else:
         # Determine mesh paths based on save_deg
         if save_deg == 1:
-            mesh_path_fluid, mesh_path_solid = mesh_path_fluid_sd1, mesh_path_solid_sd1
+            mesh_path_solid = mesh_path_solid_sd1
 
-        if quantity == "wss":
-            create_transformed_matrix(visualization_hemo_folder, formatted_data_folder,
-                                      mesh_path_fluid, case_name, start_time, end_time, quantity,
-                                      fluid_domain_id, solid_domain_id, stride)
-        elif quantity in {"mps", "strain"}:
+        if quantity == "strain":
             _, dof_info = create_transformed_matrix(visualization_stress_strain_folder, formatted_data_folder,
                                                     mesh_path_solid, case_name, start_time, end_time, quantity,
                                                     fluid_domain_id, solid_domain_id, stride)
@@ -537,11 +555,11 @@ def main():
     # time_between_output_files = time_between_input_files * stride
     time_between_output_files = dt * stride  # FIXME: Is it okay to use dt here instead of time_between_input_files?
 
-    if quantity not in {"wss", "mps", "strain"}:
+    if quantity != "strain":
         logging.info("--- Creating point traces...")
         try:
-            create_point_trace(formatted_data_folder, visualization_separate_domain_folder, point_ids,
-                               save_deg, time_between_output_files, start_time, quantity)
+            create_point_trace(str(formatted_data_folder), str(visualization_separate_domain_folder), point_ids,
+                               time_between_output_files, start_time, quantity)
         except Exception as e:
             logging.error(f"ERROR: Failed to create point traces: {e}")
 
@@ -569,7 +587,7 @@ def main():
                                time_between_output_files, dof_info, start_time, quantity, lower_freq, higher_freq,
                                amplitude=True, filter_type="multiband", pass_stop_list=pass_stop_list,
                                overwrite=overwrite)
-    elif quantity in {"mps", "strain"}:
+    elif quantity == "strain":
         logging.info(f"--- Creating high-pass visualizations for {quantity}...")
         for i in range(len(lower_freq)):
             create_hi_pass_viz(formatted_data_folder, visualization_hi_pass_folder, mesh_path_solid,
