@@ -9,6 +9,9 @@ from turtleFSI.problems import *
 from dolfin import HDF5File, Mesh, MeshFunction, facets, assemble, UserExpression, sqrt, FacetNormal, ds, \
     DirichletBC, Measure, inner, parameters
 
+from fsipy.simulations.simulation_common import load_probe_points, calculate_and_print_flow_properties, \
+    print_probe_points
+
 # set compiler arguments
 parameters["form_compiler"]["quadrature_degree"] = 6
 parameters["form_compiler"]["optimize"] = True
@@ -48,7 +51,7 @@ def set_problem_parameters(default_variables, **namespace):
         rigid_id=11,  # "rigid wall" id for the fluid
         outer_id=33,  # id for the outer surface of the solid
         # Fluid parameters
-        Q_mean=2.5E-06,
+        Q_mean=1.25E-06,
         P_mean=11200,
         T_Cycle=0.951,  # Used to define length of flow waveform
         rho_f=1.000E3,  # Fluid density [kg/m3]
@@ -64,8 +67,8 @@ def set_problem_parameters(default_variables, **namespace):
         lambda_s=lambda_s_val,  # Solid Young's modulus [Pa]
         dx_s_id=2,  # ID of marker in the solid domain
         # FSI parameters
-        fsi_region=[0.123043, 0.13458, 0.064187, 0.004],  # x, y, and z coordinate of FSI region center,
-                                                          # and radius of FSI region sphere
+        fsi_region=[0.123, 0.134, 0.063, 0.004],  # x, y, and z coordinate of FSI region center,
+                                                  # and radius of FSI region sphere
         # Simulation parameters
         folder="aneurysm_results",  # Folder name generated for the simulation
         mesh_path="mesh/file_aneurysm.h5",
@@ -73,6 +76,7 @@ def set_problem_parameters(default_variables, **namespace):
         P_FC_File="FC_Pressure",  # File name containing the fourier coefficients for the pressure waveform
         compiler_parameters=_compiler_parameters,  # Update the defaul values of the compiler arguments (FEniCS)
         save_deg=2,  # Degree of the functions saved for visualisation
+        scale_probe=True,  # Scale the probe points to meters
     ))
 
     return default_variables
@@ -189,7 +193,19 @@ def create_bcs(t, DVP, mesh, boundaries, mu_f,
 
     # Create inlet subdomain for computing the flow rate inside post_solve
     dsi = ds(inlet_id, domain=mesh, subdomain_data=boundaries)
-    return dict(bcs=bcs, inlet=inlet, p_out_bc_val=p_out_bc_val, F_solid_linear=F_solid_linear, n=n, dsi=dsi)
+    inlet_area = assemble(1.0 * dsi)
+    return dict(bcs=bcs, inlet=inlet, p_out_bc_val=p_out_bc_val, F_solid_linear=F_solid_linear, n=n, dsi=dsi,
+                inlet_area=inlet_area)
+
+
+def initiate(mesh_path, scale_probe, **namespace):
+
+    probe_points = load_probe_points(mesh_path)
+    # In case the probe points are in mm, scale them to meters
+    if scale_probe:
+        probe_points = probe_points * 0.001
+
+    return dict(probe_points=probe_points)
 
 
 def pre_solve(t, inlet, p_out_bc_val, **namespace):
@@ -209,8 +225,10 @@ def pre_solve(t, inlet, p_out_bc_val, **namespace):
     return dict(inlet=inlet, p_out_bc_val=p_out_bc_val)
 
 
-def post_solve(n, dsi, v_, **namespace):
-    # Compute flow rate at inlet
-    flow_rate_inlet = abs(assemble(inner(v_["n"], n) * dsi))
-    if MPI.rank(MPI.comm_world) == 0:
-        print(f"Inlet flow rate is: {flow_rate_inlet} m^3/s\n")
+def post_solve(dvp_, n, dsi, dt, mesh, inlet_area, mu_f, rho_f, probe_points, **namespace):
+
+    v = dvp_["n"].sub(1, deepcopy=True)
+    p = dvp_["n"].sub(2, deepcopy=True)
+
+    print_probe_points(v, p, probe_points)
+    calculate_and_print_flow_properties(dt, mesh, v, inlet_area, mu_f, rho_f, n, dsi)
