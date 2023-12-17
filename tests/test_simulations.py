@@ -153,10 +153,10 @@ def test_aneurysm_problem(input_mesh, tmpdir):
     assert np.isclose(flow_rate_at_inlet, expected_flow_rate), "Flow rate does not match expected value."
 
     # check velocity mean, min, max in the domain
-    ourput_velocity = (r"Velocity \(mean, min, max\): (\d+(?:\.\d+)?(?:e-\d+)?)\s*,\s*(\d+(?:\.\d+)?(?:e-\d+)?)\s*,"
+    output_velocity = (r"Velocity \(mean, min, max\): (\d+(?:\.\d+)?(?:e-\d+)?)\s*,\s*(\d+(?:\.\d+)?(?:e-\d+)?)\s*,"
                        r"\s*(\d+(?:\.\d+)?(?:e-\d+)?)")
 
-    output_match_velocity = re.findall(ourput_velocity, str(result))
+    output_match_velocity = re.findall(output_velocity, str(result))
     assert output_match_velocity is not None, "Regular expression did not match the output."
 
     expected_velocity_mean_min_max = [0.0007154906300607233, 6.665204824466191e-18, 0.002775071833322646]
