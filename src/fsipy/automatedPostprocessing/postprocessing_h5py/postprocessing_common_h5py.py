@@ -380,7 +380,7 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
             np.savez_compressed(output_path, component=formatted_data[i])
         else:
             np.savez_compressed(output_path, component=quantity_magnitude)
-    
+
     # save dof_info_dict in case of strain
     if quantity == "strain":
         np.save(output_folder / "dof_info.npy", dof_info_dict)
