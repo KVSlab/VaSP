@@ -171,7 +171,7 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
         stride (int): Stride for selecting timesteps.
 
     Returns:
-        float: Time between simulation output files.
+        Tuple[float, dict[str, np.ndarray]]: A tuple containing the time between files and a dictionary containing
     """
     logging.info(f"--- Creating matrix for case {case_name}...")
     input_path = Path(input_path)
@@ -241,6 +241,8 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
     # get information about dofs
     if quantity in {"wss", "mps", "strain"}:
         dof_info_dict = {name: vector_data[key][:] for name, key in zip(dof_info_bame, dof_info)}
+    else:
+        dof_info_dict = None
 
     # Get the format string from the dictionary based on the quantity
     format_string = quantity_to_array.get(quantity, 'VisualisationVector/{}')
@@ -378,6 +380,10 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
             np.savez_compressed(output_path, component=formatted_data[i])
         else:
             np.savez_compressed(output_path, component=quantity_magnitude)
+    
+    # save dof_info_dict in case of strain
+    if quantity == "strain":
+        np.save(output_folder / "dof_info.npy", dof_info_dict)
 
     logging.info("--- Finished writing component files\n")
     return time_between_files, dof_info_dict
