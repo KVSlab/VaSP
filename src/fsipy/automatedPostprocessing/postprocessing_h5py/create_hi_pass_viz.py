@@ -144,7 +144,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
     if output_path.exists():
         logging.debug(f"--- The file at {output_path} already exists; overwriting.")
         output_path.unlink()
-    
+
     if amplitude:
         if output_path_amplitude.exists() and not overwrite:
             logging.info(f"--- The file at {output_path_amplitude} already exists; not overwriting. "
@@ -153,7 +153,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
         if output_path_amplitude.exists():
             logging.debug(f"--- The file at {output_path_amplitude} already exists; overwriting.")
             output_path_amplitude.unlink()
-    
+
     # Create H5 file
     vector_data = h5py.File(output_path, "a")
     vector_data_amplitude = h5py.File(output_path_amplitude, "a") if amplitude else None
@@ -171,7 +171,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
         geo_array[...] = coord_array_fsi
         topo_array = vector_data.create_dataset("Mesh/0/mesh/topology", (n_elements_fsi, 4), dtype="i")
         topo_array[...] = topo_array_fsi
-    
+
     if quantity in {"d", "v", "p"} and amplitude:
         geo_array = vector_data_amplitude.create_dataset("Mesh/0/mesh/geometry", (n_nodes_fsi, 3))
         geo_array[...] = coord_array_fsi
@@ -256,7 +256,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
                     array_name = f"{viz_type_amplitude}/{viz_type_amplitude}_{idx}"
                     dof_array = vector_data_amplitude.create_dataset(f"{array_name}/{name}", data=data)
                     dof_array[:] = data
-                
+
                 v_array_amplitude = np.zeros((int(n_cells_fsi * 4), 9))
                 v_array_amplitude[:, 0] = components_data_amplitude[0][:, idx]  # 11
                 v_array_amplitude[:, 1] = components_data_amplitude[1][:, idx]  # 12
@@ -268,7 +268,8 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
                 v_array_amplitude[:, 7] = components_data_amplitude[3][:, idx]  # 23
                 v_array_amplitude[:, 8] = components_data_amplitude[4][:, idx]  # 33
                 # flatten the array because strain is saved with `write_checkpoint` as one-dimensional array
-                v_array_flat_amplitude = vector_data_amplitude.create_dataset(f"{array_name}/vector", (int(n_cells_fsi * 4 * 9), 1))
+                v_array_flat_amplitude = vector_data_amplitude.create_dataset(f"{array_name}/vector",
+                                                                              (int(n_cells_fsi * 4 * 9), 1))
                 v_array_flat_amplitude[:, 0] = v_array_amplitude.flatten()
                 att_type = "Tensor"
 
@@ -276,9 +277,12 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
                 for iel in range(int(n_cells_fsi * 4)):
                     # Create the strain tensor
                     strain_tensor = np.array([
-                        [components_data_amplitude[0][iel, idx], components_data_amplitude[1][iel, idx], components_data_amplitude[5][iel, idx]],
-                        [components_data_amplitude[1][iel, idx], components_data_amplitude[2][iel, idx], components_data_amplitude[3][iel, idx]],
-                        [components_data_amplitude[5][iel, idx], components_data_amplitude[3][iel, idx], components_data_amplitude[4][iel, idx]]
+                        [components_data_amplitude[0][iel, idx], components_data_amplitude[1][iel, idx],
+                         components_data_amplitude[5][iel, idx]],
+                        [components_data_amplitude[1][iel, idx], components_data_amplitude[2][iel, idx],
+                         components_data_amplitude[3][iel, idx]],
+                        [components_data_amplitude[5][iel, idx], components_data_amplitude[3][iel, idx],
+                         components_data_amplitude[4][iel, idx]]
                     ])
 
                     # Check if the strain tensor is all zeros. This is a shortcut to avoid taking eignevalues if
@@ -292,7 +296,8 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
                     # Assign MPS to rms_magnitude
                     # v_array_amplitude[:, 0] = MPS
                     rms_magnitude[iel, idx] = MPS
-                    vector_data_amplitude.create_dataset(f"{viz_type_magnitude}/{viz_type_magnitude}_{idx}/vector", data=MPS)
+                    vector_data_amplitude.create_dataset(f"{viz_type_magnitude}/{viz_type_magnitude}_{idx}/vector",
+                                                         data=MPS)
 
         else:
             v_array = vector_data.create_dataset(array_name, (n_nodes_fsi, 3))
@@ -309,9 +314,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
                 # Take magnitude of RMS Amplitude, this way you don't lose any directional changes
                 rms_magnitude[:, idx] = LA.norm(v_array, axis=1)
 
-
     vector_data.close()
-
 
     # 3. Create xdmf file for visualization
     if quantity in {"d", "v", "p"}:
@@ -324,7 +327,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
                                     n_nodes, att_type, viz_type, output_folder)
     else:
         NotImplementedError(f"Quantity {quantity} not implemented.")
-    
+
     # If amplitude is selected, create xdmf file for visualization
     if amplitude:
         if quantity in {"d", "v", "p"}:
@@ -339,7 +342,6 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
             NotImplementedError(f"Quantity {quantity} not implemented.")
 
     # If amplitude is selected, save the percentiles of magnitude of RMS amplitude to file
-    # NOTE: This part is actually computing the magnitude of the amplitude. (i.e. computing a scalar quantity from a vector or tensor)
     if amplitude:
         logging.info("--- Saving amplitude percentiles to file...")
 
@@ -410,7 +412,8 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
                                         n_nodes, att_type, viz_type_magnitude, output_folder)
 
 
-def parse_command_line_args() -> Tuple[Path, Path, int, int, float, float, str, List[int], List[int], str, bool, bool, int]:
+def parse_command_line_args() -> Tuple[Path, Path, int, int, float, float, str,
+                                       List[int], List[int], str, bool, bool, int]:
     """
     Parse arguments from the command line.
 
@@ -440,12 +443,12 @@ def parse_command_line_args() -> Tuple[Path, Path, int, int, float, float, str, 
                              "Default is 1.")
     parser.add_argument("--start-time", type=float, default=0.0,
                         help="Start time of simulation (in seconds). Default is 0. For strain, do not provide a "
-                                "start time since the user has already specified the start time when creating the "
-                                "h5 file for the displacement.")
+                             "start time since the user has already specified the start time when creating the "
+                             "h5 file for the displacement.")
     parser.add_argument("--end-time", type=float, default=None,
                         help="End time of simulation (in seconds). Default is to end at the last time step."
-                                "For strain, do not provide an end time since the user has already specified the end "
-                                "time when creating the h5 file for the displacement.")
+                             "For strain, do not provide an end time since the user has already specified the end "
+                             "time when creating the h5 file for the displacement.")
     parser.add_argument("-q", "--quantity", type=str, default="v",
                         help="Quantity to postprocess. Choose 'v' for velocity, 'd' for displacement, 'p' for pressure,"
                              " or 'strain' for strain. Default is 'v'.")
@@ -491,7 +494,7 @@ def parse_command_line_args() -> Tuple[Path, Path, int, int, float, float, str, 
 
 def main():
     folder, mesh_path, save_deg, stride, start_time, end_time, quantity, bands, point_ids, filter_type, amplitude, \
-         overwrite, log_level = parse_command_line_args()
+        overwrite, log_level = parse_command_line_args()
 
     # Create logger and set log level
     logging.basicConfig(level=log_level, format="%(message)s")
