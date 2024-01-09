@@ -11,6 +11,7 @@ import sys
 import logging
 from typing import List, Union, Tuple
 from pathlib import Path
+import pickle
 
 import configargparse
 import h5py
@@ -157,7 +158,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
     # Create H5 file
     vector_data = h5py.File(output_path, "a")
     vector_data_amplitude = h5py.File(output_path_amplitude, "a") if amplitude else None
-    # vector_data_mps_amplitude = h5py.File(output_path_magnitude, "a") if quantity == "strain" and amplitude else None
+    vector_data_mps = h5py.File(output_path_magnitude, "a") if quantity == "strain" and amplitude else None
 
     logging.info("--- Creating mesh arrays for visualization...")
 
@@ -210,6 +211,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
         rms_magnitude = np.zeros((n_nodes_fsi, num_ts)) if quantity != "strain" else \
             np.zeros((int(n_cells_fsi * 4), num_ts))
         components_data_amplitude = np.zeros_like(components_data)
+        # NOTE: Fixing the window size to 250 for now. It would be better to make this a parameter.
         window_size = 250  # This is approximately 1/4th of the value used in the spectrograms (992)
         for idy in tqdm(range(n_nodes_fsi), desc="--- Calculating amplitude", unit=" node"):
             for component_index, component_data in enumerate(components_data):
@@ -284,20 +286,25 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
                         [components_data_amplitude[5][iel, idx], components_data_amplitude[3][iel, idx],
                          components_data_amplitude[4][iel, idx]]
                     ])
-
                     # Check if the strain tensor is all zeros. This is a shortcut to avoid taking eignevalues if
                     # the Strain tensor is all zeroes (outside the FSI region).
-                    if np.all(np.abs(strain_tensor) < 1e-8):
+                    if np.all(np.abs(strain_tensor) < 1e-12):
                         MPS = 0.0
                     else:
                         # Calculate Maximum Principal Strain (MPS) for filtered strain tensor
                         MPS = get_eig(strain_tensor)
 
                     # Assign MPS to rms_magnitude
-                    # v_array_amplitude[:, 0] = MPS
                     rms_magnitude[iel, idx] = MPS
-                    vector_data_amplitude.create_dataset(f"{viz_type_magnitude}/{viz_type_magnitude}_{idx}/vector",
-                                                         data=MPS)
+
+                array_name = f"{viz_type_magnitude}/{viz_type_magnitude}_{idx}"
+                assert dof_info is not None
+                for name, data in dof_info.items():
+                    dof_array = vector_data_mps.create_dataset(f"{array_name}/{name}", data=data)
+                    dof_array[:] = data
+                v_array_mps = vector_data_mps.create_dataset(f"{array_name}/vector",
+                                                             (int(n_cells_fsi * 4), 1))
+                v_array_mps[:, 0] = rms_magnitude[:, idx]
 
         else:
             v_array = vector_data.create_dataset(array_name, (n_nodes_fsi, 3))
@@ -391,22 +398,9 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
 
         if quantity == "strain":
             logging.info("--- Saving MPS amplitude to file...")
-            # Create H5 file
-            with h5py.File(output_path_magnitude, "w") as vector_data:
-                logging.info("--- Saving data for each timestep...")
-                # Loop through elements and load in the data
-                for idx in tqdm(range(num_ts), desc="--- Saving data", unit=" timestep"):
-                    array_name = f"{viz_type_magnitude}/{viz_type_magnitude}_{idx}"
-                    assert dof_info is not None
-                    for name, data in dof_info.items():
-                        dof_array = vector_data.create_dataset(f"{array_name}/{name}", data=data)
-                        dof_array[:] = data
-
-                    v_array = vector_data.create_dataset(f"{array_name}/vector", (n_cells_fsi * 4, 1))
-                    v_array[:, 0] = rms_magnitude[:, idx]
-
             assert dof_info is not None
             n_nodes = dof_info["mesh/geometry"].shape[0]
+            att_type = "Scalar"
             # NOTE: this is for max-principal strain
             create_checkpoint_xdmf_file(num_ts, time_between_files, start_t, n_elements_fsi,
                                         n_nodes, att_type, viz_type_magnitude, output_folder)
@@ -580,8 +574,9 @@ def main():
         logging.info(f"--- Formatted data already exists at: {formatted_data_path}\n")
     elif formatted_data_path.exists() and quantity == "strain":
         logging.info(f"--- Formatted data already exists at: {formatted_data_path}\n")
-        dof_info_path = formatted_data_folder / "dof_info.npy"
-        dof_info = np.load(dof_info_path, allow_pickle=True).item()
+        dof_info_path = formatted_data_folder / "dof_info.pkl"
+        with open(dof_info_path, "rb") as f:
+            dof_info = pickle.load(f)
     else:
         # Determine mesh paths based on save_deg
         if save_deg == 1:

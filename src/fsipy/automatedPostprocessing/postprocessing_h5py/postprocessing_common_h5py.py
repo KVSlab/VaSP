@@ -11,7 +11,8 @@ This file contains helper functions for creating visualizations outside of FEniC
 import os
 import logging
 from pathlib import Path
-from typing import Tuple, Union, List
+from typing import Tuple, Union, List, Optional
+import pickle
 
 import h5py
 import pandas as pd
@@ -154,7 +155,7 @@ def read_npz_files(filepath: Union[str, Path]) -> pd.DataFrame:
 def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union[str, Path],
                               mesh_path: Union[str, Path], case_name: str, start_t: float, end_t: float, quantity: str,
                               fluid_domain_id: Union[int, list[int]], solid_domain_id: Union[int, list[int]],
-                              stride: int = 1) -> Tuple[float, dict[str, np.ndarray]]:
+                              stride: int = 1) -> Tuple[float, Optional[dict[str, np.ndarray]]]:
     """
     Create a transformed matrix from simulation data.
 
@@ -229,18 +230,18 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
     # In case of wss, mps, strain, we need to get the more information from h5 file
     name_of_quantity_in_h5 = list(vector_data.keys())[0]
     first_data = name_of_quantity_in_h5 + "/" + name_of_quantity_in_h5 + "_0"
-    dof_info_bame = [
+    dof_info_name = [
         "cell_dofs",
         "cells",
         "mesh/geometry",
         "mesh/topology",
         "x_cell_dofs",
     ]
-    dof_info = [first_data + "/" + name for name in dof_info_bame]
+    dof_info = [first_data + "/" + name for name in dof_info_name]
 
     # get information about dofs
     if quantity in {"wss", "mps", "strain"}:
-        dof_info_dict = {name: vector_data[key][:] for name, key in zip(dof_info_bame, dof_info)}
+        dof_info_dict = {name: np.array(vector_data[key][:]) for name, key in zip(dof_info_name, dof_info)}
     else:
         dof_info_dict = None
 
@@ -383,7 +384,8 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
 
     # save dof_info_dict in case of strain
     if quantity == "strain":
-        np.save(output_folder / "dof_info.npy", dof_info_dict)
+        with open(output_folder / "dof_info.pkl", "wb") as f:
+            pickle.dump(dof_info_dict, f)
 
     logging.info("--- Finished writing component files\n")
     return time_between_files, dof_info_dict
