@@ -12,7 +12,7 @@ parts:
       - file: docker
       - file: issues
 
-  - caption: Using [software name]
+  - caption: Using VaSP
     chapters:
     - file: preprocess
     - file: simulation
