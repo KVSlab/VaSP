@@ -11,6 +11,51 @@
 
 ## Installation on Linux or macOS
 
+### Step 1:  Clone the `VaSP` repository
+
+Start by downloading and navigating to the root directory of `VaSP` with the following command in your terminal:
+
+``` console
+$ git clone https://github.com/KVSLab/VaSP.git
+$ cd VaSP
+```
+
+### Step 2:  Create a `conda` environment
+
+Once you have installed `conda`, create a new environment for `VaSP` with all its dependencies using the following
+command in your terminal:
+
+``` console
+$ conda env update --file environment.yml --name your_environment
+```
+
+### Step 3: Activate the `conda` environment
+
+After the configuration of the `conda` environment is finished, activate the newly created environment by running the
+following command:
+
+``` console
+$ conda activate your_environment
+```
+
+### Step 4: Install `VaSP` inside the `conda` environment using `pip`
+
+Finally, you can install the `VaSP` package inside your environment using `pip`:
+
+``` console
+$ python3 -m pip install .
+```
+
+### Step 5: Verify the installation
+
+You can verify that `VaSP` is installed correctly by downloading the test dependencies, and running the tests using the
+following commands:
+
+``` console
+$ python3 -m pip install .[test]
+$ python3 -m pytest tests 
+```
+
 ## Installation on Windows
 
 We recommend Windows users to use [Windows Subsystem for Linux](https://learn.microsoft.com/en-us/windows/wsl/install)
@@ -21,9 +66,9 @@ the [FEniCS Reference Manual](https://fenics.readthedocs.io/en/latest/installati
 dependencies through `conda` by removing the `fenics` dependency inside `environment.yml` and follow the steps of
 the [Linux/macOS](install:linux) installation instructions.
 
-## Editable installation of ___
+## Editable installation of VaSP
 
-If you want to make changes to any of the scripts included in `software`, you can install an editable version on your
+If you want to make changes to any of the scripts included in `VaSP`, you can install an editable version on your
 machine by supplying the `--editable` flag:
 
 ```
