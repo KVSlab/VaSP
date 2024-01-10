@@ -5,8 +5,8 @@
 
 #######################################################################################
 # Book settings
-title: to be filled  # The title of the book. Will be placed in the left navbar.
-author: to be filled  # The author of the book
+title: VaSP  # The title of the book. Will be placed in the left navbar.
+author: Kei Yamamoto  # The author of the book
 copyright: "2023"  # Copyright year to be placed in the footer
 logo: logo.png  # A path to the book logo
 
