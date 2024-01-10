@@ -5,13 +5,14 @@
 The dependencies of `software` are:
 
 * Python >= 3.8
+* cppimport >= 22.8.2
+* pandas >= 2.1.2
+* matplotlib >= 3.8.0
 * FEniCS >= 2018.1
 * morphMan >= 1.2
+* VaMPy >= 1.0.4
 * vmtk >= 1.4.0
-* Oasis >= 2018.1
-* paramiko >= 3.0
-* cppimport >= 22.8.2
-* turtleFSI >= 1.5.0
+* turtleFSI >= 2.4.0
 
 ## Installing with `conda`
 
