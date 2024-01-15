@@ -1,10 +1,35 @@
 # Pre-processing
 
-Since pre-processing part of `VaSP` is based on [VaMPy](https://github.com/KVSlab/VaMPy), overlapping functionality of the pre-processing will not be covered here. Instead, users are encouraged to refer to the [VaMPy documentation](https://kvslab.github.io/VaMPy/preprocess.html) for some of the basic functionalities. In this document, we will focus on the newly implemented parts of the pre-processing that are specific for performing fluid-structure interaction (FSI) simulations. 
+Since pre-processing part of `VaSP` is based on [VaMPy](https://github.com/KVSlab/VaMPy), overlapping functionality of the pre-processing will not be covered here. Instead, users are encouraged to refer to the [VaMPy documentation](https://kvslab.github.io/VaMPy/preprocess.html) for some of the basic functionalities used in `VaSP`. In this document, we will focus on the newly implemented parts of the pre-processing that are specific for performing fluid-structure interaction (FSI) simulations.
+
+The main script for running pre-processing is `automated_preprocessing.py` located under `src/vasp/automatedPreprocessing` and can be run by using the command `vasp-generate-mesh`. Although there are quite many parameters for `vasp-generate-mesh`, it is not necessary to specify all the arguments. In fact, it is recommended that the user starts from providing minimally required arguments first, and then control the other arguments based on the user's need for meshing. To run the pre-processing, i.e. generating the volume mesh for FSI simulations, the user is required to provide the surface mesh in `vtp` or `stl` format. Assume that the user has the surface mesh named `my_mesh.vtp`. Then, pre-processing can be performed as
+
+``` console
+vasp-generate-mesh --input-model /[some_path]/my_mesh.vtp
+```
+
+which should produce the following files in the same folder as `my_mesh.vtp`
+
+<ul>
+  <li>my_mesh.h5: input mesh for FSI simulation</li>
+  <li>my_mesh.vtu: default output mesh file from VMTK</li>
+  <li>my_mesh.xml or my_mesh.xml.gz (compressed or not): FEniCS compatible version of the mesh, not used in VaSP</li>
+  <li>my_mesh_edge_length.h5/xmdf: averaged edge length for each cells. This can be used to check the quality of the mesh</li>
+  <li>my_mesh_boundaries.pvd/vtu: boundary mesh with IDs for each boundaries.</li>
+  <li>my_mesh_domains.pvd/vtu: volume mesh with IDs for each domains.</li>
+</ul>
+
+Among the files generated after pre-processing, `my_mesh.h5` will be used as an input to the FSI simulation. However, `.h5` file cannot be viewed by Paraview, and thus we have added other files such as `my_mesh_boundaries.pvd` and `my_mesh_domains.pvd` for viewing the mesh and IDs with Paraview.
+
+For checking the parameters, please run the following command to get the description of the parameters
+
+``` console
+vasp-generate-mesh --help
+```
 
 ##  Fluid and Solid mesh generation
 
-To perform FSI simulations, fluid and solid regions need to be generated and marked so that different partial differential equations can be solved on each domain. In `VaSP`, user is, first, required to provide the surface mesh, which represent the interface of the fluid and solid domain. Then, fluid mesh is created inside the surface mesh to fill the provided surface mesh while solid mesh is created outside the surface mesh to cover the fluid mesh. This mechanism of generating two different mesh works very well for blood vessels. We extended VMTK, a framework for generating mesh based for image-based vascular modelling, to enable the solid mesh generation by utilizing the functionality of adding boundary layer meshing. Fig {numref}`{domains}` is an example of FSI mesh with fluid and solid regions marked as 1 and 2, respectively.
+To perform FSI simulations, fluid and solid regions need to be generated and marked so that different partial differential equations can be solved on each domain. In `VaSP`, the provided surface mesh represents the interface of the fluid and solid domain. Then, fluid mesh is created inside the surface mesh to fill the provided surface mesh while solid mesh is created outside the surface mesh to cover the fluid mesh. This mechanism of generating two different mesh works very well for blood vessels. We extended VMTK, a framework for generating mesh based for image-based vascular modelling, to enable the solid mesh generation by utilizing the functionality of adding boundary layer meshing. Fig {numref}`{domains}` is an example of FSI mesh with fluid and solid regions marked as 1 and 2, respectively.
 
 ```{figure} figures/case9_domain_ids.png
 ---
