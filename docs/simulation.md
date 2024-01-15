@@ -1,7 +1,58 @@
 # Fluid Structure Interaction Simulations and monitoring tool during the simulation
 
-## Simulations in `turtleFSI`
+## Simulations using `turtleFSI`
 
 `VaSP` uses [turtleFSI](https://github.com/KVSlab/turtleFSI) for performing FSI simulations. In short, `turtleFSI` is a monolithic FSI solver built based on [FEniCS](https://fenicsproject.org). For the detailed usage of `turtleFSI` and tutorials, users are referred to the [turtleFSI documentation](https://turtlefsi2.readthedocs.io/en/latest/). Here, we will introduce the very basic command for using `turtleFSI` and supporting functions that are specifically added for performing vascular FSI. 
 
-After the pre-processing step, mesh file with `*.h5` suffix is required as an input to the FSI simulation. In addition, user may use mesh file `*_boundaries.pvd` to check the ID for boundaries.
+To run FSI simulations with `turtleFSI`, users typically need to create a problem file that contains information about input parameters and boundary conditions. How to create your own problem file is explained in details [here](https://turtlefsi2.readthedocs.io/en/latest/using_turtleFSI.html#create-your-own-problem-file). With the problem file and the mesh from pre-processing step in hand, you can now run FSI simulation with `turtleFSI` as follows:
+
+```console
+turtleFSI -p [path_to_problem]
+```
+
+It is possible to run `turtleFSI` with Message Passing Interface (MPI). To run `turtleFSI`, please use:
+
+```console
+mpirun -np [number_of_cpu] -p [path_to_problem]
+```
+
+`turtleFSI` also supports using config file for changing the parameter without modifying the original problem file. To run a problem file with config file, please use:
+
+```console
+turtleFSI -p [path_to_problem] -c [path_to_config_file]
+```
+
+An example of config file is located [here](https://github.com/KVSlab/turtleFSI/tree/master/docs/examples).
+
+For example, if the user want to run a problem file named `my_problem.py` with config file `my_config.config` using 4 processors, the command would then be:
+
+```console
+mpirun -np 4 turtleFSI -p my_problem -c my_config.config
+```
+
+In this case, it is assumed that `my_problem.py` and `my_config.config` are located in the same folder where the user executes the above command. 
+
+## Monitoring tool during the simulation
+
+Due to the nature of vascular FSI simulations, it is usually the case that the simulation needs to be run on the supercomputer with many CPUs where the total simulation time may exceed one day. In such a case, it is crucial to monitor the progress your simulations and potentially check if the simulations are going as you wish. For that purpose, `vasp-log-plotter` can be used to plot the following quantities based on the log file generated during the run. Quantities that can be plotted are as follows:
+
+
+<ul>
+  <li> cpu time per time step against simulation time </li>
+  <li> number of newton iterations to converge to the specified tolerance (absolute & relative)</li>
+  <li> velocity and pressure magnitude at probe points over time</li>
+  <li> flow rate at the inlet</li>
+  <li> maximum, minimum, and average velocity in the entire domain </li>
+  <li> maximum, minimum, and average CFL number in the entire domain </li>
+  <li> maximum, minimum, and average Reynolds number in the entire domain </li>
+</ul>
+
+To get a complete list of the parameters, please run:
+
+```console
+vasp-log-plotter --help
+```
+
+```{attention}
+
+```
