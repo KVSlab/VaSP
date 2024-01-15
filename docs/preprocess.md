@@ -50,5 +50,5 @@ Similar to the domains, boundaries also need to be marked separately for applyin
   <li>Solid outer wall</li>
 </ol>
 
-The first two boundaries are necessary for specifying boundary conditions for the fluid domain. In case of do-nothing boundary condition at the outlet, there is no need to specify the ID for the outlet while the inlet ID is always required to specify the inflow. The third boundary, fluid and solid interface, is required to distinguish static and dynamic boundary between fluid and solid. The fourth boundary is usually used to fix the solid inlet and outlet while the last boundary is used to specify Robin boundary condition at the outer wall of the vascular system for representing surrounding environment. 
+The first two boundaries are necessary for specifying boundary conditions for the fluid domain. In case of do-nothing boundary condition at the outlet, there is no need to specify the ID for the outlet while the inlet ID is always required to specify the inflow. The third boundary, fluid and solid interface, is required to distinguish static and dynamic boundary between fluid and solid. The fourth boundary is usually used to fix the solid inlet and outlet while the last boundary is used to specify Robin boundary condition at the outer wall of the vascular system for representing surrounding environment.
 
