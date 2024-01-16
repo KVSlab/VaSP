@@ -109,20 +109,6 @@ def get_mesh_domain_and_boundaries(mesh_path, fsi_region, dx_f_id, fsi_id, rigid
                 boundaries.array()[i] = rigid_id  # changed "fsi" idx to "rigid wall" idx
         i += 1
 
-    # NOTE: Instead of using a sphere, we can also use a box (x-range) to define the FSI region
-    # Only consider FSI in domain within fsi_x_range
-    # fsi_x_min = fsi_x_range[0]
-    # fsi_x_max = fsi_x_range[1]
-
-    # i = 0
-    # for submesh_facet in facets(mesh):
-    #     idx_facet = boundaries.array()[i]
-    #     if idx_facet == fsi_id or idx_facet == outer_id:
-    #         mid = submesh_facet.midpoint()
-    #         if mid.x() < fsi_x_min or mid.x() > fsi_x_max:
-    #             boundaries.array()[i] = rigid_id  # changed "fsi" id to "rigid wall" id
-    #     i += 1
-
     # In this region, make fluid more viscous
     x_min = 0.024
     i = 0
