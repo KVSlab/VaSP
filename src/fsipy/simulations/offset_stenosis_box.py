@@ -67,9 +67,7 @@ def set_problem_parameters(default_variables, **namespace):
         lambda_s=lambda_s_val,  # Solid Young's modulus [Pa]
         dx_s_id=2,  # ID of marker in the solid domain
         # FSI parameters
-        fsi_x_range=[-0.0002, 0.016],  # x-range of FSI region
-        fsi_y_range=[-0.0035, 0.0035],  # y-range of FSI region
-        fsi_z_range=[-0.0035, 0.0035],  # z-range of FSI region
+        fsi_region=[-0.0002, 0.016, -0.0035, 0.0035, -0.0035, 0.0035],  # FSI region
         # Simulation parameters
         folder="offset_stenosis_results_box",  # Folder name generated for the simulation
         mesh_path="mesh/file_stenosis.h5",
@@ -82,7 +80,7 @@ def set_problem_parameters(default_variables, **namespace):
     return default_variables
 
 
-def get_mesh_domain_and_boundaries(mesh_path, fsi_x_range, fsi_y_range, fsi_z_range, dx_f_id, fsi_id, rigid_id, outer_id, **namespace):
+def get_mesh_domain_and_boundaries(mesh_path, fsi_region, dx_f_id, fsi_id, rigid_id, outer_id, **namespace):
 
     # Read mesh
     mesh = Mesh()
@@ -102,11 +100,11 @@ def get_mesh_domain_and_boundaries(mesh_path, fsi_x_range, fsi_y_range, fsi_z_ra
         idx_facet = boundaries.array()[i]
         if idx_facet == fsi_id or idx_facet == outer_id:
             mid = submesh_facet.midpoint()
-            if mid.x() < fsi_x_range[0] or mid.x() > fsi_x_range[1]:
+            if mid.x() < fsi_region[0] or mid.x() > fsi_region[1]:
                 boundaries.array()[i] = rigid_id  # changed "fsi" id to "rigid wall" id
-            elif mid.y() < fsi_y_range[0] or mid.y() > fsi_y_range[1]:
+            elif mid.y() < fsi_region[2] or mid.y() > fsi_region[3]:
                 boundaries.array()[i] = rigid_id
-            elif mid.z() < fsi_z_range[0] or mid.z() > fsi_z_range[1]:
+            elif mid.z() < fsi_region[4] or mid.z() > fsi_region[5]:
                 boundaries.array()[i] = rigid_id
         
         i += 1
