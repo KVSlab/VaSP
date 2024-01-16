@@ -106,9 +106,9 @@ def get_mesh_domain_and_boundaries(mesh_path, fsi_region, dx_f_id, fsi_id, rigid
                 boundaries.array()[i] = rigid_id
             elif mid.z() < fsi_region[4] or mid.z() > fsi_region[5]:
                 boundaries.array()[i] = rigid_id
-        
+
         i += 1
-    
+
     # In this region, make fluid more viscous
     x_min = 0.024
     i = 0
@@ -119,7 +119,6 @@ def get_mesh_domain_and_boundaries(mesh_path, fsi_region, dx_f_id, fsi_id, rigid
             if mid.x() > x_min:
                 domains.array()[i] = dx_f_id[1]
         i += 1
-
 
     return mesh, domains, boundaries
 
