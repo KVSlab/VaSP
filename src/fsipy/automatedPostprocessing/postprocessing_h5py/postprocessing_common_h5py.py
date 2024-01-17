@@ -201,7 +201,7 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
         'p': 'pressure.xdmf',
         'wss': 'WSS.xdmf',
         'mps': 'MaxPrincipalStrain.xdmf',
-        'strain': 'Green-Lagrange-strain.xdmf'
+        'strain': 'GreenLagrangeStrain.xdmf'
     }
 
     if quantity in xdmf_files:

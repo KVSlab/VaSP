@@ -88,7 +88,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
     elif quantity == "p":
         viz_type = "pressure"
     elif quantity == "strain":
-        viz_type = "Green-Lagrange-strain"
+        viz_type = "GreenLagrangeStrain"
     else:
         raise ValueError("Input 'd', 'v', 'p', 'strain', or for quantity")
 
