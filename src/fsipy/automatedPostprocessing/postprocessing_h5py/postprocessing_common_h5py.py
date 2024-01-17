@@ -224,7 +224,7 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
     quantity_to_array = {
         "wss": "WSS/WSS_{}/vector",
         "mps": "MaxPrincipalStrain/MaxPrincipalStrain_{}/vector",
-        "strain": "Green-Lagrange-strain/Green-Lagrange-strain_{}/vector"
+        "strain": "GreenLagrangeStrain/GreenLagrangeStrain_{}/vector"
     }
 
     # In case of wss, mps, strain, we need to get the more information from h5 file
