@@ -268,6 +268,9 @@ def compute_stress(visualization_separate_domain_folder: Path, mesh_path: Path, 
 
 def main() -> None:
     """Main function."""
+    if MPI.size(MPI.comm_world) == 1:
+        print("--- Running in serial mode, you can use MPI to speed up the postprocessing. \n")
+
     args = parse_arguments()
     folder_path = args.folder
 
