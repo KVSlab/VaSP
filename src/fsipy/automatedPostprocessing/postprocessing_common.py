@@ -6,7 +6,7 @@ import re
 import json
 import logging
 from pathlib import Path
-from typing import Union, Optional, Dict
+from typing import Union, Optional, Dict, Tuple, List
 
 import numpy as np
 import h5py
@@ -51,7 +51,7 @@ def get_domain_ids(mesh_path, fluid_domain_id, solid_domain_id):
     return fluid_ids, solid_ids, all_ids
 
 
-def output_file_lists(xdmf_file):
+def output_file_lists(xdmf_file: Path) -> Tuple[List[str], List[float], List[int]]:
     """
     If the simulation has been restarted, the output is stored in multiple files and may not have even temporal spacing
     This loop determines the file names from the xdmf output file
@@ -60,33 +60,52 @@ def output_file_lists(xdmf_file):
         xdmf_file (Path): Path to xdmf file
 
     Returns:
-        h5file_name_list (list): List of names of h5 files associated with each timestep
-        timevalue_list (list): List of time values in xdmf file
-        index_list (list): List of indices of each timestp in the corresponding h5 file
+        Tuple[List[str], List[float], List[int]]: A tuple containing:
+            - List of names of h5 files associated with each timestep
+            - List of time values in xdmf file
+            - List of indices of each timestep in the corresponding h5 file
     """
 
-    file1 = open(xdmf_file, 'r')
-    Lines = file1.readlines()
-    h5file_name_list = []
-    timevalue_list = []
-    index_list = []
+    with open(xdmf_file, 'r') as file:
+        lines = file.readlines()
+
+    h5file_name_list: List[str] = []
+    timevalue_list: List[float] = []
+    index_list: List[int] = []
+    checkpoint_data: bool = False
+
+    for line in lines:
+        if "FiniteElementFunction" in line:
+            checkpoint_data = True
+            break
+
+    time_pattern: str = '<Time Value="(.+?)"'
+    h5_pattern_checkpoint: str = r'"HDF">(.*?):'
+    index_pattern_checkpoint: str = r'_([0-9]+)\/vector'
+    h5_pattern_no_checkpoint: str = '"HDF">(.+?):/'
+    index_pattern_no_checkpoint: str = "VisualisationVector/(.+?)</DataItem"
 
     # This loop goes through the xdmf output file and gets the time value (timevalue_list), associated
     # with .h5 file (h5file_name_list) and index of each timestep in the corresponding h5 file (index_list)
-    for line in Lines:
+    for line in lines:
         if '<Time Value' in line:
-            time_pattern = '<Time Value="(.+?)"'
             time_str = re.findall(time_pattern, line)
             time = float(time_str[0])
             timevalue_list.append(time)
 
-        elif 'VisualisationVector' in line:
-            h5_pattern = '"HDF">(.+?):/'
-            h5_str = re.findall(h5_pattern, line)
+        if checkpoint_data and 'vector' in line:
+            h5_str = re.findall(h5_pattern_checkpoint, line)
             h5file_name_list.append(h5_str[0])
 
-            index_pattern = "VisualisationVector/(.+?)</DataItem>"
-            index_str = re.findall(index_pattern, line)
+            index_str = re.findall(index_pattern_checkpoint, line)
+            index = int(index_str[0])
+            index_list.append(index)
+
+        elif not checkpoint_data and 'VisualisationVector' in line:
+            h5_str = re.findall(h5_pattern_no_checkpoint, line)
+            h5file_name_list.append(h5_str[0])
+
+            index_str = re.findall(index_pattern_no_checkpoint, line)
             index = int(index_str[0])
             index_list.append(index)
 
