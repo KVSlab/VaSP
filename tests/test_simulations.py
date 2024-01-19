@@ -43,6 +43,19 @@ def test_offset_stenosis_problem(input_mesh, tmpdir):
     assert np.isclose(velocity_last_time_step, expected_velocity).all(), "Velocity does not match expected value."
     assert np.isclose(pressure_last_time_step, expected_pressure), "Pressure does not match expected value."
 
+    # Here we will check the displacement from the probe point
+    output_re = (r"Point {}: Displacement: \((-?\d+\.\d+(?:e[+-]?\d+)?), (-?\d+\.\d+(?:e[+-]?\d+)?), "
+                    r"(-?\d+\.\d+(?:e[+-]?\d+)?)\)").format(target_probe_point)
+    output_match = re.findall(output_re, str(result))
+    
+    assert output_match is not None, "Regular expression did not match the output."
+
+    expected_displacement = [-9.431090796213597e-06, -4.33478380630615e-05, -4.655061542874265e-05]
+    displacement_last_time_step = [float(output_match[-1][0]), float(output_match[-1][1]), float(output_match[-1][2])]
+
+    print("Displacement: {}".format(displacement_last_time_step))
+    assert np.isclose(displacement_last_time_step, expected_displacement).all()
+
 
 @pytest.mark.parametrize("input_mesh", [input_data_paths[1]])
 def test_predeform_problem(input_mesh, tmpdir):
