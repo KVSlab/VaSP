@@ -2,6 +2,7 @@ import argparse
 import h5py
 from pathlib import Path
 import numpy as np
+import json
 
 from fsipy.automatedPostprocessing.postprocessing_common import get_domain_ids
 
@@ -31,22 +32,31 @@ def generate_solid_probe(mesh_path: Path, fsi_region: list) -> None:
 
     with h5py.File(mesh_path, "r") as mesh:
             coords = mesh['mesh/coordinates'][:, :]
+
     fluid_ids, solid_ids, all_ids = get_domain_ids(mesh_path, fluid_domain_id, solid_domain_id)
     x_min, x_max, y_min, y_max, z_min, z_max = fsi_region
     points_in_box = np.where((coords[:, 0] > x_min) & (coords[:, 0] < x_max) &
                               (coords[:, 1] > y_min) & (coords[:, 1] < y_max) &
                               (coords[:, 2] > z_min) & (coords[:, 2] < z_max))[0]
+
     solid_probe_ids = np.intersect1d(points_in_box, solid_ids)
-    # pick 20 points from the solid probe
-    solid_probe_ids = np.random.choice(solid_probe_ids, 20, replace=False)
+    # pick 50 points from the solid probe
+    solid_probe_ids = np.random.choice(solid_probe_ids, 50, replace=False)
 
     # get the coordinates of the solid probe
     solid_probe_coords = coords[solid_probe_ids, :]
-
     # save as csv file with x, y, z coordinates
-    output_path = mesh_path.parent / "solid_probe.csv"
+    # csv file can be imported in paraview as a table and then converted to a point cloud
+    # using the TableToPoints filter
+    csv_file_name = mesh_path.stem + "_solid_probe.csv"
+    output_path = mesh_path.parent / csv_file_name
     np.savetxt(output_path, solid_probe_coords, delimiter=",")
     print("Solid probe coordinates saved in solid_probe.csv")
+
+    json_file_name = mesh_path.stem + "_solid_probe.json"
+    output_path_json = mesh_path.parent / json_file_name
+    with open(output_path_json, 'w') as f:
+        json.dump(solid_probe_coords.tolist(), f)
 
     return None
 
