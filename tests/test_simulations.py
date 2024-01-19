@@ -45,9 +45,9 @@ def test_offset_stenosis_problem(input_mesh, tmpdir):
 
     # Here we will check the displacement from the probe point
     output_re = (r"Point {}: Displacement: \((-?\d+\.\d+(?:e[+-]?\d+)?), (-?\d+\.\d+(?:e[+-]?\d+)?), "
-                    r"(-?\d+\.\d+(?:e[+-]?\d+)?)\)").format(target_probe_point)
+                 r"(-?\d+\.\d+(?:e[+-]?\d+)?)\)").format(target_probe_point)
     output_match = re.findall(output_re, str(result))
-    
+
     assert output_match is not None, "Regular expression did not match the output."
 
     expected_displacement = [-9.431090796213597e-06, -4.33478380630615e-05, -4.655061542874265e-05]

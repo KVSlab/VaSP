@@ -31,13 +31,13 @@ def generate_solid_probe(mesh_path: Path, fsi_region: list) -> None:
     solid_domain_id = 2
 
     with h5py.File(mesh_path, "r") as mesh:
-            coords = mesh['mesh/coordinates'][:, :]
+        coords = mesh['mesh/coordinates'][:, :]
 
     fluid_ids, solid_ids, all_ids = get_domain_ids(mesh_path, fluid_domain_id, solid_domain_id)
     x_min, x_max, y_min, y_max, z_min, z_max = fsi_region
     points_in_box = np.where((coords[:, 0] > x_min) & (coords[:, 0] < x_max) &
-                              (coords[:, 1] > y_min) & (coords[:, 1] < y_max) &
-                              (coords[:, 2] > z_min) & (coords[:, 2] < z_max))[0]
+                             (coords[:, 1] > y_min) & (coords[:, 1] < y_max) &
+                             (coords[:, 2] > z_min) & (coords[:, 2] < z_max))[0]
 
     solid_probe_ids = np.intersect1d(points_in_box, solid_ids)
     # pick 50 points from the solid probe
@@ -51,19 +51,21 @@ def generate_solid_probe(mesh_path: Path, fsi_region: list) -> None:
     csv_file_name = mesh_path.stem + "_solid_probe.csv"
     output_path = mesh_path.parent / csv_file_name
     np.savetxt(output_path, solid_probe_coords, delimiter=",")
-    print("Solid probe coordinates saved in solid_probe.csv")
 
     json_file_name = mesh_path.stem + "_solid_probe.json"
     output_path_json = mesh_path.parent / json_file_name
     with open(output_path_json, 'w') as f:
         json.dump(solid_probe_coords.tolist(), f)
 
+    print(f"Solid probe saved to {output_path_json}")
+
     return None
+
 
 def main():
     args = parse_arguments()
     generate_solid_probe(args.mesh_path, args.fsi_region)
 
+
 if __name__ == "__main__":
     main()
-    
