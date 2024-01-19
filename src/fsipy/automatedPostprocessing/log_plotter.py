@@ -49,6 +49,7 @@ def parse_log_file(log_file: str) -> Dict[str, Any]:
             "rtol": [],
         },
         "probe_points": {},
+        "probe_points_displacement": {},
         "flow_properties": {
             "flow_rate": [],
             "velocity_mean": [],
@@ -70,6 +71,7 @@ def parse_log_file(log_file: str) -> Dict[str, Any]:
     newton_iteration_pattern = \
         re.compile(r'Newton iteration (.*): r \(atol\) = (.*) \(tol = .*\), r \(rel\) = (.*) \(tol = .*\)')
     probe_point_pattern = re.compile(r"Probe Point (.*): Velocity: \((.*), (.*), (.*)\) \| Pressure: (.*)")
+    probe_point_displacement_pattern = re.compile(r"Probe Point (.*): Displacement: \((.*), (.*), (.*)\)")
     flow_rate_pattern = re.compile(r"\s*Flow Rate at Inlet: (.*)")
     velocity_pattern = re.compile(r"\s*Velocity \(mean, min, max\): (.*), (.*), (.*)")
     cfl_pattern = re.compile(r"\s*CFL \(mean, min, max\): (.*), (.*), (.*)")
@@ -117,6 +119,20 @@ def parse_log_file(log_file: str) -> Dict[str, Any]:
                 data["probe_points"][probe_point]["pressure"].append(float(match.group(5)))
                 continue
 
+            match = probe_point_displacement_pattern.match(line)
+            if match:
+                probe_point = int(match.group(1))
+                if probe_point not in data["probe_points_displacement"]:
+                    data["probe_points_displacement"][probe_point] = {
+                        "displacement": [],
+                        "displacement_magnitude": []
+                    }
+                displacement_components = [float(match.group(2)), float(match.group(3)), float(match.group(4))]
+                displacement_magnitude = np.sqrt(np.sum(np.array(displacement_components) ** 2))
+                data["probe_points_displacement"][probe_point]["displacement"].append(displacement_components)
+                data["probe_points_displacement"][probe_point]["displacement_magnitude"].append(displacement_magnitude)
+                continue
+
             match = flow_rate_pattern.match(line)
             if match:
                 data["flow_properties"]["flow_rate"].append(float(match.group(1)))
@@ -155,6 +171,12 @@ def parse_log_file(log_file: str) -> Dict[str, Any]:
         data["probe_points"][probe_point]["velocity"] = np.array(data["probe_points"][probe_point]["velocity"])
         data["probe_points"][probe_point]["magnitude"] = np.array(data["probe_points"][probe_point]["magnitude"])
         data["probe_points"][probe_point]["pressure"] = np.array(data["probe_points"][probe_point]["pressure"])
+
+    for probe_point in data["probe_points_displacement"]:
+        data["probe_points_displacement"][probe_point]["displacement"] = \
+            np.array(data["probe_points_displacement"][probe_point]["displacement"])
+        data["probe_points_displacement"][probe_point]["displacement_magnitude"] = \
+            np.array(data["probe_points_displacement"][probe_point]["displacement_magnitude"])
 
     data["flow_properties"]["flow_rate"] = np.array(data['flow_properties']['flow_rate'])
     data["flow_properties"]["velocity_mean"] = np.array(data["flow_properties"]["velocity_mean"])
@@ -519,6 +541,78 @@ def plot_probe_points(time: np.ndarray, probe_points: Dict[int, Dict[str, np.nda
         save_plot_to_file("Probe Points", output_directory)
 
 
+def plot_probe_points_displacement(time: np.ndarray, probe_points: Dict[int, Dict[str, np.ndarray]],
+                                   selected_probe_points: Optional[List[int]] = None, save_to_file: bool = False,
+                                   output_directory: Optional[str] = None, figure_size: Tuple[int, int] = (12, 6),
+                                   start: Optional[int] = None, end: Optional[int] = None) -> None:
+    """
+    Plot displacement magnitude for probe points against time.
+
+    Args:
+        time (numpy.ndarray): Time array.
+        probe_points (dict): Probe point data containing displacement magnitude arrays.
+        selected_probe_points (list, optional): List of probe points to plot. Plot all probe points if not provided.
+        save_to_file (bool, optional): Whether to save the figures to files (default is False).
+        output_directory (str, optional): The directory where the figure will be saved when save_to_file is True.
+        figure_size (tuple, optional): Figure size in inches (width, height). Default is (12, 8).
+        start (int, optional): Index to start plotting data from. Default is None (start from the beginning).
+        end (int, optional): Index to end plotting data at. Default is None (end at the last data point).
+    """
+    logging.info("--- Creating plot for displacement magnitude for probe points")
+
+    # If selected_probe_points is not provided, plot all probe points
+    if selected_probe_points is None:
+        selected_probe_points = list(probe_points.keys())
+
+    # Filter probe_points dictionary to select only the specified probe points
+    selected_probe_data = \
+        {probe_point: data for probe_point, data in probe_points.items() if probe_point in selected_probe_points}
+
+    num_selected_probe_points = len(selected_probe_data)
+
+    # Calculate the number of rows and columns for subplots
+    num_rows = int(np.ceil(num_selected_probe_points / 2))
+    num_cols = min(2, num_selected_probe_points)
+
+    for probe_point in selected_probe_points:
+        if probe_point not in probe_points:
+            # Log a warning for probe points not found in the dictionary
+            logging.warning(f"WARNING: Probe point {probe_point} not found. Skipping.")
+
+    # Create subplots based on the number of selected probe points
+    if num_rows == 1 and num_cols == 1:
+        # If only one probe point is selected, create a single figure
+        fig, axes = plt.subplots(figsize=figure_size)
+        axes = [fig.gca()]
+    else:
+        fig, axes = plt.subplots(num_rows, num_cols, figsize=figure_size)
+
+        # Flatten the axes array for easier iteration
+        axes = axes.flatten()
+
+    for i, (probe_point, data) in enumerate(selected_probe_data.items()):
+        ax = axes[i]
+
+        # Extract the data within the specified range (start:end)
+        displacement_data = data["displacement_magnitude"][start:end]
+
+        ax.plot(time[start:end], displacement_data, color='b')
+        ax.set_xlabel("Time [s]")
+        ax.set_ylabel("Displacement [m]")
+        ax.set_title(f"Probe point {probe_point}")
+        ax.grid(True)
+
+    # Remove any empty subplots if the number of probe points doesn't fill the entire grid
+    for i in range(num_selected_probe_points, num_rows * num_cols):
+        fig.delaxes(axes[i])
+
+    # Adjust spacing between subplots
+    plt.tight_layout()
+
+    if save_to_file:
+        save_plot_to_file("Probe Points Displacement", output_directory)
+
+
 def plot_probe_points_comparison(probe_points: Dict[int, Dict[str, np.ndarray]], time_steps_per_cycle: int,
                                  selected_probe_points: Optional[List[int]] = None, save_to_file: bool = False,
                                  output_directory: Optional[str] = None, figure_size: Tuple[int, int] = (12, 6),
@@ -599,6 +693,80 @@ def plot_probe_points_comparison(probe_points: Dict[int, Dict[str, np.ndarray]],
 
         if save_to_file:
             save_plot_to_file(f"Probe Points Comparison {probe_point}", output_directory)
+
+
+def plot_probe_points_displacement_comparison(probe_points: Dict[int, Dict[str, np.ndarray]], time_steps_per_cycle: int,
+                                              selected_probe_points: Optional[List[int]] = None,
+                                              save_to_file: bool = False, output_directory: Optional[str] = None,
+                                              figure_size: Tuple[int, int] = (12, 6), start_cycle: Optional[int] = 0,
+                                              end_cycle: Optional[int] = None) -> None:
+    """
+    Plot comparison of displacement magnitude for probe points across multiple cycles.
+
+    Args:
+        probe_points (dict): Probe point data containing displacement magnitude arrays.
+        selected_probe_points (list, optional): List of probe points to plot. Plot all probe points if not provided.
+        time_steps_per_cycle (int): The number of time steps in each cycle.
+        save_to_file (bool, optional): Whether to save the figures to files (default is False).
+        output_directory (str, optional): The directory where the figure will be saved when save_to_file is True.
+        figure_size (tuple, optional): Figure size in inches (width, height). Default is (12, 8).
+        start_cycle (int, optional): The cycle to start comparing from. Default is 1 (start from  first cycle).
+        end_cycle (int, optional): The cycle to end comparing at. Default is None (end at last cycle).
+    """
+    # If selected_probe_points is not provided, plot all probe points
+    if selected_probe_points is None:
+        selected_probe_points = list(probe_points.keys())
+
+    # Filter probe_points dictionary to select only the specified probe points
+    selected_probe_data = \
+        {probe_point: data for probe_point, data in probe_points.items() if probe_point in selected_probe_points}
+
+    for probe_point in selected_probe_points:
+        if probe_point not in probe_points:
+            # Log a warning for probe points not found in the dictionary
+            logging.warning(f"WARNING: Probe point {probe_point} not found. Skipping.")
+
+    # Determine the total number of cycles
+    num_cycles = round(len(probe_points[selected_probe_points[0]]["displacement_magnitude"]) / time_steps_per_cycle)
+
+    # If start_cycle is None, start at first cycle
+    first_cycle = 1 if start_cycle is None else int(start_cycle)
+
+    # If end_cycle is not provided, end at last cycle
+    last_cycle = num_cycles if end_cycle is None else int(end_cycle)
+
+    for i, (probe_point, data) in enumerate(selected_probe_data.items()):
+        logging.info(f"--- Creating plot for probe point {probe_point} - " +
+                     f"Comparing from cycle {first_cycle} to cycle {last_cycle}")
+
+        # Create subplots for magnitude and pressure
+        fig, axs = plt.subplots(1, 1, figsize=figure_size)
+
+        ax = axs
+
+        # Split the data into separate cycles
+        split_displacement_data = np.array_split(data["displacement_magnitude"], num_cycles)
+
+        # Plot each cycle
+        for cycle in range(first_cycle - 1, last_cycle):
+            cycle_displacement_data = split_displacement_data[cycle]
+
+            ax.plot(cycle_displacement_data, label=f"Cycle {cycle + 1}")
+            ax.set_xlabel("[-]")
+            ax.set_ylabel("Displacement [m]")
+            ax.set_title("Displacement Magnitude")
+            ax.grid(True)
+            ax.legend(loc="upper right")
+
+        # Add common title
+        fig.suptitle(f"Probe point {probe_point} - " +
+                     f"Comparing from cycle {first_cycle} to cycle {last_cycle}")
+
+        # Adjust spacing between subplots
+        plt.tight_layout()
+
+        if save_to_file:
+            save_plot_to_file(f"Probe Points Comparison Displacement {probe_point}", output_directory)
 
 
 def save_plot_to_file(variable_name: str, output_directory: Optional[str]) -> None:
@@ -842,6 +1010,7 @@ def parse_command_line_args() -> argparse.Namespace:
     parser.add_argument("--plot-newton-iteration-atol", action="store_true", help="Plot Newton iteration (atol)")
     parser.add_argument("--plot-newton-iteration-rtol", action="store_true", help="Plot Newton iteration (rtol)")
     parser.add_argument("--plot-probe-points", action="store_true", help="Plot probe points")
+    parser.add_argument("--plot-probe-points-displacement", action="store_true", help="Plot probe points displacement")
     parser.add_argument("--plot-probe-points-tke", action="store_true", help="Plot TKE for probe points")
     parser.add_argument("--plot-flow-rate", action="store_true", help="Plot flow rate")
     parser.add_argument("--plot-velocity", action="store_true", help="Plot velocity (mean, min and max)")
@@ -874,7 +1043,8 @@ def main() -> None:
 
     # Enable --plot-all by default if no specific --plot options are provided
     plot_types = ['cpu_time', 'ramp_factor', 'pressure', 'newton_iteration_atol', 'newton_iteration_rtol',
-                  'probe_points', 'flow_rate', 'velocity', 'cfl', 'reynolds', 'probe_points_tke']
+                  'probe_points', 'probe_points_displacement', 'flow_rate', 'velocity', 'cfl', 'reynolds',
+                  'probe_points_tke']
     args.plot_all = args.plot_all or all(not getattr(args, f'plot_{plot_type}') for plot_type in plot_types)
 
     # Create logger and set log level
@@ -912,6 +1082,7 @@ def main() -> None:
     newton_iteration_atol = parsed_data.get("newton_iteration", {}).get("atol", [])
     newton_iteration_rtol = parsed_data.get("newton_iteration", {}).get("rtol", [])
     probe_points = parsed_data.get("probe_points", {})
+    probe_points_displacement = parsed_data.get("probe_points_displacement", {})
     flow_rate = parsed_data.get("flow_properties", {}).get("flow_rate", [])
     velocity_mean = parsed_data.get("flow_properties", {}).get("velocity_mean", [])
     velocity_min = parsed_data.get("flow_properties", {}).get("velocity_min", [])
@@ -960,6 +1131,11 @@ def main() -> None:
             probe_points[probe_point]["pressure"] = \
                 compute_average_over_cycles(probe_data["pressure"][start:end], time_steps_per_cycle) \
                 if len(probe_data["pressure"]) > 0 else probe_data["pressure"]
+
+        for probe_point, probe_data in probe_points_displacement.items():
+            probe_points_displacement[probe_point]["displacement_magnitude"] = \
+                compute_average_over_cycles(probe_data["displacement_magnitude"][start:end], time_steps_per_cycle) \
+                if len(probe_data["displacement_magnitude"]) > 0 else probe_data["displacement_magnitude"]
 
         time = time[start:start + len(cpu_time)]
 
@@ -1085,6 +1261,21 @@ def main() -> None:
             plot_probe_points(time, probe_points, selected_probe_points=args.probe_points, save_to_file=args.save,
                               figure_size=args.figure_size, output_directory=args.output_directory, start=start,
                               end=end)
+
+    if check_and_warn_empty("Probe Points Displacement", probe_points_displacement,
+                            args.plot_all or args.plot_probe_points_displacement):
+        if args.compare_cycles:
+            # Call the plot function to plot probe points comparison across multiple cycles
+            plot_probe_points_displacement_comparison(probe_points_displacement, time_steps_per_cycle,
+                                                      selected_probe_points=args.probe_points, save_to_file=args.save,
+                                                      figure_size=args.figure_size,
+                                                      output_directory=args.output_directory, start_cycle=start_cycle,
+                                                      end_cycle=end_cycle)
+        else:
+            # Call the plot function to plot probe points
+            plot_probe_points_displacement(time, probe_points_displacement, selected_probe_points=args.probe_points,
+                                           save_to_file=args.save, figure_size=args.figure_size,
+                                           output_directory=args.output_directory, start=start, end=end)
 
     if check_and_warn_empty("Probe Points", probe_points, args.plot_all or args.plot_probe_points_tke):
         # Compute TKE data for probe points
