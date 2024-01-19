@@ -10,7 +10,7 @@ from dolfin import HDF5File, Mesh, MeshFunction, facets, cells, UserExpression, 
     DirichletBC, Measure, inner, parameters, assemble
 
 from fsipy.simulations.simulation_common import load_probe_points, print_probe_points, print_mesh_summary, \
-    calculate_and_print_flow_properties
+    calculate_and_print_flow_properties, load_solid_probe_points, print_solid_probe_points
 
 # set compiler arguments
 parameters["form_compiler"]["quadrature_degree"] = 6
@@ -180,8 +180,9 @@ class InnerP(UserExpression):
 def initiate(mesh_path, **namespace):
 
     probe_points = load_probe_points(mesh_path)
+    solid_probe_points = load_solid_probe_points(mesh_path)
 
-    return dict(probe_points=probe_points)
+    return dict(probe_points=probe_points, solid_probe_points=solid_probe_points)
 
 
 def create_bcs(t, DVP, mesh, boundaries, mu_f,
@@ -247,10 +248,11 @@ def pre_solve(t, inlet, p_out_bc_val, **namespace):
     return dict(inlet=inlet, p_out_bc_val=p_out_bc_val)
 
 
-def post_solve(probe_points, dvp_, dt, mesh, inlet_area, dsi, mu_f, rho_f, n, **namespace):
-
+def post_solve(probe_points, solid_probe_points, dvp_, dt, mesh, inlet_area, dsi, mu_f, rho_f, n, **namespace):
+    d = dvp_["n"].sub(0, deepcopy=True)
     v = dvp_["n"].sub(1, deepcopy=True)
     p = dvp_["n"].sub(2, deepcopy=True)
 
     print_probe_points(v, p, probe_points)
+    print_solid_probe_points(d, solid_probe_points)
     calculate_and_print_flow_properties(dt, mesh, v, inlet_area, mu_f[0], rho_f[0], n, dsi)
