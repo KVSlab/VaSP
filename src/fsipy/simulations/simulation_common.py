@@ -197,6 +197,25 @@ def load_probe_points(mesh_path: Union[str, Path]) -> np.ndarray:
     return probe_points
 
 
+def load_solid_probe_points(mesh_path: Union[str, Path]) -> np.ndarray:
+    """
+    Load solid probe points from a corresponding file based on the mesh file's path.
+
+    Args:
+        mesh_path (str or Path): The path to the mesh file.
+
+    Returns:
+        np.ndarray: An array containing the loaded probe points.
+    """
+    mesh_path = Path(mesh_path)
+    solid_probe_file_name = mesh_path.stem + "_solid_probe.json"
+    solid_probe_path = mesh_path.parent / solid_probe_file_name
+    with open(solid_probe_path) as f:
+        solid_probe_points = np.array(json.load(f))
+
+    return solid_probe_points
+
+
 def print_probe_points(v: Function, p: Function, probe_points: List[Union[float, np.ndarray]]) -> None:
     """
     Print velocity and pressure at probe points.
@@ -218,6 +237,24 @@ def print_probe_points(v: Function, p: Function, probe_points: List[Union[float,
 
         if MPI.rank(MPI.comm_world) == 0:
             print(f"Probe Point {i}: Velocity: ({uu}, {vv}, {ww}) | Pressure: {pp}")
+
+
+def print_solid_probe_points(d: Function, probe_points: List[Union[float, np.ndarray]]) -> None:
+    """
+    Print displacement at probe points.
+
+    Args:
+        d (dolfin.Function): Displacement function with components d.sub(0), d.sub(1), and d.sub(2).
+        probe_points (list): List of probe points.
+    """
+    for i, point in enumerate(probe_points):
+        # Extract components of displacement at the probe point
+        dx = peval(d.sub(0), point)
+        dy = peval(d.sub(1), point)
+        dz = peval(d.sub(2), point)
+
+        if MPI.rank(MPI.comm_world) == 0:
+            print(f"Probe Point {i}: Displacement: ({dx}, {dy}, {dz})")
 
 
 def peval(f: Function, x: Union[float, np.ndarray]) -> np.ndarray:
