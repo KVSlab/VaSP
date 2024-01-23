@@ -240,7 +240,7 @@ def print_probe_points(v: Function, p: Function, probe_points: List[np.ndarray])
         pp = peval(p, point.tolist())
 
         if MPI.rank(MPI.comm_world) == 0:
-            print(f"Probe Point {i}: Velocity: {u_eval[0], u_eval[1], u_eval[2]}, Pressure: {pp}")
+            print(f"Probe Point {i}: Velocity: ({u_eval[0]}, {u_eval[1]}, {u_eval[2]}) | Pressure: {pp}")
 
 
 def print_solid_probe_points(d: Function, probe_points: List[np.ndarray]) -> None:
