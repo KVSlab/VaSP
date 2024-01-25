@@ -20,6 +20,7 @@ import argparse
 import logging
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
+import pickle
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -601,6 +602,53 @@ def plot_probe_points_comparison(probe_points: Dict[int, Dict[str, np.ndarray]],
             save_plot_to_file(f"Probe Points Comparison {probe_point}", output_directory)
 
 
+def save_probe_points_data_to_file(probe_points: Dict[int, Dict[str, np.ndarray]], output_directory: Optional[str],
+                                   time: np.ndarray, start: Optional[int] = None, end: Optional[int] = None) -> None:
+    """
+    Save probe points data to files.
+
+    Args:
+        probe_points (dict): Probe point data containing velocity magnitude and pressure arrays.
+        output_directory (str, optional): The directory where the files will be saved when save_to_file is True.
+        time (numpy.ndarray): Time array.
+        start (int, optional): Index to start saving data from. Default is None (start from the beginning).
+        end (int, optional): Index to end saving data at. Default is None (end at the last data point).
+    """
+    
+    # Create the output directory if it doesn't exist
+    if output_directory:
+        output_path = Path(output_directory)
+        output_path.mkdir(parents=True, exist_ok=True)
+    else:
+        output_path = Path.cwd()
+
+    # Save probe points data to files
+    for probe_point, data in probe_points.items():
+        # Create a dictionary to store the data
+        probe_point_data = {
+            "time": [],
+            "velocity_magnitude": [],
+            "pressure": []
+        }
+
+        # Extract the data within the specified range (start:end)
+        time_data = time[start:end]
+        magnitude_data = data["magnitude"][start:end]
+        pressure_data = data["pressure"][start:end]
+
+        # Store the data in the dictionary
+        probe_point_data["time"] = time_data
+        probe_point_data["velocity_magnitude"] = magnitude_data
+        probe_point_data["pressure"] = pressure_data
+
+        # Save the data to a JSON file
+        filename = output_path / f"probe_point_{probe_point}.pkl"
+        with open(filename, 'wb') as file:
+            pickle.dump(probe_point_data, file)
+        
+        logging.info(f"Probe point {probe_point} data saved to {filename}")
+
+
 def save_plot_to_file(variable_name: str, output_directory: Optional[str]) -> None:
     """
     Save a plot to a file.
@@ -861,8 +909,9 @@ def parse_command_line_args() -> argparse.Namespace:
     parser.add_argument("--figure-size", type=lambda x: tuple(map(int, x.split(','))), default=(10, 6),
                         help="Figure size in inches (width, height), e.g., '12,8' (default: 10,6)")
     parser.add_argument("--save", action="store_true", help="Save the figures to files")
-    parser.add_argument("--output-directory", type=str, default="Images",
-                        help="Directory where plot images will be saved (default: 'Images')")
+    parser.add_argument("--save-probes", action="store_true", help="Save probe points data to files")
+    parser.add_argument("--output-directory", type=str, default="Data",
+                        help="Directory where plot images will be saved (default: 'Data')")
     parser.add_argument("--log-level", type=int, default=20,
                         help="Specify the log level (default is 20, which is INFO)")
 
@@ -1074,7 +1123,13 @@ def main() -> None:
                                             figure_size=args.figure_size, start=start, end=end)
 
     if check_and_warn_empty("Probe Points", probe_points, args.plot_all or args.plot_probe_points):
-        if args.compare_cycles:
+        if args.save_probes:
+            # Save probe points data to files
+            save_probe_points_data_to_file(probe_points, args.output_directory, time, start=start, end=end)
+            # Stop here if --save-probes is used
+            return
+
+        elif args.compare_cycles:
             # Call the plot function to plot probe points comparison across multiple cycles
             plot_probe_points_comparison(probe_points, time_steps_per_cycle, selected_probe_points=args.probe_points,
                                          save_to_file=args.save, figure_size=args.figure_size,
