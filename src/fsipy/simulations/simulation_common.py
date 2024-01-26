@@ -197,7 +197,26 @@ def load_probe_points(mesh_path: Union[str, Path]) -> np.ndarray:
     return probe_points
 
 
-def print_probe_points(v: Function, p: Function, probe_points: List[Union[float, np.ndarray]]) -> None:
+def load_solid_probe_points(mesh_path: Union[str, Path]) -> np.ndarray:
+    """
+    Load solid probe points from a corresponding file based on the mesh file's path.
+
+    Args:
+        mesh_path (str or Path): The path to the mesh file.
+
+    Returns:
+        np.ndarray: An array containing the loaded probe points.
+    """
+    mesh_path = Path(mesh_path)
+    solid_probe_file_name = mesh_path.stem + "_solid_probe.json"
+    solid_probe_path = mesh_path.parent / solid_probe_file_name
+    with open(solid_probe_path) as f:
+        solid_probe_points = np.array(json.load(f))
+
+    return solid_probe_points
+
+
+def print_probe_points(v: Function, p: Function, probe_points: List[np.ndarray]) -> None:
     """
     Print velocity and pressure at probe points.
 
@@ -209,24 +228,46 @@ def print_probe_points(v: Function, p: Function, probe_points: List[Union[float,
     Returns:
         None
     """
+    # make sure that extrapolation is not allowed
+    if v.get_allow_extrapolation():
+        v.set_allow_extrapolation(False)
+
+    if p.get_allow_extrapolation():
+        p.set_allow_extrapolation(False)
+
     for i, point in enumerate(probe_points):
-        # Extract components of velocity and pressure at the probe point
-        uu = peval(v.sub(0), point)
-        vv = peval(v.sub(1), point)
-        ww = peval(v.sub(2), point)
-        pp = peval(p, point)
+        u_eval = peval(v, point.tolist())
+        pp = peval(p, point.tolist())
 
         if MPI.rank(MPI.comm_world) == 0:
-            print(f"Probe Point {i}: Velocity: ({uu}, {vv}, {ww}) | Pressure: {pp}")
+            print(f"Probe Point {i}: Velocity: ({u_eval[0]}, {u_eval[1]}, {u_eval[2]}) | Pressure: {pp}")
 
 
-def peval(f: Function, x: Union[float, np.ndarray]) -> np.ndarray:
+def print_solid_probe_points(d: Function, probe_points: List[np.ndarray]) -> None:
+    """
+    Print displacement at probe points.
+
+    Args:
+        d (dolfin.Function): Displacement function with components d.sub(0), d.sub(1), and d.sub(2).
+        probe_points (list): List of probe points.
+    """
+    # make sure that extrapolation is not allowed
+    if d.get_allow_extrapolation():
+        d.set_allow_extrapolation(False)
+
+    for i, point in enumerate(probe_points):
+        d_eval = peval(d, point.tolist())
+        if MPI.rank(MPI.comm_world) == 0:
+            print(f"Probe Point {i}: Displacement: {d_eval[0], d_eval[1], d_eval[2]}")
+
+
+def peval(f: Function, x: Union[float, List[float]]) -> np.ndarray:
     """
     Parallel synchronized evaluation of a function.
 
     Args:
         f (dolfin.Function): Function to be evaluated.
-        x (Union[float, np.ndarray]): Input value for the function.
+        x (List[float]): Point at which to evaluate the function.
 
     Returns:
         np.ndarray: Evaluated function values.

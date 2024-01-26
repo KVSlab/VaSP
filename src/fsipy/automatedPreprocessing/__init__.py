@@ -3,8 +3,10 @@
 
 from . import automated_preprocessing
 from . import preprocessing_common
+from . import generate_solid_probe
 
 __all__ = [
     "automatedPreprocessing",
     "preprocessing_common",
+    "generate_solid_probe",
 ]
