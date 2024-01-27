@@ -1,16 +1,5 @@
 # Known issues
 
-## Anaconda compatability issue
+## GUI issue with docker (Mac only)
 
-Some users may experience errors regarding compatibility if Anaconda already has been configured with certain channels.
-To resolve this issue you can remove conflicting channels using:
-
-``` console
-$ conda config --remove channels [CHANNEL NAME]
-```
-
-Alternatively, you can set your Anaconda channel priority to *flexible*, with the following command:
-
-``` console
-$ conda config --set channel_priority flexible
-```
+Some Mac user may experience issue with GUI when using docker. This is most likely an issue with `VTK` or `VMTK` and not `VaSP` itself. Therefore, Mac user is highly recommended to use `conda` for using `VaSP`.
