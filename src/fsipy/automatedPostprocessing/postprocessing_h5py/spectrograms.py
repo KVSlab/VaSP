@@ -58,7 +58,7 @@ def read_command_line_spec() -> configargparse.Namespace:
     parser.add_argument('--ylim', type=float, default=None,
                         help="Set the y-limit of the spectrogram graph (Hz).")
     parser.add_argument('--sampling-region', type=str, default="sphere",
-                        help="Specify the sampling region. Choose 'sphere' to sample within a sphere or 'domain' to "
+                        help="Specify the sampling region. Choose 'sphere' to sample within a sphere, 'domain' to "
                              "sample within a specified domain or 'box' to sample within a box.")
     parser.add_argument('--fluid-sampling-domain-id', type=int, default=1,
                         help="Domain ID for the fluid region to be sampled. Input a labelled mesh with this ID. Used "
@@ -168,11 +168,11 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
         start_t (float): Start time for data processing.
         end_t (float): End time for data processing.
         n_samples (int): Number of samples.
-        sampling_region (str): Region for sampling data ("sphere" or "domain" or "box").
+        sampling_region (str): Region for sampling data ("sphere", "domain" or "box").
         fluid_sampling_domain_id (int): Domain ID for fluid sampling (used when sampling_region="domain").
         solid_sampling_domain_id (int): Domain ID for solid sampling (used when sampling_region="domain").
         fsi_region (list): x, y, and z coordinates of sphere center and radius of the sphere (used when
-            sampling_region="sphere" ). In case of sampling_region="box", the list should contain [x_min, x_max,
+            sampling_region="sphere"). In case of sampling_region="box", the list should contain [x_min, x_max,
             y_min, y_max, z_min, z_max]. The box is defined by the minimum and maximum values of x, y, and z.
         quantity (str): Quantity to postprocess.
         interface_only (bool): Whether to include only interface ID's.
@@ -266,7 +266,7 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
         solid_ids = np.intersect1d(box_ids, solid_ids)
 
     else:
-        raise ValueError(f"Invalid sampling method '{sampling_region}'. Please specify 'sphere' or 'domain' or 'box'.")
+        raise ValueError(f"Invalid sampling method '{sampling_region}'. Please specify 'sphere', 'domain' or 'box'.")
 
     if quantity == "wss":
         # For wss spectrogram, we use all the nodes within the sphere because the input df only includes the wall
