@@ -49,7 +49,7 @@ def parse_log_file(log_file: str) -> Dict[str, Any]:
             "atol": [],
             "rtol": [],
         },
-        "probe_points": {},  # Dictionary to store probe point data
+        "probe_points": {},
         "probe_points_displacement": {},
         "flow_properties": {
             "flow_rate": [],
@@ -72,7 +72,6 @@ def parse_log_file(log_file: str) -> Dict[str, Any]:
     newton_iteration_pattern = \
         re.compile(r'Newton iteration (.*): r \(atol\) = (.*) \(tol = .*\), r \(rel\) = (.*) \(tol = .*\)')
     probe_point_pattern = re.compile(r"Probe Point (.*): Velocity: \((.*), (.*), (.*)\) \| Pressure: (.*)")
-    probe_point_displacement_pattern = re.compile(r"Probe Point (.*): Displacement: \((.*), (.*), (.*)\)")
     probe_point_displacement_pattern = re.compile(r"Probe Point (.*): Displacement: \((.*), (.*), (.*)\)")
     flow_rate_pattern = re.compile(r"\s*Flow Rate at Inlet: (.*)")
     velocity_pattern = re.compile(r"\s*Velocity \(mean, min, max\): (.*), (.*), (.*)")
@@ -135,20 +134,6 @@ def parse_log_file(log_file: str) -> Dict[str, Any]:
                 data["probe_points_displacement"][probe_point]["displacement_magnitude"].append(displacement_magnitude)
                 continue
 
-            match = probe_point_displacement_pattern.match(line)
-            if match:
-                probe_point = int(match.group(1))
-                if probe_point not in data["probe_points_displacement"]:
-                    data["probe_points_displacement"][probe_point] = {
-                        "displacement": [],
-                        "displacement_magnitude": []
-                    }
-                displacement_components = [float(match.group(2)), float(match.group(3)), float(match.group(4))]
-                displacement_magnitude = np.sqrt(np.sum(np.array(displacement_components) ** 2))
-                data["probe_points_displacement"][probe_point]["displacement"].append(displacement_components)
-                data["probe_points_displacement"][probe_point]["displacement_magnitude"].append(displacement_magnitude)
-                continue
-
             match = flow_rate_pattern.match(line)
             if match:
                 data["flow_properties"]["flow_rate"].append(float(match.group(1)))
@@ -187,12 +172,6 @@ def parse_log_file(log_file: str) -> Dict[str, Any]:
         data["probe_points"][probe_point]["velocity"] = np.array(data["probe_points"][probe_point]["velocity"])
         data["probe_points"][probe_point]["magnitude"] = np.array(data["probe_points"][probe_point]["magnitude"])
         data["probe_points"][probe_point]["pressure"] = np.array(data["probe_points"][probe_point]["pressure"])
-
-    for probe_point in data["probe_points_displacement"]:
-        data["probe_points_displacement"][probe_point]["displacement"] = \
-            np.array(data["probe_points_displacement"][probe_point]["displacement"])
-        data["probe_points_displacement"][probe_point]["displacement_magnitude"] = \
-            np.array(data["probe_points_displacement"][probe_point]["displacement_magnitude"])
 
     for probe_point in data["probe_points_displacement"]:
         data["probe_points_displacement"][probe_point]["displacement"] = \
@@ -1391,7 +1370,8 @@ def main() -> None:
                                                         start=start, end=end)
             # Stop here if --save-probes is used
             return
-        if args.compare_cycles:
+
+        elif args.compare_cycles:
             # Call the plot function to plot probe points comparison across multiple cycles
             plot_probe_points_displacement_comparison(probe_points_displacement, time_steps_per_cycle,
                                                       selected_probe_points=args.probe_points, save_to_file=args.save,
