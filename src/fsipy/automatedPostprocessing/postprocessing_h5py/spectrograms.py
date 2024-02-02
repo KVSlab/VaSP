@@ -58,8 +58,8 @@ def read_command_line_spec() -> configargparse.Namespace:
     parser.add_argument('--ylim', type=float, default=None,
                         help="Set the y-limit of the spectrogram graph (Hz).")
     parser.add_argument('--sampling-region', type=str, default="sphere",
-                        help="Specify the sampling region. Choose 'sphere' to sample within a sphere or 'domain' to "
-                             "sample within a specified domain.")
+                        help="Specify the sampling region. Choose 'sphere' to sample within a sphere, 'domain' to "
+                             "sample within a specified domain or 'box' to sample within a box.")
     parser.add_argument('--fluid-sampling-domain-id', type=int, default=1,
                         help="Domain ID for the fluid region to be sampled. Input a labelled mesh with this ID. Used "
                              "only when sampling region is 'domain'.")
@@ -168,11 +168,12 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
         start_t (float): Start time for data processing.
         end_t (float): End time for data processing.
         n_samples (int): Number of samples.
-        sampling_region (str): Region for sampling data ("sphere" or "domain").
+        sampling_region (str): Region for sampling data ("sphere", "domain" or "box").
         fluid_sampling_domain_id (int): Domain ID for fluid sampling (used when sampling_region="domain").
         solid_sampling_domain_id (int): Domain ID for solid sampling (used when sampling_region="domain").
         fsi_region (list): x, y, and z coordinates of sphere center and radius of the sphere (used when
-            sampling_region="sphere").
+            sampling_region="sphere"). In case of sampling_region="box", the list should contain [x_min, x_max,
+            y_min, y_max, z_min, z_max]. The box is defined by the minimum and maximum values of x, y, and z.
         quantity (str): Quantity to postprocess.
         interface_only (bool): Whether to include only interface ID's.
         component (str): Component of the data to be visualized.
@@ -227,10 +228,6 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
 
     logging.info("\n--- Processing data and getting ID's")
 
-    # We want to find the points in the sac, so we use a sphere to roughly define the sac.
-    x_sphere, y_sphere, z_sphere, r_sphere = fsi_region
-    sac_center = np.array([x_sphere, y_sphere, z_sphere])
-
     if quantity == "wss":
         wss_output_file = visualization_separate_domain_folder / "WSS_ts.h5"
         surface_elements, coords = get_surface_topology_coords(wss_output_file)
@@ -238,6 +235,9 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
         coords = get_coords(mesh_path)
 
     if sampling_region == "sphere":
+        # We want to find the points in the sac, so we use a sphere to roughly define the sac.
+        x_sphere, y_sphere, z_sphere, r_sphere = fsi_region
+        sac_center = np.array([x_sphere, y_sphere, z_sphere])
         # Get solid and fluid ID's
         fluid_ids, solid_ids, all_ids = get_domain_ids(mesh_path, fluid_domain_id, solid_domain_id)
         interface_ids = get_interface_ids(mesh_path, fluid_domain_id, solid_domain_id)
@@ -255,8 +255,18 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
         fluid_ids, solid_ids, all_ids = \
             get_domain_ids_specified_region(mesh_path, fluid_sampling_domain_id, solid_sampling_domain_id)
         interface_ids = np.intersect1d(fluid_ids, solid_ids)
+    elif sampling_region == "box":
+        x_min, x_max, y_min, y_max, z_min, z_max = fsi_region
+        fluid_ids, solid_ids, all_ids = get_domain_ids(mesh_path, fluid_domain_id, solid_domain_id)
+        box_ids = find_points_in_box(x_min, x_max, y_min, y_max, z_min, z_max, coords)
+
+        # Get nodes in box only
+        all_ids = np.intersect1d(box_ids, all_ids)
+        fluid_ids = np.intersect1d(box_ids, fluid_ids)
+        solid_ids = np.intersect1d(box_ids, solid_ids)
+
     else:
-        raise ValueError(f"Invalid sampling method '{sampling_region}'. Please specify 'sphere' or 'domain'.")
+        raise ValueError(f"Invalid sampling method '{sampling_region}'. Please specify 'sphere', 'domain' or 'box'.")
 
     if quantity == "wss":
         # For wss spectrogram, we use all the nodes within the sphere because the input df only includes the wall
@@ -317,6 +327,31 @@ def find_points_in_sphere(center: np.ndarray, radius: float, coords: np.ndarray)
     points_in_sphere = np.where(radius_nodes < radius)[0]
 
     return points_in_sphere
+
+
+def find_points_in_box(x_min: float, x_max: float, y_min: float, y_max: float, z_min: float, z_max: float,
+                       coords: np.ndarray) -> np.ndarray:
+    """
+    Find points within a box defined by its minimum and maximum x, y, and z coordinates.
+
+    Args:
+        x_min (float): Minimum x coordinate of the box.
+        x_max (float): Maximum x coordinate of the box.
+        y_min (float): Minimum y coordinate of the box.
+        y_max (float): Maximum y coordinate of the box.
+        z_min (float): Minimum z coordinate of the box.
+        z_max (float): Maximum z coordinate of the box.
+        coords (np.ndarray): The coordinates of mesh nodes as a 2D NumPy array with shape (n, 3).
+
+    Returns:
+        np.ndarray: Indices of points within the box.
+    """
+    # Get all points in the box
+    points_in_box = np.where((coords[:, 0] > x_min) & (coords[:, 0] < x_max) &
+                             (coords[:, 1] > y_min) & (coords[:, 1] < y_max) &
+                             (coords[:, 2] > z_min) & (coords[:, 2] < z_max))[0]
+
+    return points_in_box
 
 
 def shift_bit_length(x: int) -> int:
