@@ -735,7 +735,7 @@ def save_probe_points_data_to_file(probe_points: Dict[int, Dict[str, np.ndarray]
         probe_point_data["velocity_magnitude"] = magnitude_data
         probe_point_data["pressure"] = pressure_data
 
-        # Save the data to a JSON file
+        # Save the data to as a pickle file
         filename = output_path / f"probe_point_{probe_point}.pkl"
         with open(filename, 'wb') as file:
             pickle.dump(probe_point_data, file)
@@ -780,7 +780,7 @@ def save_probe_points_displacement_data_to_file(probe_points: Dict[int, Dict[str
         probe_point_data["time"] = time_data
         probe_point_data["displacement_magnitude"] = displacement_data
 
-        # Save the data to a JSON file
+        # Save the data as a pickle file
         filename = output_path / f"probe_point_{probe_point}_displacement.pkl"
         with open(filename, 'wb') as file:
             pickle.dump(probe_point_data, file)
