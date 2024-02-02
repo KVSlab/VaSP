@@ -49,7 +49,7 @@ def parse_log_file(log_file: str) -> Dict[str, Any]:
             "atol": [],
             "rtol": [],
         },
-        "probe_points": {},
+        "probe_points": {},  # Dictionary to store probe point data
         "probe_points_displacement": {},
         "flow_properties": {
             "flow_rate": [],
@@ -72,6 +72,7 @@ def parse_log_file(log_file: str) -> Dict[str, Any]:
     newton_iteration_pattern = \
         re.compile(r'Newton iteration (.*): r \(atol\) = (.*) \(tol = .*\), r \(rel\) = (.*) \(tol = .*\)')
     probe_point_pattern = re.compile(r"Probe Point (.*): Velocity: \((.*), (.*), (.*)\) \| Pressure: (.*)")
+    probe_point_displacement_pattern = re.compile(r"Probe Point (.*): Displacement: \((.*), (.*), (.*)\)")
     probe_point_displacement_pattern = re.compile(r"Probe Point (.*): Displacement: \((.*), (.*), (.*)\)")
     flow_rate_pattern = re.compile(r"\s*Flow Rate at Inlet: (.*)")
     velocity_pattern = re.compile(r"\s*Velocity \(mean, min, max\): (.*), (.*), (.*)")
@@ -134,6 +135,20 @@ def parse_log_file(log_file: str) -> Dict[str, Any]:
                 data["probe_points_displacement"][probe_point]["displacement_magnitude"].append(displacement_magnitude)
                 continue
 
+            match = probe_point_displacement_pattern.match(line)
+            if match:
+                probe_point = int(match.group(1))
+                if probe_point not in data["probe_points_displacement"]:
+                    data["probe_points_displacement"][probe_point] = {
+                        "displacement": [],
+                        "displacement_magnitude": []
+                    }
+                displacement_components = [float(match.group(2)), float(match.group(3)), float(match.group(4))]
+                displacement_magnitude = np.sqrt(np.sum(np.array(displacement_components) ** 2))
+                data["probe_points_displacement"][probe_point]["displacement"].append(displacement_components)
+                data["probe_points_displacement"][probe_point]["displacement_magnitude"].append(displacement_magnitude)
+                continue
+
             match = flow_rate_pattern.match(line)
             if match:
                 data["flow_properties"]["flow_rate"].append(float(match.group(1)))
@@ -172,6 +187,12 @@ def parse_log_file(log_file: str) -> Dict[str, Any]:
         data["probe_points"][probe_point]["velocity"] = np.array(data["probe_points"][probe_point]["velocity"])
         data["probe_points"][probe_point]["magnitude"] = np.array(data["probe_points"][probe_point]["magnitude"])
         data["probe_points"][probe_point]["pressure"] = np.array(data["probe_points"][probe_point]["pressure"])
+
+    for probe_point in data["probe_points_displacement"]:
+        data["probe_points_displacement"][probe_point]["displacement"] = \
+            np.array(data["probe_points_displacement"][probe_point]["displacement"])
+        data["probe_points_displacement"][probe_point]["displacement_magnitude"] = \
+            np.array(data["probe_points_displacement"][probe_point]["displacement_magnitude"])
 
     for probe_point in data["probe_points_displacement"]:
         data["probe_points_displacement"][probe_point]["displacement"] = \
@@ -708,7 +729,7 @@ def save_probe_points_data_to_file(probe_points: Dict[int, Dict[str, np.ndarray]
         start (int, optional): Index to start saving data from. Default is None (start from the beginning).
         end (int, optional): Index to end saving data at. Default is None (end at the last data point).
     """
-    
+
     # Create the output directory if it doesn't exist
     if output_directory:
         output_path = Path(output_directory)
@@ -739,7 +760,7 @@ def save_probe_points_data_to_file(probe_points: Dict[int, Dict[str, np.ndarray]
         filename = output_path / f"probe_point_{probe_point}.pkl"
         with open(filename, 'wb') as file:
             pickle.dump(probe_point_data, file)
-        
+
         logging.info(f"Probe point {probe_point} data saved to {filename}")
 
 
@@ -785,7 +806,7 @@ def save_probe_points_displacement_data_to_file(probe_points: Dict[int, Dict[str
         with open(filename, 'wb') as file:
             pickle.dump(probe_point_data, file)
 
-        logging.info(f"Probe point {probe_point} displacement data saved to {filename}")    
+        logging.info(f"Probe point {probe_point} displacement data saved to {filename}")
 
 
 def plot_probe_points_displacement_comparison(probe_points: Dict[int, Dict[str, np.ndarray]], time_steps_per_cycle: int,

@@ -10,7 +10,7 @@ from dolfin import HDF5File, Mesh, MeshFunction, facets, cells, UserExpression, 
     DirichletBC, Measure, inner, parameters, assemble
 
 from fsipy.simulations.simulation_common import load_probe_points, print_probe_points, print_mesh_summary, \
-    calculate_and_print_flow_properties, load_solid_probe_points, print_solid_probe_points
+    calculate_and_print_flow_properties
 
 # set compiler arguments
 parameters["form_compiler"]["quadrature_degree"] = 6
@@ -67,9 +67,9 @@ def set_problem_parameters(default_variables, **namespace):
         lambda_s=lambda_s_val,  # Solid Young's modulus [Pa]
         dx_s_id=2,  # ID of marker in the solid domain
         # FSI parameters
-        fsi_region=[0.008, 0, 0, 0.008],  # range of x coordinates for fsi region
+        fsi_region=[-0.0002, 0.016, -0.0035, 0.0035, -0.0035, 0.0035],  # FSI region
         # Simulation parameters
-        folder="offset_stenosis_results",  # Folder name generated for the simulation
+        folder="offset_stenosis_results_box",  # Folder name generated for the simulation
         mesh_path="mesh/file_stenosis.h5",
         FC_file="FC_MCA_10",  # File name containing the Fourier coefficients for the flow waveform
         P_FC_File="FC_Pressure",  # File name containing the Fourier coefficients for the pressure waveform
@@ -93,20 +93,20 @@ def get_mesh_domain_and_boundaries(mesh_path, fsi_region, dx_f_id, fsi_id, rigid
 
     print_mesh_summary(mesh)
 
-    # Only consider FSI in domain within this sphere
-    sph_x = fsi_region[0]
-    sph_y = fsi_region[1]
-    sph_z = fsi_region[2]
-    sph_rad = fsi_region[3]
-
+    # NOTE: Instead of using a sphere, we can also use a box to define the FSI region
+    # Only consider FSI in domain within fsi_x_range, fsi_y_range, fsi_z_range
     i = 0
     for submesh_facet in facets(mesh):
         idx_facet = boundaries.array()[i]
         if idx_facet == fsi_id or idx_facet == outer_id:
             mid = submesh_facet.midpoint()
-            dist_sph_center = np.sqrt((mid.x() - sph_x) ** 2 + (mid.y() - sph_y) ** 2 + (mid.z() - sph_z) ** 2)
-            if dist_sph_center > sph_rad:
-                boundaries.array()[i] = rigid_id  # changed "fsi" idx to "rigid wall" idx
+            if mid.x() < fsi_region[0] or mid.x() > fsi_region[1]:
+                boundaries.array()[i] = rigid_id  # changed "fsi" id to "rigid wall" id
+            elif mid.y() < fsi_region[2] or mid.y() > fsi_region[3]:
+                boundaries.array()[i] = rigid_id
+            elif mid.z() < fsi_region[4] or mid.z() > fsi_region[5]:
+                boundaries.array()[i] = rigid_id
+
         i += 1
 
     # In this region, make fluid more viscous
@@ -166,9 +166,8 @@ class InnerP(UserExpression):
 def initiate(mesh_path, **namespace):
 
     probe_points = load_probe_points(mesh_path)
-    solid_probe_points = load_solid_probe_points(mesh_path)
 
-    return dict(probe_points=probe_points, solid_probe_points=solid_probe_points)
+    return dict(probe_points=probe_points)
 
 
 def create_bcs(t, DVP, mesh, boundaries, mu_f,
@@ -234,11 +233,10 @@ def pre_solve(t, inlet, p_out_bc_val, **namespace):
     return dict(inlet=inlet, p_out_bc_val=p_out_bc_val)
 
 
-def post_solve(probe_points, solid_probe_points, dvp_, dt, mesh, inlet_area, dsi, mu_f, rho_f, n, **namespace):
-    d = dvp_["n"].sub(0, deepcopy=True)
+def post_solve(probe_points, dvp_, dt, mesh, inlet_area, dsi, mu_f, rho_f, n, **namespace):
+
     v = dvp_["n"].sub(1, deepcopy=True)
     p = dvp_["n"].sub(2, deepcopy=True)
 
     print_probe_points(v, p, probe_points)
-    print_solid_probe_points(d, solid_probe_points)
     calculate_and_print_flow_properties(dt, mesh, v, inlet_area, mu_f[0], rho_f[0], n, dsi)
