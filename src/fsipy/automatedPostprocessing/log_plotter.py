@@ -719,7 +719,7 @@ def save_probe_points_data_to_file(probe_points: Dict[int, Dict[str, np.ndarray]
     # Save probe points data to files
     for probe_point, data in probe_points.items():
         # Create a dictionary to store the data
-        probe_point_data = {
+        probe_point_data: Dict[str, Any] = {
             "time": [],
             "velocity_magnitude": [],
             "pressure": []
@@ -767,7 +767,7 @@ def save_probe_points_displacement_data_to_file(probe_points: Dict[int, Dict[str
     # Save probe points displacement data to files
     for probe_point, data in probe_points.items():
         # Create a dictionary to store the data
-        probe_point_data = {
+        probe_point_data: Dict[str, Any] = {
             "time": [],
             "displacement_magnitude": []
         }
