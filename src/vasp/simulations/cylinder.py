@@ -6,7 +6,7 @@ from turtleFSI.problems import *
 from dolfin import HDF5File, Mesh, MeshFunction, assemble, UserExpression, FacetNormal, ds, \
     DirichletBC, Measure, inner, parameters, SpatialCoordinate, Constant
 
-from fsipy.simulations.simulation_common import calculate_and_print_flow_properties
+from vasp.simulations.simulation_common import calculate_and_print_flow_properties
 
 # set compiler arguments
 parameters["form_compiler"]["quadrature_degree"] = 6
