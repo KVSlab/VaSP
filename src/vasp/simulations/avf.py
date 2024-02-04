@@ -278,7 +278,7 @@ def create_bcs(DVP, mesh, boundaries, T, dt, fsi_id, inlet_id1, inlet_id2, rigid
     # Assemble Dirichlet boundary conditions
     bcs = [u_inlet1, u_inlet2, u_inlet_s1, u_inlet_s2, d_inlet1, d_inlet2, d_inlet_s1, d_inlet_s2]
 
-     # Create inlet subdomain for computing the flow rate inside post_solve
+    # Create inlet subdomain for computing the flow rate inside post_solve
     inlet_area = assemble(1.0 * dsi1)
 
     return dict(bcs=bcs, u_inflow_exp1=u_inflow_exp1, u_inflow_exp2=u_inflow_exp2, p_out_bc_val=p_out_bc_val,
@@ -310,4 +310,3 @@ def post_solve(dvp_, n, dsi1, dt, mesh, inlet_area, mu_f, rho_f, probe_points, *
 
     print_probe_points(v, p, probe_points)
     calculate_and_print_flow_properties(dt, mesh, v, inlet_area, mu_f, rho_f, n, dsi1)
-
