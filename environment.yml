@@ -1,4 +1,4 @@
-name: fsipy
+name: vasp
 
 channels:
   - conda-forge
