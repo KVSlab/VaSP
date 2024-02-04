@@ -28,7 +28,7 @@ def test_compute_hemodynamics(tmpdir):
 
     shutil.copytree(folder_path, tmpdir_path, dirs_exist_ok=True)
 
-    cmd = (f"fsipy-compute-hemo --folder {tmpdir_path}")
+    cmd = (f"vasp-compute-hemo --folder {tmpdir_path}")
     _ = subprocess.check_output(cmd, shell=True)
 
     hemodynamics_data = tmpdir_path / "Hemodynamic_indices"
