@@ -31,7 +31,7 @@ vasp-compute-hemo = "vasp.automatedPostprocessing.postprocessing_fenics.compute_
 vasp-create-spectrograms-chromagrams = "vasp.automatedPostprocessing.postprocessing_h5py.create_spectrograms_chromagrams:main"
 vasp-create-spectrogram-from-components = "vasp.automatedPostprocessing.postprocessing_h5py.create_spectrogram_from_components:main"
 vasp-create-spectrum = "vasp.automatedPostprocessing.postprocessing_h5py.create_spectrum:main"
-vasp-create-hi-pass-viz = "fsipy.automatedPostprocessing.postprocessing_h5py.create_hi_pass_viz:main"
+vasp-create-hi-pass-viz = "vasp.automatedPostprocessing.postprocessing_h5py.create_hi_pass_viz:main"
 
 [project.optional-dependencies]
 test = [
