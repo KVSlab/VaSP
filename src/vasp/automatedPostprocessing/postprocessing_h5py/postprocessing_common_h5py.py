@@ -22,7 +22,7 @@ from tqdm import tqdm
 from scipy import signal
 import matplotlib.pyplot as plt
 
-from fsipy.automatedPostprocessing.postprocessing_common import get_domain_ids, output_file_lists, \
+from vasp.automatedPostprocessing.postprocessing_common import get_domain_ids, output_file_lists, \
     read_parameters_from_file
 
 
