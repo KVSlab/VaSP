@@ -1,8 +1,8 @@
-"""Top-level package for fsipy."""
+"""Top-level package for vasp."""
 from importlib.metadata import metadata
 
 
-meta = metadata("fsipy")
+meta = metadata("vasp")
 __version__ = meta["Version"]
 __author__ = meta["Author"]
 __license__ = meta["License"]
