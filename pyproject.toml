@@ -2,10 +2,13 @@
 requires = ["setuptools>=61.0.0", "wheel"]
 
 [project]
-name = "fsipy"
+name = "vasp"
 version = "0.1.0"
 description = "Vascular Fluid Structure Interaction Pipline"
-authors = [{name = "John Smith", email = "johnsmith@example.org"}]
+authors = [{name = "Kei Yamamoto", email = "keiya@simula.no"},
+           {name = "Johannes Ring", email = "johannr@simula.no"},
+           {name = "David A. Bruneau", email = "david.bruneau@mail.utoronto.ca"},
+           {name = "Jørgen S. Dokken", email = "dokken@simula.no"}]
 license = { file = "LICENSE" }
 readme = "README.md"
 dependencies = [
@@ -15,20 +18,20 @@ dependencies = [
 ]
 
 [project.scripts]
-fsipy-generate-mesh = "fsipy.automatedPreprocessing.automated_preprocessing:main_meshing"
-fsipy-generate-solid-probe = "fsipy.automatedPreprocessing.generate_solid_probe:main"
-fsipy-predeform-mesh = "fsipy.automatedPostprocessing.predeform_mesh:main"
-fsipy-refine-mesh = "fsipy.automatedPostprocessing.postprocessing_mesh.create_refined_mesh:main"
-fsipy-separate-mesh = "fsipy.automatedPostprocessing.postprocessing_mesh.separate_mesh:main"
-fsipy-log-plotter = "fsipy.automatedPostprocessing.log_plotter:main"
-fsipy-create-hdf5 = "fsipy.automatedPostprocessing.postprocessing_fenics.create_hdf5:main"
-fsipy-create-separate-domain-viz = "fsipy.automatedPostprocessing.postprocessing_fenics.create_separate_domain_visualization:main"
-fsipy-compute-stress = "fsipy.automatedPostprocessing.postprocessing_fenics.compute_stress_strain:main"
-fsipy-compute-hemo = "fsipy.automatedPostprocessing.postprocessing_fenics.compute_hemodynamics:main"
-fsipy-create-spectrograms-chromagrams = "fsipy.automatedPostprocessing.postprocessing_h5py.create_spectrograms_chromagrams:main"
-fsipy-create-spectrogram-from-components = "fsipy.automatedPostprocessing.postprocessing_h5py.create_spectrogram_from_components:main"
-fsipy-create-spectrum = "fsipy.automatedPostprocessing.postprocessing_h5py.create_spectrum:main"
-fsipy-create-hi-pass-viz = "fsipy.automatedPostprocessing.postprocessing_h5py.create_hi_pass_viz:main"
+vasp-generate-mesh = "vasp.automatedPreprocessing.automated_preprocessing:main_meshing"
+vasp-generate-solid-probe = "vasp.automatedPreprocessing.generate_solid_probe:main"
+vasp-predeform-mesh = "vasp.automatedPostprocessing.predeform_mesh:main"
+vasp-refine-mesh = "vasp.automatedPostprocessing.postprocessing_mesh.create_refined_mesh:main"
+vasp-separate-mesh = "vasp.automatedPostprocessing.postprocessing_mesh.separate_mesh:main"
+vasp-log-plotter = "vasp.automatedPostprocessing.log_plotter:main"
+vasp-create-hdf5 = "vasp.automatedPostprocessing.postprocessing_fenics.create_hdf5:main"
+vasp-create-separate-domain-viz = "vasp.automatedPostprocessing.postprocessing_fenics.create_separate_domain_visualization:main"
+vasp-compute-stress = "vasp.automatedPostprocessing.postprocessing_fenics.compute_stress_strain:main"
+vasp-compute-hemo = "vasp.automatedPostprocessing.postprocessing_fenics.compute_hemodynamics:main"
+vasp-create-spectrograms-chromagrams = "vasp.automatedPostprocessing.postprocessing_h5py.create_spectrograms_chromagrams:main"
+vasp-create-spectrogram-from-components = "vasp.automatedPostprocessing.postprocessing_h5py.create_spectrogram_from_components:main"
+vasp-create-spectrum = "vasp.automatedPostprocessing.postprocessing_h5py.create_spectrum:main"
+vasp-create-hi-pass-viz = "fsipy.automatedPostprocessing.postprocessing_h5py.create_hi_pass_viz:main"
 
 [project.optional-dependencies]
 test = [
