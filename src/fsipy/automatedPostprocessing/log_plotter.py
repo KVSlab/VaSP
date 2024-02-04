@@ -11,7 +11,7 @@ results.
 
 Example:
 
-fsipy-log-plotter simulation.log --plot-all --save --output-directory Results --figure-size 12,8
+vasp-log-plotter simulation.log --plot-all --save --output-directory Results --figure-size 12,8
 """
 
 import re
