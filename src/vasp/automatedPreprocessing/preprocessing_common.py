@@ -10,7 +10,7 @@ from dolfin import Mesh, MeshFunction, File, HDF5File, FunctionSpace, Function, 
 from vmtk import vmtkdistancetospheres
 from morphman import vmtkscripts, write_polydata
 
-from fsipy.automatedPreprocessing.vmtkmeshgeneratorfsi import vmtkMeshGeneratorFsi
+from vasp.automatedPreprocessing.vmtkmeshgeneratorfsi import vmtkMeshGeneratorFsi
 
 # Global array names
 distanceToSpheresArrayName = "DistanceToSpheres"
