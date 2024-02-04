@@ -1,6 +1,6 @@
 # Borrowed from VaMPy
 # Original Workflow File: https://github.com/KVSlab/VaMPy/blob/master/.github/workflows/check_and_test_package.yml
-# Description: Check and test the code of FSIPy
+# Description: Check and test the code of VaSP
 
 name: CI
 
@@ -41,7 +41,7 @@ jobs:
       - name: Install types-paramiko
         run: python3 -m pip install types-paramiko
 
-      - name: Install FSIPy
+      - name: Install VaSP
         run: python3 -m pip install .[test]
 
       - name: Check code with Flake8
@@ -57,12 +57,12 @@ jobs:
         include:
           - os: ubuntu-latest
             label: linux-64
-            prefix: /usr/share/miniconda3/envs/fsipy
+            prefix: /usr/share/miniconda3/envs/vasp
           - os: macos-latest
             label: osx-64
-            prefix: /Users/runner/miniconda3/envs/fsipy
+            prefix: /Users/runner/miniconda3/envs/vasp
 
-    name: Test FSIPy on ${{ matrix.label }}
+    name: Test VaSP on ${{ matrix.label }}
     runs-on: ${{ matrix.os }}
 
     # https://github.com/marketplace/actions/setup-miniconda#use-a-default-shell
@@ -89,7 +89,7 @@ jobs:
           miniforge-variant: Mambaforge
           miniforge-version: latest
           channels: conda-forge
-          activate-environment: fsipy
+          activate-environment: vasp
           use-mamba: true
 
       - name: Set cache date
@@ -102,10 +102,10 @@ jobs:
         id: cache
 
       - name: Update environment
-        run: mamba env update -n fsipy -f environment.yml
+        run: mamba env update -n vasp -f environment.yml
         if: steps.cache.outputs.cache-hit != 'true'
 
-      - name: Install FSIPy
+      - name: Install VaSP
         run: python3 -m pip install --editable .[test]
 
       - name: Run tests
