@@ -37,7 +37,7 @@ In this case, it is assumed that `my_problem.py` and `my_config.config` are loca
 Due to the nature of vascular FSI simulations, it is usually the case that the simulation needs to be run on the supercomputer with many CPUs where the total simulation time may exceed one day. In such a case, it is crucial to monitor the progress of your simulations and check if the simulations are going as you wish. For that purpose, `vasp-log-plotter` can be used to plot the relevant quantities based on the log file generated during the run. 
 
 Since the plot is generated based on the log file, users must use functions from `vasp.simulations.simulation_common` to print out the information in the log file. Particularly, functions such as `load_probe_points`, 
-`print_probe_points`, `calculate_and_print_flow_properties` are important. Example problem files located under `src/fsipy/simulations` illustrates how to use those functions inside the problem files.
+`print_probe_points`, `calculate_and_print_flow_properties` are important. Example problem files located under `src/vasp/simulations` illustrates how to use those functions inside the problem files.
 
 Quantities that can be plotted are as follows:
 
