@@ -7,6 +7,9 @@ from turtleFSI.problems import *
 from dolfin import HDF5File, Mesh, MeshFunction, facets, UserExpression, FacetNormal, ds, \
     DirichletBC, Measure, inner, parameters, assemble, Constant, SpatialCoordinate
 
+from vasp.simulations.simulation_common import load_probe_points, calculate_and_print_flow_properties, \
+    print_probe_points
+
 # set compiler arguments
 parameters["form_compiler"]["quadrature_degree"] = 6
 parameters["form_compiler"]["optimize"] = True
@@ -84,6 +87,7 @@ def set_problem_parameters(default_variables, **namespace):
         folder="avf_results",  # Folder where the results will be stored
         compiler_parameters=_compiler_parameters,  # Update the defaul values of the compiler arguments (FEniCS)
         save_deg=2,  # Degree of the functions saved for visualisation
+        scale_probe=True,  # Scale the probe points to meters
     ))
 
     return default_variables
@@ -274,8 +278,21 @@ def create_bcs(DVP, mesh, boundaries, T, dt, fsi_id, inlet_id1, inlet_id2, rigid
     # Assemble Dirichlet boundary conditions
     bcs = [u_inlet1, u_inlet2, u_inlet_s1, u_inlet_s2, d_inlet1, d_inlet2, d_inlet_s1, d_inlet_s2]
 
+    # Create inlet subdomain for computing the flow rate inside post_solve
+    inlet_area = assemble(1.0 * dsi1)
+
     return dict(bcs=bcs, u_inflow_exp1=u_inflow_exp1, u_inflow_exp2=u_inflow_exp2, p_out_bc_val=p_out_bc_val,
-                F_solid_linear=F_solid_linear)
+                F_solid_linear=F_solid_linear, n=n, inlet_area=inlet_area, dsi1=dsi1)
+
+
+def initiate(mesh_path, scale_probe, **namespace):
+
+    probe_points = load_probe_points(mesh_path)
+    # In case the probe points are in mm, scale them to meters
+    if scale_probe:
+        probe_points = probe_points * 0.001
+
+    return dict(probe_points=probe_points)
 
 
 def pre_solve(t, u_inflow_exp1, u_inflow_exp2, p_out_bc_val, **namespace):
@@ -284,3 +301,12 @@ def pre_solve(t, u_inflow_exp1, u_inflow_exp2, p_out_bc_val, **namespace):
     u_inflow_exp2.update(t)
     p_out_bc_val.update(t)
     return dict(u_inflow_exp1=u_inflow_exp1, u_inflow_exp2=u_inflow_exp2, p_out_bc_val=p_out_bc_val)
+
+
+def post_solve(dvp_, n, dsi1, dt, mesh, inlet_area, mu_f, rho_f, probe_points, **namespace):
+
+    v = dvp_["n"].sub(1, deepcopy=True)
+    p = dvp_["n"].sub(2, deepcopy=True)
+
+    print_probe_points(v, p, probe_points)
+    calculate_and_print_flow_properties(dt, mesh, v, inlet_area, mu_f, rho_f, n, dsi1)

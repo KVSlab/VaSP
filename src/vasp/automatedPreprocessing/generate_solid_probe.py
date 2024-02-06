@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import json
 
-from fsipy.automatedPostprocessing.postprocessing_common import get_domain_ids
+from vasp.automatedPostprocessing.postprocessing_common import get_domain_ids
 
 
 def parse_arguments() -> argparse.Namespace:

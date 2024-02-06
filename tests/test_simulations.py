@@ -5,7 +5,7 @@ import numpy as np
 
 
 # Define the list of input geometrical data paths
-# Since we will run turtleFSI from src/fsipy/simulations/, we need to go up one level
+# Since we will run turtleFSI from src/vasp/simulations/, we need to go up one level
 input_data_paths = [
     "../../../tests/test_data/offset_stenosis/offset_stenosis.h5",
     "../../../tests/test_data/cylinder/cylinder.h5",
@@ -21,7 +21,7 @@ def test_offset_stenosis_problem(input_mesh, tmpdir):
     """
     cmd = ("turtleFSI -p offset_stenosis -dt 0.01 -T 0.04 --verbose True" +
            f" --theta 0.51 --folder {tmpdir} --sub-folder 1 --new-arguments mesh_path={input_mesh}")
-    result = subprocess.check_output(cmd, shell=True, cwd="src/fsipy/simulations/")
+    result = subprocess.check_output(cmd, shell=True, cwd="src/vasp/simulations/")
 
     # Here we check the velocity and pressure at the last time step from Probe point 5
     target_probe_point = 5
@@ -64,7 +64,7 @@ def test_predeform_problem(input_mesh, tmpdir):
     """
     cmd = ("turtleFSI -p predeform -dt 0.01 -T 0.03 --verbose True" +
            f" --theta 0.51 --folder {tmpdir} --sub-folder 1 --new-arguments mesh_path={input_mesh}")
-    result = subprocess.check_output(cmd, shell=True, cwd="src/fsipy/simulations/")
+    result = subprocess.check_output(cmd, shell=True, cwd="src/vasp/simulations/")
 
     output_re = r"v \(centerline, at inlet\) = (\d+\.\d+|\d+) m/s"
     output_match = re.findall(output_re, str(result))
@@ -86,7 +86,7 @@ def test_cylinder_problem(input_mesh, tmpdir):
     """
     cmd = ("turtleFSI -p cylinder -dt 0.001 -T 0.004 --verbose True " +
            f"--folder {tmpdir} --sub-folder 1 --new-arguments mesh_path={input_mesh}")
-    result = subprocess.check_output(cmd, shell=True, cwd="src/fsipy/simulations/")
+    result = subprocess.check_output(cmd, shell=True, cwd="src/vasp/simulations/")
     # check flow rate at inlet
     output_flow_rate = r"Flow Rate at Inlet: (\d+(?:\.\d+)?(?:e-\d+)?)"
 
@@ -152,7 +152,7 @@ def test_aneurysm_problem(input_mesh, tmpdir):
     """
     cmd = ("turtleFSI -p aneurysm -dt 0.001 -T 0.004 --verbose True " +
            f"--folder {tmpdir} --sub-folder 1 --new-arguments inlet_id=4 mesh_path={input_mesh}")
-    result = subprocess.check_output(cmd, shell=True, cwd="src/fsipy/simulations/")
+    result = subprocess.check_output(cmd, shell=True, cwd="src/vasp/simulations/")
     # check flow rate at inlet
     output_flow_rate = r"Flow Rate at Inlet: (\d+(?:\.\d+)?(?:e-\d+)?)"
 

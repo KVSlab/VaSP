@@ -17,8 +17,8 @@ from dolfin import Mesh, HDF5File, VectorFunctionSpace, Function, MPI, parameter
     TestFunction, inner, ds, assemble, FacetNormal, sym, project, FunctionSpace, PETScDMCollection, grad, \
     LUSolver, FunctionAssigner, BoundaryMesh
 from vampy.automatedPostprocessing.postprocessing_common import get_dataset_names
-from fsipy.automatedPostprocessing.postprocessing_common import read_parameters_from_file
-from fsipy.automatedPostprocessing.postprocessing_fenics.postprocessing_fenics_common import project_dg
+from vasp.automatedPostprocessing.postprocessing_common import read_parameters_from_file
+from vasp.automatedPostprocessing.postprocessing_fenics.postprocessing_fenics_common import project_dg
 
 # set compiler arguments
 parameters["reorder_dofs_serial"] = False

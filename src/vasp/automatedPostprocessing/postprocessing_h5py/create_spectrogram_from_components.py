@@ -13,7 +13,7 @@ from typing import Union, Optional
 import numpy as np
 import matplotlib.pyplot as plt
 
-from fsipy.automatedPostprocessing.postprocessing_h5py import spectrograms as spec
+from vasp.automatedPostprocessing.postprocessing_h5py import spectrograms as spec
 
 
 def create_spectrogram_from_components(folder: Union[str, Path], quantity: str, n_samples: int, min_color: float,

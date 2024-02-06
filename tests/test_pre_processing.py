@@ -6,10 +6,10 @@ import vtk
 from dolfin import Mesh, HDF5File, XDMFFile, FunctionSpace, Function
 from vampy.automatedPreprocessing.preprocessing_common import read_polydata
 
-from fsipy.automatedPreprocessing.automated_preprocessing import read_command_line, \
+from vasp.automatedPreprocessing.automated_preprocessing import read_command_line, \
     run_pre_processing
 
-# Define test cases for testing command line options for fsipy-generate-mesh script
+# Define test cases for testing command line options for vasp-generate-mesh script
 command_line_test_cases = [
     (["-i", "tests/test_data/cylinder/cylinder.vtp", "-ra"], "--- Removing mesh and all pre-processing files"),
     (["-i", "tests/test_data/cylinder/cylinder.vtp", "-f", "True"], "--- Adding flow extensions"),
@@ -31,7 +31,7 @@ command_line_test_cases = [
 
 
 @pytest.mark.parametrize("args, description", command_line_test_cases)
-def test_fsipy_mesh(args, description, tmpdir):
+def test_vasp_mesh(args, description, tmpdir):
     # Define test data paths
     original_model_path = Path(args[1])
 
@@ -41,7 +41,7 @@ def test_fsipy_mesh(args, description, tmpdir):
     # Replace the original model path in args with the model in tmpdir
     args[1] = str(model_path)
 
-    command = ["fsipy-generate-mesh", "-viz", "False", "-c", "2"] + args
+    command = ["vasp-generate-mesh", "-viz", "False", "-c", "2"] + args
 
     # Run the script and capture the output and return code
     result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)

@@ -22,9 +22,9 @@ from vampy.automatedPreprocessing.repair_tools import find_and_delete_nan_triang
 from vampy.automatedPreprocessing.simulate import run_simulation
 from vampy.automatedPreprocessing.visualize import visualize_model
 
-from fsipy.automatedPreprocessing.preprocessing_common import generate_mesh, distance_to_spheres_solid_thickness, \
+from vasp.automatedPreprocessing.preprocessing_common import generate_mesh, distance_to_spheres_solid_thickness, \
     dist_sphere_spheres, convert_xml_mesh_to_hdf5, convert_vtu_mesh_to_xdmf, edge_length_evaluator
-from fsipy.simulations.simulation_common import load_mesh_and_data, print_mesh_summary
+from vasp.simulations.simulation_common import load_mesh_and_data, print_mesh_summary
 
 
 def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_factor, smoothing_iterations,

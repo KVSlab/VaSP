@@ -6,9 +6,9 @@ import pytest
 import numpy as np
 from dolfin import Mesh, cpp
 
-from fsipy.automatedPreprocessing.automated_preprocessing import read_command_line, \
+from vasp.automatedPreprocessing.automated_preprocessing import read_command_line, \
     run_pre_processing
-from fsipy.simulations.simulation_common import load_mesh_and_data, load_mesh_info, print_mesh_summary, \
+from vasp.simulations.simulation_common import load_mesh_and_data, load_mesh_info, print_mesh_summary, \
     load_probe_points
 
 

@@ -9,7 +9,7 @@ from turtleFSI.problems import *
 from dolfin import HDF5File, Mesh, MeshFunction, facets, cells, UserExpression, FacetNormal, ds, \
     DirichletBC, Measure, inner, parameters, assemble
 
-from fsipy.simulations.simulation_common import load_probe_points, print_probe_points, print_mesh_summary, \
+from vasp.simulations.simulation_common import load_probe_points, print_probe_points, print_mesh_summary, \
     calculate_and_print_flow_properties, load_solid_probe_points, print_solid_probe_points
 
 # set compiler arguments

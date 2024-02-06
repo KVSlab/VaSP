@@ -29,7 +29,7 @@ test_cases = [
 def test_plot_options(tmpdir, log_file, args, expected_image):
     log_path = Path("tests/test_data/logs") / log_file
 
-    command = ["fsipy-log-plotter", str(log_path), "--save", f"--output-directory={tmpdir}"] + args
+    command = ["vasp-log-plotter", str(log_path), "--save", f"--output-directory={tmpdir}"] + args
     subprocess.run(command, check=True)
 
     # Get the paths to the generated and expected images
@@ -50,7 +50,7 @@ def test_plot_options_compute_average(tmpdir, log_file, args, expected_image):
 
     log_path = Path("tests/test_data/logs") / log_file
 
-    command = ["fsipy-log-plotter", str(log_path), "--save", f"--output-directory={tmpdir}", "--compute-average"] + args
+    command = ["vasp-log-plotter", str(log_path), "--save", f"--output-directory={tmpdir}", "--compute-average"] + args
     subprocess.run(command, check=True)
 
     # Get the paths to the generated and expected images
@@ -71,7 +71,7 @@ def test_plot_options_compare_cycles(tmpdir, log_file, args, expected_image):
 
     log_path = Path("tests/test_data/logs") / log_file
 
-    command = ["fsipy-log-plotter", str(log_path), "--save", f"--output-directory={tmpdir}", "--compare-cycles"] + args
+    command = ["vasp-log-plotter", str(log_path), "--save", f"--output-directory={tmpdir}", "--compare-cycles"] + args
     subprocess.run(command, check=True)
 
     # Adjust the expected image name to account for "_comparison.png" ending
@@ -109,7 +109,7 @@ def test_plot_all(tmpdir):
     reference_images = list(reference_image_directory.glob("*.png"))
 
     # Customize the command to run the script with --plot-all
-    command = ["fsipy-log-plotter", str(log_path), "--save", f"--output-directory={tmpdir}", "--plot-all"]
+    command = ["vasp-log-plotter", str(log_path), "--save", f"--output-directory={tmpdir}", "--plot-all"]
     subprocess.run(command, check=True)
 
     for reference_image in reference_images:
@@ -132,7 +132,7 @@ def test_plot_all(tmpdir):
 def generate_reference_images(log_file, args, output_directory):
     log_path = Path("tests/test_data/logs") / log_file
 
-    command = ["fsipy-log-plotter", str(log_path), "--save", f"--output-directory={output_directory}"] + args
+    command = ["vasp-log-plotter", str(log_path), "--save", f"--output-directory={output_directory}"] + args
 
     subprocess.run(command, check=True)
 
