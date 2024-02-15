@@ -138,6 +138,11 @@ def compute_stress(visualization_separate_domain_folder: Path, mesh_path: Path, 
     GLS = Function(VT)
     MPStress = Function(V)
     MPStrain = Function(V)
+
+    # Time averaged stress and strain
+    MPStrain_avg = Function(V)
+    MPStress_avg = Function(V)
+
     # Create test and trial functions
     v = TestFunction(VT)
     u = TrialFunction(VT)
@@ -257,6 +262,11 @@ def compute_stress(visualization_separate_domain_folder: Path, mesh_path: Path, 
         GLS.assign(epsilon)
         MPStress.assign(max_principal_stress)
         MPStrain.assign(max_principal_strain)
+
+        # accumulate stress and strain
+        MPStress_avg.vector().axpy(1.0, max_principal_stress.vector())
+        MPStrain_avg.vector().axpy(1.0, max_principal_strain.vector())
+
         # Write indices to file
         for name, xdmf_object in stress_strain.items():
             variable = stress_strain_dict[name]
@@ -264,6 +274,23 @@ def compute_stress(visualization_separate_domain_folder: Path, mesh_path: Path, 
             xdmf_object.close()
 
         counter += 1
+
+    # Average stress and strain
+    MPStress_avg.vector()[:] = MPStress_avg.vector() / counter
+    MPStrain_avg.vector()[:] = MPStrain_avg.vector() / counter
+
+    # Write indices to file
+    mps_stress_avg_path = stress_strain_path / "MaxPrincipalStress_avg.xdmf"
+    mps_strain_avg_path = stress_strain_path / "MaxPrincipalStrain_avg.xdmf"
+
+    mps_stress_avg_xdmf = XDMFFile(MPI.comm_world, str(mps_stress_avg_path))
+    mps_strain_avg_xdmf = XDMFFile(MPI.comm_world, str(mps_strain_avg_path))
+
+    mps_stress_avg_xdmf.write_checkpoint(MPStress_avg, "MaxPrincipalStress_avg", 0, XDMFFile.Encoding.HDF5)
+    mps_strain_avg_xdmf.write_checkpoint(MPStrain_avg, "MaxPrincipalStrain_avg", 0, XDMFFile.Encoding.HDF5)
+
+    if MPI.rank(MPI.comm_world) == 0:
+        print(f" --- Stress and Strain post processing completed and saved to {stress_strain_path} \n")
 
 
 def main() -> None:
