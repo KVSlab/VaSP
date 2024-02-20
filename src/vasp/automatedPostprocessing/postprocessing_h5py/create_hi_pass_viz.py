@@ -323,7 +323,6 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
 
     vector_data.close()
 
-
     # 3. Create xdmf file for visualization
     if quantity in {"d", "v", "p"}:
         create_xdmf_file(num_ts, time_between_files, start_t, n_elements_fsi,
