@@ -288,7 +288,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
                     ])
                     # Check if the strain tensor is all zeros. This is a shortcut to avoid taking eignevalues if
                     # the Strain tensor is all zeroes (outside the FSI region).
-                    if np.all(np.abs(strain_tensor) < 1e-12):
+                    if np.all(np.abs(strain_tensor) < 1e-8):
                         MPS = 0.0
                     else:
                         # Calculate Maximum Principal Strain (MPS) for filtered strain tensor
@@ -319,7 +319,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
                 v_array_amplitude[:, 1] = components_data_amplitude[2][:, idx]
                 v_array_amplitude[:, 2] = components_data_amplitude[3][:, idx]
                 # Take magnitude of RMS Amplitude, this way you don't lose any directional changes
-                rms_magnitude[:, idx] = LA.norm(v_array, axis=1)
+                rms_magnitude[:, idx] = LA.norm(v_array_amplitude, axis=1)
 
     vector_data.close()
 
