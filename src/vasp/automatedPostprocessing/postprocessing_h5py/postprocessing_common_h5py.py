@@ -155,7 +155,7 @@ def read_npz_files(filepath: Union[str, Path]) -> pd.DataFrame:
 def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union[str, Path],
                               mesh_path: Union[str, Path], case_name: str, start_t: float, end_t: float, quantity: str,
                               fluid_domain_id: Union[int, list[int]], solid_domain_id: Union[int, list[int]],
-                              stride: int = 1) -> Tuple[float, Optional[dict[str, np.ndarray]]]:
+                              stride: int = 1) -> Tuple[float, Optional[dict[str, np.ndarray]], Optional[dict[str, np.ndarray]]]:
     """
     Create a transformed matrix from simulation data.
 
@@ -172,7 +172,7 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
         stride (int): Stride for selecting timesteps.
 
     Returns:
-        Tuple[float, dict[str, np.ndarray]]: A tuple containing the time between files and a dictionary containing
+        Tuple[float, dict[str, np.ndarray], dict[str, np.ndarray]]: A tuple containing the time between files, dof_info_dict,
     """
     logging.info(f"--- Creating matrix for case {case_name}...")
     input_path = Path(input_path)
@@ -244,6 +244,19 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
         dof_info_dict = {name: np.array(vector_data[key][:]) for name, key in zip(dof_info_name, dof_info)}
     else:
         dof_info_dict = None
+    
+    if quantity in {"wss", "mps", "strain"}:
+        xdmf_path_amplitude = input_path / xdmf_files["mps"]
+        h5_ts_amplitude, _, _ = output_file_lists(xdmf_path_amplitude)
+        first_h5_file_amplitude = input_path / h5_ts_amplitude[0]
+        vector_data_amplitude = h5py.File(first_h5_file_amplitude, 'r')
+        name_of_quantity_in_h5_amplitude = list(vector_data_amplitude.keys())[0]
+        first_data_amplitude = name_of_quantity_in_h5_amplitude + "/" + name_of_quantity_in_h5_amplitude + "_0"
+        dof_info_amplitude = [first_data_amplitude + "/" + name for name in dof_info_name]
+        dof_info_dict_amplitude = {name: np.array(vector_data_amplitude[key][:]) for name, key in zip(dof_info_name, dof_info_amplitude)}
+        vector_data_amplitude.close()
+    else:
+        dof_info_dict_amplitude = None
 
     # Get the format string from the dictionary based on the quantity
     format_string = quantity_to_array.get(quantity, 'VisualisationVector/{}')
@@ -386,9 +399,11 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
     if quantity == "strain":
         with open(output_folder / "dof_info.pkl", "wb") as f:
             pickle.dump(dof_info_dict, f)
+        with open(output_folder / "dof_info_amplitude.pkl", "wb") as f:
+            pickle.dump(dof_info_dict_amplitude, f)
 
     logging.info("--- Finished writing component files\n")
-    return time_between_files, dof_info_dict
+    return time_between_files, dof_info_dict, dof_info_dict_amplitude
 
 
 def create_point_trace(formatted_data_folder: str, output_folder: str, point_ids: List[int],
@@ -779,6 +794,5 @@ def get_eig(T: np.ndarray) -> float:
 
     # Calculate polynomial roots
     lambda1 = 1 / 3 * (np.sqrt(p) * 2 * np.cos(phi) + I1)
-
     # Return polynomial roots (eigenvalues)
     return lambda1

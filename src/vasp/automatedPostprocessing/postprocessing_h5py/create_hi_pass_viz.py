@@ -27,7 +27,7 @@ from vasp.automatedPostprocessing.postprocessing_h5py.postprocessing_common_h5py
 
 
 def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_path: Path, time_between_files: float,
-                       dof_info: Union[dict, None], start_t: float, quantity: str,
+                       dof_info: Union[dict, None], dof_info_amplitude: Union[dict, None], start_t: float, quantity: str,
                        lowcut: Union[float, List[float]] = 0, highcut: Union[float, List[float]] = 100000,
                        amplitude: bool = False, filter_type: str = "bandpass", pass_stop_list: List[str] = [],
                        overwrite: bool = False) -> None:
@@ -40,6 +40,8 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
         mesh_path (Path): Path to the mesh file.
         time_between_files (float): Time between files.
         dof_info (Union[dict, None]): Dictionary containing the information about the degrees of freedom.
+        dof_info_amplitude (Union[dict, None]): Dictionary containing the information about the degrees of freedom.
+                                                Specifically for amplitude (scalar) data.
         start_t (float): Start time.
         quantity (str): Type of data (e.g., 'd', 'v', 'strain').
         lowcut (Union[int, List[int]]): Low-cut frequency or list of low-cut frequencies for multi-band filtering.
@@ -133,7 +135,6 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
 
         # Get number of timesteps
         num_ts = components_data[0].shape[1]
-
     logging.debug(f"--- Nodes: {n_nodes_fsi}, Elements: {n_elements_fsi}, Timesteps: {num_ts}")
 
     if output_path.exists() and not overwrite:
@@ -178,8 +179,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
         geo_array[...] = coord_array_fsi
         topo_array = vector_data_amplitude.create_dataset("Mesh/0/mesh/topology", (n_elements_fsi, 4), dtype="i")
         topo_array[...] = topo_array_fsi
-
-    for idy in tqdm(range(n_nodes_fsi), desc="--- Filtering nodes", unit=" node"):
+    for idy in tqdm(range(components_data[0].shape[0]), desc="--- Filtering nodes", unit=" node"):
         if filter_type == "multiband":
             # Loop through the bands and either bandpass or bandstop filter them
             for low_freq, high_freq, filter_type_band in zip(lowcut_list, highcut_list, pass_stop_list):
@@ -212,8 +212,8 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
             np.zeros((int(n_cells_fsi * 4), num_ts))
         components_data_amplitude = np.zeros_like(components_data)
         # NOTE: Fixing the window size to 250 for now. It would be better to make this a parameter.
-        window_size = 250  # This is approximately 1/4th of the value used in the spectrograms (992)
-        for idy in tqdm(range(n_nodes_fsi), desc="--- Calculating amplitude", unit=" node"):
+        window_size = 25  # This is approximately 1/4th of the value used in the spectrograms (992)
+        for idy in tqdm(range(components_data[0].shape[0]), desc="--- Calculating amplitude", unit=" node"):
             for component_index, component_data in enumerate(components_data):
                 components_data_amplitude[component_index][idy, :] = \
                     calculate_windowed_rms(component_data[idy, :], window_size)
@@ -288,10 +288,11 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
                     ])
                     # Check if the strain tensor is all zeros. This is a shortcut to avoid taking eignevalues if
                     # the Strain tensor is all zeroes (outside the FSI region).
-                    if np.all(np.abs(strain_tensor) < 1e-8):
+                    if np.all(np.abs(strain_tensor) < 1e-7):
                         MPS = 0.0
                     else:
                         # Calculate Maximum Principal Strain (MPS) for filtered strain tensor
+                        print("strain tensor", strain_tensor)
                         MPS = get_eig(strain_tensor)
 
                     # Assign MPS to rms_magnitude
@@ -299,7 +300,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
 
                 array_name = f"{viz_type_magnitude}/{viz_type_magnitude}_{idx}"
                 assert dof_info is not None
-                for name, data in dof_info.items():
+                for name, data in dof_info_amplitude.items():
                     dof_array = vector_data_mps.create_dataset(f"{array_name}/{name}", data=data)
                     dof_array[:] = data
                 v_array_mps = vector_data_mps.create_dataset(f"{array_name}/vector",
@@ -570,6 +571,7 @@ def main():
 
     logging.info("--- Preparing data...")
     dof_info = None
+    dof_info_amplitude = None
     if formatted_data_path.exists() and quantity != "strain":
         logging.info(f"--- Formatted data already exists at: {formatted_data_path}\n")
     elif formatted_data_path.exists() and quantity == "strain":
@@ -577,13 +579,15 @@ def main():
         dof_info_path = formatted_data_folder / "dof_info.pkl"
         with open(dof_info_path, "rb") as f:
             dof_info = pickle.load(f)
+        dof_info_amplitude_path = formatted_data_folder / "dof_info_amplitude.pkl"
+        with open(dof_info_amplitude_path, "rb") as f:
+            dof_info_amplitude = pickle.load(f)
     else:
         # Determine mesh paths based on save_deg
-        if save_deg == 1:
-            mesh_path_solid = mesh_path_solid_sd1
-
+        # if save_deg == 1:
+        mesh_path_solid = mesh_path_solid_sd1
         if quantity == "strain":
-            _, dof_info = create_transformed_matrix(visualization_stress_strain_folder, formatted_data_folder,
+            _, dof_info, dof_info_amplitude = create_transformed_matrix(visualization_stress_strain_folder, formatted_data_folder,
                                                     mesh_path_solid, case_name, start_time, end_time, quantity,
                                                     fluid_domain_id, solid_domain_id, stride)
         else:
@@ -607,21 +611,21 @@ def main():
         for low_freq, high_freq in zip(lower_freq, higher_freq):
             logging.info(f"\n--- Creating high-pass visualization {low_freq}-{high_freq} with amplitude...")
             create_hi_pass_viz(formatted_data_folder, visualization_hi_pass_folder, mesh_path,
-                               time_between_output_files, dof_info, start_time, quantity, low_freq, high_freq,
+                               time_between_output_files, dof_info, dof_info_amplitude, start_time, quantity, low_freq, high_freq,
                                amplitude=amplitude, overwrite=overwrite)
 
         # Create multiband high-pass visualizations
         if filter_type == "multiband":
             logging.info("\n--- Creating multiband high-pass visualization with amplitude...")
             create_hi_pass_viz(formatted_data_folder, visualization_hi_pass_folder, mesh_path,
-                               time_between_output_files, dof_info, start_time, quantity, lower_freq, higher_freq,
+                               time_between_output_files, dof_info, dof_info_amplitude, start_time, quantity, lower_freq, higher_freq,
                                amplitude=amplitude, filter_type="multiband", pass_stop_list=pass_stop_list,
                                overwrite=overwrite)
     elif quantity == "strain":
         logging.info(f"--- Creating high-pass visualizations for {quantity}...")
         for i in range(len(lower_freq)):
             create_hi_pass_viz(formatted_data_folder, visualization_hi_pass_folder, mesh_path_solid,
-                               time_between_output_files, dof_info, start_time, quantity, lower_freq[i], higher_freq[i],
+                               time_between_output_files, dof_info, dof_info_amplitude, start_time, quantity, lower_freq[i], higher_freq[i],
                                amplitude=amplitude, overwrite=overwrite)
 
     logging.info(f"\n--- High-pass visualizations saved at: {visualization_hi_pass_folder}\n")
