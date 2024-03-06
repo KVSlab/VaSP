@@ -281,7 +281,7 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
     if quantity in {"d", "v", "p"}:
         num_cols = int((end_t - start_t) / (time_between_files * stride)) - 1
     elif quantity in {"wss", "mps", "strain"}:
-        num_cols = num_ts
+        num_cols = num_ts - 1
 
     # Pre-allocate the arrays for the formatted data
     if quantity in {"v", "d"}:
