@@ -212,7 +212,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
             np.zeros((int(n_cells_fsi * 4), num_ts))
         components_data_amplitude = np.zeros_like(components_data)
         # NOTE: Fixing the window size to 250 for now. It would be better to make this a parameter.
-        window_size = 25  # This is approximately 1/4th of the value used in the spectrograms (992)
+        window_size = 250  # This is approximately 1/4th of the value used in the spectrograms (992)
         for idy in tqdm(range(components_data[0].shape[0]), desc="--- Calculating amplitude", unit=" node"):
             for component_index, component_data in enumerate(components_data):
                 components_data_amplitude[component_index][idy, :] = \
