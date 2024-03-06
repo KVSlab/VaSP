@@ -781,9 +781,9 @@ def read_command_line(input_path=None):
 
     parser.add_argument("-mgr", "--mesh-generation-retries",
                         type=int,
-                        default=2,
+                        default=4,
                         help="Number of mesh generation retries before trying to subdivide and smooth the " +
-                             "input model (default: 2)")
+                             "input model")
 
     no_solid = parser.add_mutually_exclusive_group(required=False)
     no_solid.add_argument('-ns', '--no-solid',
