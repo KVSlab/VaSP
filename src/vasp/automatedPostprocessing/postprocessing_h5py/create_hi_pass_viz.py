@@ -298,7 +298,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
                     rms_magnitude[iel, idx] = MPS
 
                 array_name = f"{viz_type_magnitude}/{viz_type_magnitude}_{idx}"
-                assert dof_info is not None
+                assert dof_info_amplitude is not None
                 for name, data in dof_info_amplitude.items():
                     dof_array = vector_data_mps.create_dataset(f"{array_name}/{name}", data=data)
                     dof_array[:] = data
