@@ -128,6 +128,11 @@ def create_hdf5(visualization_path, mesh_path, save_time_step, stride, start_tim
     d_output_path = visualization_separate_domain_folder / "d_solid.h5" if extract_solid_only \
         else visualization_separate_domain_folder / "d.h5"
 
+    # save fluid mesh as mesh.h5 for computing flow metrics indices later with VaMPy
+    mesh_save_path = visualization_separate_domain_folder / "mesh.h5"
+    with HDF5File(MPI.comm_world, str(mesh_save_path), "w") as mesh_file:
+        mesh_file.write(mesh_fluid, "mesh")
+
     # Initialize h5 file names that might differ during the loop
     h5_file_prev = None
     h5_file_prev_d = None
