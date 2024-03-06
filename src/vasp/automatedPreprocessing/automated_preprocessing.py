@@ -717,7 +717,7 @@ def read_command_line(input_path=None):
                         default=1.0,
                         type=float,
                         help="Scaling factor for HDF5 mesh. Used to scale model to [mm]. " +
-                             "Note that probes and other parameters are not scaled." +
+                             "Note that probes and other parameters are not scaled. " +
                              "Do not use in combination with --scale-factor.")
 
     parser.add_argument('-rs', '--resampling-step',
@@ -732,7 +732,7 @@ def read_command_line(input_path=None):
                         default=[0, 0.1, 0.4, 0.6],
                         help="Parameters for meshing method 'distancetospheres'. This should be given as " +
                              "four numbers for the distancetosphere scaling function: 'offset', 'scale', 'min' " +
-                             "and 'max'. For example --meshing-parameters 0 0.1 0.3 0.4" +
+                             "and 'max'. For example --meshing-parameters 0 0.1 0.3 0.4. " +
                              "Note: If --scale-factor is used, 'offset', 'min', and 'max' parameters will be " +
                              "adjusted accordingly.")
 
