@@ -5,7 +5,7 @@
 
 import argparse
 import sys
-from os import remove, path
+from pathlib import Path
 
 import numpy as np
 from morphman import get_uncapped_surface, write_polydata, get_parameters, vtk_clean_polydata, \
@@ -81,35 +81,37 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
         branch_ids_offset (int): Set offset for marking solid mesh IDs when extracting a branch.
     """
     # Get paths
-    case_name = input_model.rsplit(path.sep, 1)[-1].rsplit('.')[0]
-    dir_path = input_model.rsplit(path.sep, 1)[0]
-    print("\n--- Working on case:", case_name, "\n")
+    input_model_path = Path(input_model)
+    case_name = input_model_path.stem
+    dir_path = input_model_path.parent
+    print(f"\n--- Working on case: {case_name} \n")
 
     # Naming conventions
-    base_path = path.join(dir_path, case_name)
-    file_name_centerlines = base_path + "_centerlines.vtp"
-    file_name_refine_region_centerlines = base_path + "_refine_region_centerline.vtp"
-    file_name_region_centerlines = base_path + "_sac_centerline_{}.vtp"
-    file_name_distance_to_sphere_diam = base_path + "_distance_to_sphere_diam.vtp"
-    file_name_distance_to_sphere_const = base_path + "_distance_to_sphere_const.vtp"
-    file_name_distance_to_sphere_curv = base_path + "_distance_to_sphere_curv.vtp"
-    file_name_distance_to_sphere_spheres = base_path + "_distance_to_sphere_spheres.vtp"
-    file_name_distance_to_sphere_solid_thickness = base_path + "_distance_to_sphere_solid_thickness.vtp"
-    file_name_parameters = base_path + "_info.json"
-    file_name_probe_points = base_path + "_probe_point.json"
-    file_name_voronoi = base_path + "_voronoi.vtp"
-    file_name_voronoi_smooth = base_path + "_voronoi_smooth.vtp"
-    file_name_voronoi_surface = base_path + "_voronoi_surface.vtp"
-    file_name_surface_smooth = base_path + "_smooth.vtp"
-    file_name_model_flow_ext = base_path + "_flowext.vtp"
-    file_name_clipped_model = base_path + "_clippedmodel.vtp"
-    file_name_flow_centerlines = base_path + "_flow_cl.vtp"
-    file_name_surface_name = base_path + "_remeshed_surface.vtp"
-    file_name_xml_mesh = base_path + ".xml"
-    file_name_vtu_mesh = base_path + ".vtu"
-    file_name_hdf5_mesh = base_path + ".h5"
-    file_name_xdmf_mesh = base_path + ".xdmf"
-    file_name_edge_length_xdmf = base_path + "_edge_length.xdmf"
+    base_path = dir_path / case_name
+    file_name_centerlines = base_path.with_name(base_path.name + "_centerlines.vtp")
+    file_name_refine_region_centerlines = base_path.with_name(base_path.name + "_refine_region_centerline.vtp")
+    file_name_region_centerlines = base_path.with_name(base_path.name + "_sac_centerline_{}.vtp")
+    file_name_distance_to_sphere_diam = base_path.with_name(base_path.name + "_distance_to_sphere_diam.vtp")
+    file_name_distance_to_sphere_const = base_path.with_name(base_path.name + "_distance_to_sphere_const.vtp")
+    file_name_distance_to_sphere_curv = base_path.with_name(base_path.name + "_distance_to_sphere_curv.vtp")
+    file_name_distance_to_sphere_spheres = base_path.with_name(base_path.name + "_distance_to_sphere_spheres.vtp")
+    file_name_distance_to_sphere_solid_thickness = \
+        base_path.with_name(base_path.name + "_distance_to_sphere_solid_thickness.vtp")
+    file_name_parameters = base_path.with_name(base_path.name + "_info.json")
+    file_name_probe_points = base_path.with_name(base_path.name + "_probe_point.json")
+    file_name_voronoi = base_path.with_name(base_path.name + "_voronoi.vtp")
+    file_name_voronoi_smooth = base_path.with_name(base_path.name + "_voronoi_smooth.vtp")
+    file_name_voronoi_surface = base_path.with_name(base_path.name + "_voronoi_surface.vtp")
+    file_name_surface_smooth = base_path.with_name(base_path.name + "_smooth.vtp")
+    file_name_model_flow_ext = base_path.with_name(base_path.name + "_flowext.vtp")
+    file_name_clipped_model = base_path.with_name(base_path.name + "_clippedmodel.vtp")
+    file_name_flow_centerlines = base_path.with_name(base_path.name + "_flow_cl.vtp")
+    file_name_surface_name = base_path.with_name(base_path.name + "_remeshed_surface.vtp")
+    file_name_xml_mesh = base_path.with_suffix(".xml")
+    file_name_vtu_mesh = base_path.with_suffix(".vtu")
+    file_name_hdf5_mesh = base_path.with_suffix(".h5")
+    file_name_xdmf_mesh = base_path.with_suffix(".xdmf")
+    file_name_edge_length_xdmf = base_path.with_name(base_path.name + "_edge_length.xdmf")
     region_centerlines = None
 
     if remove_all:
@@ -123,9 +125,9 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
             file_name_model_flow_ext, file_name_clipped_model, file_name_flow_centerlines, file_name_surface_name,
             file_name_xml_mesh, file_name_vtu_mesh, file_name_hdf5_mesh, file_name_xdmf_mesh,
         ]
-        for file in files_to_remove:
-            if path.exists(file):
-                remove(file)
+        for file_path in files_to_remove:
+            if file_path.exists():
+                file_path.unlink()
 
     # Open the surface file.
     print("--- Load model file\n")
@@ -140,19 +142,19 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
     # Check if surface is closed and uncapps model if True
     is_capped = check_if_closed_surface(surface)
     if is_capped:
-        if not path.isfile(file_name_clipped_model):
+        if not file_name_clipped_model.is_file():
             print("--- Clipping the models inlets and outlets.\n")
             # Value of gradients_limit should be generally low, to detect flat surfaces corresponding
             # to closed boundaries. Area_limit will set an upper limit of the detected area, may vary between models.
             # The circleness_limit parameters determines the detected regions' similarity to a circle, often assumed
             # to be close to a circle.
             surface = get_uncapped_surface(surface, gradients_limit=0.01, area_limit=20, circleness_limit=5)
-            write_polydata(surface, file_name_clipped_model)
+            write_polydata(surface, str(file_name_clipped_model))
         else:
-            surface = read_polydata(file_name_clipped_model)
+            surface = read_polydata(str(file_name_clipped_model))
 
     # Get model parameters
-    parameters = get_parameters(base_path)
+    parameters = get_parameters(str(base_path))
 
     if "check_surface" not in parameters.keys():
         surface = vtk_clean_polydata(surface)
@@ -168,14 +170,14 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
                                 "Nan coordinates or some other shenanigans."))
         else:
             parameters["check_surface"] = True
-            write_parameters(parameters, base_path)
+            write_parameters(parameters, str(base_path))
 
     # Create a capped version of the surface
     capped_surface = vmtk_cap_polydata(surface)
 
     # Get centerlines
     print("--- Get centerlines\n")
-    inlet, outlets = get_centers_for_meshing(surface, has_multiple_inlets, base_path)
+    inlet, outlets = get_centers_for_meshing(surface, has_multiple_inlets, str(base_path))
     has_outlet = len(outlets) != 0
 
     # Get point the furthest away from the inlet when only one boundary
@@ -185,7 +187,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
     source = outlets if has_multiple_inlets else inlet
     target = inlet if has_multiple_inlets else outlets
 
-    centerlines, voronoi, _ = compute_centerlines(source, target, file_name_centerlines, capped_surface,
+    centerlines, voronoi, _ = compute_centerlines(source, target, str(file_name_centerlines), capped_surface,
                                                   resampling=resampling_step)
     print("\n")
     tol = get_centerline_tolerance(centerlines)
@@ -200,17 +202,18 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
             print("--- Region to refine ({}): {:.3f} {:.3f} {:.3f}"
                   .format(i + 1, regions[3 * i], regions[3 * i + 1], regions[3 * i + 2]))
 
-        centerline_region, _, _ = compute_centerlines(source, regions, file_name_refine_region_centerlines,
+        centerline_region, _, _ = compute_centerlines(source, regions, str(file_name_refine_region_centerlines),
                                                       capped_surface, resampling=resampling_step)
 
         # Extract the region centerline
         refine_region_centerline = []
-        info = get_parameters(base_path)
+        info = get_parameters(str(base_path))
         num_anu = info["number_of_regions"]
 
         # Compute mean distance between points
         for i in range(num_anu):
-            if not path.isfile(file_name_region_centerlines.format(i)):
+            file_name_region_centerlines_i = Path(str(file_name_region_centerlines).format(i))
+            if not file_name_region_centerlines_i.is_file():
                 line = extract_single_line(centerline_region, i)
                 locator = get_vtk_point_locator(centerlines)
                 for j in range(line.GetNumberOfPoints() - 1, 0, -1):
@@ -222,13 +225,13 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
                         break
 
                 tmp = extract_single_line(line, 0, start_id=j)
-                write_polydata(tmp, file_name_region_centerlines.format(i))
+                write_polydata(tmp, str(file_name_region_centerlines_i))
 
                 # List of VtkPolyData sac(s) centerline
                 refine_region_centerline.append(tmp)
 
             else:
-                refine_region_centerline.append(read_polydata(file_name_region_centerlines.format(i)))
+                refine_region_centerline.append(read_polydata(str(file_name_region_centerlines_i)))
 
         # Merge the sac centerline
         region_centerlines = vtk_merge_polydata(refine_region_centerline)
@@ -242,28 +245,28 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
     # Smooth surface
     if smoothing_method == "voronoi":
         print("--- Smooth surface: Voronoi smoothing\n")
-        if not path.isfile(file_name_surface_smooth):
+        if not file_name_surface_smooth.is_file():
             # Get Voronoi diagram
-            if not path.isfile(file_name_voronoi):
-                voronoi = vmtk_compute_voronoi_diagram(capped_surface, file_name_voronoi)
-                write_polydata(voronoi, file_name_voronoi)
+            if not file_name_voronoi.is_file():
+                voronoi = vmtk_compute_voronoi_diagram(capped_surface, str(file_name_voronoi))
+                write_polydata(voronoi, str(file_name_voronoi))
             else:
-                voronoi = read_polydata(file_name_voronoi)
+                voronoi = read_polydata(str(file_name_voronoi))
 
             # Get smooth Voronoi diagram
-            if not path.isfile(file_name_voronoi_smooth):
+            if not file_name_voronoi_smooth.is_file():
                 voronoi_smoothed = smooth_voronoi_diagram(voronoi, centerlines, smoothing_factor,
                                                           no_smooth_cl=region_centerlines)
-                write_polydata(voronoi_smoothed, file_name_voronoi_smooth)
+                write_polydata(voronoi_smoothed, str(file_name_voronoi_smooth))
             else:
-                voronoi_smoothed = read_polydata(file_name_voronoi_smooth)
+                voronoi_smoothed = read_polydata(str(file_name_voronoi_smooth))
 
             # Create new surface from the smoothed Voronoi
             surface_smoothed = create_new_surface(voronoi_smoothed)
 
             # Uncapp the surface
-            surface_uncapped = prepare_output_surface(surface_smoothed, surface, centerlines, file_name_voronoi_surface,
-                                                      test_merge=True)
+            surface_uncapped = prepare_output_surface(surface_smoothed, surface, centerlines,
+                                                      str(file_name_voronoi_surface), test_merge=True)
 
             # Check if there has been added new outlets
             num_outlets = centerlines.GetNumberOfLines()
@@ -271,11 +274,10 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
             num_outlets_after = len(outlets) // 3
 
             if num_outlets != num_outlets_after:
-                write_polydata(surface, file_name_surface_smooth)
-                print(("ERROR: Automatic clipping failed. You have to open {} and " +
-                       "manually clipp the branch which still is capped. " +
-                       "Overwrite the current {} and restart the script.").format(
-                    file_name_surface_smooth, file_name_surface_smooth))
+                write_polydata(surface, str(file_name_surface_smooth))
+                print(f"ERROR: Automatic clipping failed. You have to open {file_name_surface_smooth} and " +
+                      "manually clip the branch which is still capped. " +
+                      f"Overwrite the current {file_name_surface_smooth} and restart the script.")
                 sys.exit(-1)
 
             surface = surface_uncapped
@@ -284,28 +286,28 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
             surface = vmtk_smooth_surface(surface, "laplace", iterations=200)
 
             # Write surface
-            write_polydata(surface, file_name_surface_smooth)
+            write_polydata(surface, str(file_name_surface_smooth))
 
         else:
-            surface = read_polydata(file_name_surface_smooth)
+            surface = read_polydata(str(file_name_surface_smooth))
 
     elif smoothing_method in ["laplace", "taubin"]:
-        print("--- Smooth surface: {} smoothing\n".format(smoothing_method.capitalize()))
-        if not path.isfile(file_name_surface_smooth):
+        print(f"--- Smooth surface: {smoothing_method.capitalize()} smoothing\n")
+        if not file_name_surface_smooth.is_file():
             surface = vmtk_smooth_surface(surface, smoothing_method, iterations=smoothing_iterations, passband=0.1,
                                           relaxation=0.01)
 
             # Save the smoothed surface
-            write_polydata(surface, file_name_surface_smooth)
+            write_polydata(surface, str(file_name_surface_smooth))
         else:
-            surface = read_polydata(file_name_surface_smooth)
+            surface = read_polydata(str(file_name_surface_smooth))
 
     elif smoothing_method == "no_smooth" or None:
         print("--- No smoothing of surface\n")
 
     # Add flow extensions
     if add_flow_extensions:
-        if not path.isfile(file_name_model_flow_ext):
+        if not file_name_model_flow_ext.is_file():
             print("--- Adding flow extensions\n")
             # Add extension normal on boundary for models with multiple inlets
             extension = "centerlinedirection" if has_multiple_inlets else "boundarynormal"
@@ -324,9 +326,9 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
                                                   extension_length=outlet_flow_extension_length)
 
             surface_extended = vmtk_smooth_surface(surface_extended, "laplace", iterations=200)
-            write_polydata(surface_extended, file_name_model_flow_ext)
+            write_polydata(surface_extended, str(file_name_model_flow_ext))
         else:
-            surface_extended = read_polydata(file_name_model_flow_ext)
+            surface_extended = read_polydata(str(file_name_model_flow_ext))
     else:
         print("--- Not adding flow extensions\n")
         surface_extended = surface
@@ -336,23 +338,22 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
 
     # Get new centerlines with the flow extensions
     if add_flow_extensions:
-        if not path.isfile(file_name_flow_centerlines):
+        if not file_name_flow_centerlines.is_file():
             print("--- Compute the model centerlines with flow extension.\n")
             # Compute the centerlines.
             if has_outlet:
-                inlet, outlets = get_centers_for_meshing(surface_extended, has_multiple_inlets, base_path,
+                inlet, outlets = get_centers_for_meshing(surface_extended, has_multiple_inlets, str(base_path),
                                                          use_flow_extensions=True)
             else:
-                inlet, _ = get_centers_for_meshing(surface_extended, has_multiple_inlets, base_path,
+                inlet, _ = get_centers_for_meshing(surface_extended, has_multiple_inlets, str(base_path),
                                                    use_flow_extensions=True)
             # Flip outlets and inlets for models with multiple inlets
             source = outlets if has_multiple_inlets else inlet
             target = inlet if has_multiple_inlets else outlets
-            centerlines, _, _ = compute_centerlines(source, target, file_name_flow_centerlines, capped_surface,
+            centerlines, _, _ = compute_centerlines(source, target, str(file_name_flow_centerlines), capped_surface,
                                                     resampling=resampling_step)
-
         else:
-            centerlines = read_polydata(file_name_flow_centerlines)
+            centerlines = read_polydata(str(file_name_flow_centerlines))
 
     # Clip centerline if only one inlet to avoid refining model surface
     if not has_outlet:
@@ -368,26 +369,25 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
     # Choose input for the mesh
     print("--- Computing distance to sphere\n")
     if meshing_method == "constant":
-        if not path.isfile(file_name_distance_to_sphere_const):
+        if not file_name_distance_to_sphere_const.is_file():
             distance_to_sphere = dist_sphere_constant(surface_extended, centerlines, region_center, misr_max,
-                                                      file_name_distance_to_sphere_const, edge_length)
+                                                      str(file_name_distance_to_sphere_const), edge_length)
         else:
-            distance_to_sphere = read_polydata(file_name_distance_to_sphere_const)
-
+            distance_to_sphere = read_polydata(str(file_name_distance_to_sphere_const))
     elif meshing_method == "curvature":
-        if not path.isfile(file_name_distance_to_sphere_curv):
+        if not file_name_distance_to_sphere_curv.is_file():
             distance_to_sphere = dist_sphere_curvature(surface_extended, centerlines, region_center, misr_max,
-                                                       file_name_distance_to_sphere_curv, coarsening_factor)
+                                                       str(file_name_distance_to_sphere_curv), coarsening_factor)
         else:
-            distance_to_sphere = read_polydata(file_name_distance_to_sphere_curv)
+            distance_to_sphere = read_polydata(str(file_name_distance_to_sphere_curv))
     elif meshing_method == "diameter":
-        if not path.isfile(file_name_distance_to_sphere_diam):
+        if not file_name_distance_to_sphere_diam.is_file():
             distance_to_sphere = dist_sphere_diam(surface_extended, centerlines, region_center, misr_max,
-                                                  file_name_distance_to_sphere_diam, coarsening_factor)
+                                                  str(file_name_distance_to_sphere_diam), coarsening_factor)
         else:
-            distance_to_sphere = read_polydata(file_name_distance_to_sphere_diam)
+            distance_to_sphere = read_polydata(str(file_name_distance_to_sphere_diam))
     elif meshing_method == "distancetospheres":
-        if not path.isfile(file_name_distance_to_sphere_spheres):
+        if not file_name_distance_to_sphere_spheres.is_file():
             if len(meshing_parameters) == 4:
                 if scale_factor is not None:
                     meshing_parameters[0] *= scale_factor
@@ -400,11 +400,11 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
                       "given as four parameters: 'offset', 'scale', 'min' and 'max.")
                 sys.exit(-1)
         else:
-            distance_to_sphere = read_polydata(file_name_distance_to_sphere_spheres)
+            distance_to_sphere = read_polydata(str(file_name_distance_to_sphere_spheres))
 
     # Get solid thickness
     if solid_thickness == 'variable':
-        if not path.isfile(file_name_distance_to_sphere_solid_thickness):
+        if not file_name_distance_to_sphere_solid_thickness.is_file():
             if len(solid_thickness_parameters) == 4:
                 # Apply scale factor to offset, min distance, and max distance
                 if scale_factor is not None:
@@ -422,7 +422,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
                       "given as four parameters: 'offset', 'scale', 'min' and 'max.")
                 sys.exit(-1)
         else:
-            distance_to_sphere = read_polydata(file_name_distance_to_sphere_solid_thickness)
+            distance_to_sphere = read_polydata(str(file_name_distance_to_sphere_solid_thickness))
     else:
         if len(solid_thickness_parameters) != 1 or solid_thickness_parameters[0] <= 0:
             print("ERROR: Invalid parameter for constant solid thickness. This should be a " +
@@ -434,7 +434,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
                 solid_thickness_parameters[0] *= scale_factor
 
     # Compute mesh
-    if not path.isfile(file_name_vtu_mesh):
+    if not file_name_vtu_mesh.is_file():
         print("--- Generating FSI mesh\n")
 
         def try_generate_mesh(distance_to_sphere, number_of_sublayers_fluid, number_of_sublayers_solid,
@@ -476,16 +476,12 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
         assert remeshed_surface.GetNumberOfPoints() > 0, "No points in surface mesh, try to remesh."
 
         if mesh_format in ("xml", "hdf5"):
-            write_mesh(compress_mesh, file_name_surface_name, file_name_vtu_mesh, file_name_xml_mesh,
+            write_mesh(compress_mesh, str(file_name_surface_name), str(file_name_vtu_mesh), str(file_name_xml_mesh),
                        mesh, remeshed_surface)
-
-            # Add .gz to XML mesh file if compressed
-            if compress_mesh:
-                file_name_xml_mesh = file_name_xml_mesh + ".gz"
         else:
             # Write mesh in VTU format
-            write_polydata(remeshed_surface, file_name_surface_name)
-            write_polydata(mesh, file_name_vtu_mesh)
+            write_polydata(remeshed_surface, str(file_name_surface_name))
+            write_polydata(mesh, str(file_name_vtu_mesh))
 
         # Write the mesh ID's to parameter file
         parameters["solid_side_wall_id"] = solid_side_wall_id
@@ -494,9 +490,13 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
         parameters["fluid_volume_id"] = fluid_volume_id
         parameters["solid_volume_id"] = solid_volume_id
         parameters["branch_ids_offset"] = branch_ids_offset
-        write_parameters(parameters, base_path)
+        write_parameters(parameters, str(base_path))
     else:
-        mesh = read_polydata(file_name_vtu_mesh)
+        mesh = read_polydata(str(file_name_vtu_mesh))
+
+    # Add .gz to XML mesh file if compressed
+    if compress_mesh:
+        file_name_xml_mesh = Path(f"{file_name_xml_mesh}.gz")
 
     if mesh_format == "hdf5":
         print("--- Converting XML mesh to HDF5\n")
@@ -517,19 +517,19 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
         print("--- Evaluating edge length\n")
         edge_length_evaluator(file_name_xdmf_mesh, file_name_edge_length_xdmf)
 
-    network, probe_points = setup_model_network(centerlines, file_name_probe_points, region_center, verbose_print,
+    network, probe_points = setup_model_network(centerlines, str(file_name_probe_points), region_center, verbose_print,
                                                 has_multiple_inlets)
 
     # Load updated parameters following meshing
-    parameters = get_parameters(base_path)
+    parameters = get_parameters(str(base_path))
 
     print("--- Computing flow rates and flow split, and setting boundary IDs\n")
     mean_inflow_rate = compute_flow_rate(has_multiple_inlets, inlet, parameters, flow_rate_factor)
 
-    find_boundaries(base_path, mean_inflow_rate, network, mesh, verbose_print, has_multiple_inlets)
+    find_boundaries(str(base_path), mean_inflow_rate, network, mesh, verbose_print, has_multiple_inlets)
 
     # Load updated parameters after setting boundary ID's
-    parameters = get_parameters(base_path)
+    parameters = get_parameters(str(base_path))
 
     # Determine the key for inlet and outlet based on whether we have multiple inlets or not
     inlet_key = "inlet_ids" if has_multiple_inlets else "inlet_id"
@@ -540,7 +540,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
         parameters[key] = [val + 1 for val in parameters[key]]
 
     # Write parameters back to file after adjusting inlet and outlet ID's
-    write_parameters(parameters, base_path)
+    write_parameters(parameters, str(base_path))
 
     # Display the flow split at the outlets, inlet flow rate, and probes.
     if visualize:
@@ -560,9 +560,9 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
         file_name_voronoi, file_name_voronoi_smooth, file_name_voronoi_surface, file_name_surface_smooth,
         file_name_model_flow_ext, file_name_clipped_model, file_name_flow_centerlines, file_name_surface_name
     ]
-    for file in files_to_remove:
-        if path.exists(file):
-            remove(file)
+    for file_path in files_to_remove:
+        if file_path.exists():
+            file_path.unlink()
 
 
 def read_command_line(input_path=None):

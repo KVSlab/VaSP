@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from pathlib import Path
+from typing import Union
 
 import numpy as np
 import meshio
@@ -17,7 +18,7 @@ distanceToSpheresArrayName = "DistanceToSpheres"
 distanceToSpheresArrayNameSolid = "Thickness"
 
 
-def distance_to_spheres_solid_thickness(surface: vtkPolyData, save_path: str,
+def distance_to_spheres_solid_thickness(surface: vtkPolyData, save_path: Union[str, Path],
                                         distance_offset: float = 0, distance_scale: float = 0.1,
                                         min_distance: float = 0.25, max_distance: float = 0.3) -> vtkPolyData:
     """
@@ -25,7 +26,7 @@ def distance_to_spheres_solid_thickness(surface: vtkPolyData, save_path: str,
 
     Args:
         surface (vtkPolyData): Input surface model
-        save_path (str): Location to store processed surface
+        save_path (Union[str, Path]): Location to store processed surface
         distance_offset (float): Offset added to the distances
         distance_scale (float): Scale applied to the distances
         min_distance (float): Minimum value for the distances
@@ -45,12 +46,12 @@ def distance_to_spheres_solid_thickness(surface: vtkPolyData, save_path: str,
     distanceToSpheres.Execute()
     distance_to_sphere = distanceToSpheres.Surface
 
-    write_polydata(distance_to_sphere, save_path)
+    write_polydata(distance_to_sphere, str(save_path))
 
     return distance_to_sphere
 
 
-def dist_sphere_spheres(surface: vtkPolyData, save_path: str,
+def dist_sphere_spheres(surface: vtkPolyData, save_path: Union[str, Path],
                         distance_offset: float, distance_scale: float,
                         min_distance: float, max_distance: float) -> vtkPolyData:
     """
@@ -60,7 +61,7 @@ def dist_sphere_spheres(surface: vtkPolyData, save_path: str,
 
     Args:
         surface (vtkPolyData): Input surface model
-        save_path (str): Location to store processed surface
+        save_path (Union[str, Path]): Location to store processed surface
         distance_offset (float): Offset added to the distances
         distance_scale (float): Scale applied to the distances
         min_distance (float): Minimum value for the distances
@@ -98,7 +99,7 @@ def dist_sphere_spheres(surface: vtkPolyData, save_path: str,
     surfaceArrayOperation.Execute()
     distance_to_sphere = surfaceArrayOperation.Surface
 
-    write_polydata(distance_to_sphere, save_path)
+    write_polydata(distance_to_sphere, str(save_path))
 
     return distance_to_sphere
 
@@ -179,11 +180,11 @@ def generate_mesh(surface: vtkPolyData, number_of_sublayers_fluid: int, number_o
     return generated_mesh, remeshed_surface
 
 
-def convert_xml_mesh_to_hdf5(file_name_xml_mesh: str, scaling_factor: float = 1) -> None:
+def convert_xml_mesh_to_hdf5(file_name_xml_mesh: Union[str, Path], scaling_factor: float = 1) -> None:
     """Converts an XML mesh to an HDF5 mesh.
 
     Args:
-        file_name_xml_mesh (str): The name of the XML mesh file.
+        file_name_xml_mesh (Union[str, Path]): The name of the XML mesh file.
         scaling_factor (float, optional): A scaling factor to apply to the mesh coordinates.
                                           The default value is 1 (no scaling). Note that probes
                                           and parameters inside _info.json file will not be scaled
@@ -231,13 +232,13 @@ def convert_xml_mesh_to_hdf5(file_name_xml_mesh: str, scaling_factor: float = 1)
     hdf.write(domains, "/domains")
 
 
-def convert_vtu_mesh_to_xdmf(file_name_vtu_mesh: str, file_name_xdmf_mesh: str) -> None:
+def convert_vtu_mesh_to_xdmf(file_name_vtu_mesh: Union[str, Path], file_name_xdmf_mesh: Union[str, Path]) -> None:
     """
     Convert a VTU mesh to XDMF format using meshio. This function is intended to run in serial.
 
     Args:
-        file_name_vtu_mesh (str): Path to the input VTU mesh file.
-        file_name_xdmf_mesh (str): Path to the output XDMF file.
+        file_name_vtu_mesh (Union[str, Path]): Path to the input VTU mesh file.
+        file_name_xdmf_mesh (Union[str, Path]): Path to the output XDMF file.
     """
     # Load the VTU mesh
     vtu_mesh = meshio.read(file_name_vtu_mesh)
@@ -273,23 +274,24 @@ def convert_vtu_mesh_to_xdmf(file_name_vtu_mesh: str, file_name_xdmf_mesh: str) 
     print(f"Triangle mesh XDMF file written to: {triangle_xdmf_path}\n")
 
 
-def edge_length_evaluator(file_name_mesh: str, file_name_edge_length_xdmf: str) -> None:
+def edge_length_evaluator(file_name_mesh: Union[str, Path], file_name_edge_length_xdmf: Union[str, Path]) -> None:
     """
     Evaluates the edge length of a mesh.
 
     Args:
-        file_name_mesh (str): Path to the XML mesh file.
-        file_name_edge_length_xdmf (str): Path to the output XDMF file.
+        file_name_mesh (Union[str, Path]): Path to the XML mesh file.
+        file_name_edge_length_xdmf (Union[str, Path]): Path to the output XDMF file.
     """
+    file_name_mesh = Path(file_name_mesh)
+
     # Check if the XML mesh file exists
-    mesh_path = Path(file_name_mesh)
-    if not mesh_path.is_file():
-        raise FileNotFoundError(f"The file '{mesh_path}' does not exist.")
+    if not file_name_mesh.is_file():
+        raise FileNotFoundError(f"The file '{file_name_mesh}' does not exist.")
     try:
-        mesh = Mesh(file_name_mesh)
+        mesh = Mesh(str(file_name_mesh))
     except RuntimeError:
         mesh = Mesh()
-        with XDMFFile(file_name_mesh) as xdmf:
+        with XDMFFile(str(file_name_mesh)) as xdmf:
             xdmf.read(mesh)
 
     mesh.init(1)
@@ -309,5 +311,5 @@ def edge_length_evaluator(file_name_mesh: str, file_name_edge_length_xdmf: str) 
     u.vector().apply("local")
     u.rename("edge_length", "edge_length")
 
-    with XDMFFile(file_name_edge_length_xdmf) as xdmf:
+    with XDMFFile(str(file_name_edge_length_xdmf)) as xdmf:
         xdmf.write_checkpoint(u, "edge_length", 0, append=False)
