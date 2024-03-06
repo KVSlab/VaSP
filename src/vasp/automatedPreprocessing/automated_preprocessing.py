@@ -3,10 +3,10 @@
 # Copyright (c) 2023 Simula Research Laboratory
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import argparse
 import sys
 from pathlib import Path
 
+import configargparse
 import numpy as np
 from morphman import get_uncapped_surface, write_polydata, get_parameters, vtk_clean_polydata, \
     vtk_triangulate_surface, write_parameters, vmtk_cap_polydata, compute_centerlines, get_centerline_tolerance, \
@@ -574,8 +574,8 @@ def read_command_line(input_path=None):
         Args:
             input_path (str): Input file path, positional argument with default None.
     """
-    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-                                     description="Automated pre-processing for vascular modeling.")
+    parser = configargparse.ArgumentParser(formatter_class=configargparse.ArgumentDefaultsHelpFormatter,
+                                           description="Automated pre-processing for vascular modeling.")
 
     # Add common arguments
     required = input_path is None
@@ -585,6 +585,9 @@ def read_command_line(input_path=None):
                    action='store_true',
                    default=False,
                    help="Activates the verbose mode.")
+
+    parser.add_argument('--config', is_config_file=True,
+                        help='Configuration file')
 
     parser.add_argument('-i', '--input-model',
                         type=str,
