@@ -27,10 +27,10 @@ from vasp.automatedPostprocessing.postprocessing_h5py.postprocessing_common_h5py
 
 
 def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_path: Path, time_between_files: float,
-                       dof_info: Union[dict, None], dof_info_amplitude: Union[dict, None], start_t: float, quantity: str,
-                       lowcut: Union[float, List[float]] = 0, highcut: Union[float, List[float]] = 100000,
-                       amplitude: bool = False, filter_type: str = "bandpass", pass_stop_list: List[str] = [],
-                       overwrite: bool = False) -> None:
+                       dof_info: Union[dict, None], dof_info_amplitude: Union[dict, None], start_t: float,
+                       quantity: str, lowcut: Union[float, List[float]] = 0,
+                       highcut: Union[float, List[float]] = 100000, amplitude: bool = False,
+                       filter_type: str = "bandpass", pass_stop_list: List[str] = [], overwrite: bool = False) -> None:
     """
     Create high-pass visualization data.
 
@@ -586,9 +586,11 @@ def main():
         if save_deg == 1:
             mesh_path_solid = mesh_path_solid_sd1
         if quantity == "strain":
-            _, dof_info, dof_info_amplitude = create_transformed_matrix(visualization_stress_strain_folder, formatted_data_folder,
-                                                    mesh_path_solid, case_name, start_time, end_time, quantity,
-                                                    fluid_domain_id, solid_domain_id, stride)
+            _, dof_info, dof_info_amplitude = create_transformed_matrix(visualization_stress_strain_folder,
+                                                                        formatted_data_folder, mesh_path_solid,
+                                                                        case_name, start_time,
+                                                                        end_time, quantity,
+                                                                        fluid_domain_id, solid_domain_id, stride)
         else:
             # Make the output h5 files with quantity magnitudes
             create_transformed_matrix(visualization_path, formatted_data_folder, mesh_path, case_name, start_time,
@@ -610,22 +612,22 @@ def main():
         for low_freq, high_freq in zip(lower_freq, higher_freq):
             logging.info(f"\n--- Creating high-pass visualization {low_freq}-{high_freq} with amplitude...")
             create_hi_pass_viz(formatted_data_folder, visualization_hi_pass_folder, mesh_path,
-                               time_between_output_files, dof_info, dof_info_amplitude, start_time, quantity, low_freq, high_freq,
-                               amplitude=amplitude, overwrite=overwrite)
+                               time_between_output_files, dof_info, dof_info_amplitude, start_time, quantity,
+                               low_freq, high_freq, amplitude=amplitude, overwrite=overwrite)
 
         # Create multiband high-pass visualizations
         if filter_type == "multiband":
             logging.info("\n--- Creating multiband high-pass visualization with amplitude...")
             create_hi_pass_viz(formatted_data_folder, visualization_hi_pass_folder, mesh_path,
-                               time_between_output_files, dof_info, dof_info_amplitude, start_time, quantity, lower_freq, higher_freq,
-                               amplitude=amplitude, filter_type="multiband", pass_stop_list=pass_stop_list,
-                               overwrite=overwrite)
+                               time_between_output_files, dof_info, dof_info_amplitude, start_time,
+                               quantity, lower_freq, higher_freq, amplitude=amplitude, filter_type="multiband",
+                               pass_stop_list=pass_stop_list, overwrite=overwrite)
     elif quantity == "strain":
         logging.info(f"--- Creating high-pass visualizations for {quantity}...")
         for i in range(len(lower_freq)):
             create_hi_pass_viz(formatted_data_folder, visualization_hi_pass_folder, mesh_path_solid,
-                               time_between_output_files, dof_info, dof_info_amplitude, start_time, quantity, lower_freq[i], higher_freq[i],
-                               amplitude=amplitude, overwrite=overwrite)
+                               time_between_output_files, dof_info, dof_info_amplitude, start_time,
+                               quantity, lower_freq[i], higher_freq[i], amplitude=amplitude, overwrite=overwrite)
 
     logging.info(f"\n--- High-pass visualizations saved at: {visualization_hi_pass_folder}\n")
 

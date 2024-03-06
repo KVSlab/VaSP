@@ -155,7 +155,8 @@ def read_npz_files(filepath: Union[str, Path]) -> pd.DataFrame:
 def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union[str, Path],
                               mesh_path: Union[str, Path], case_name: str, start_t: float, end_t: float, quantity: str,
                               fluid_domain_id: Union[int, list[int]], solid_domain_id: Union[int, list[int]],
-                              stride: int = 1) -> Tuple[float, Optional[dict[str, np.ndarray]], Optional[dict[str, np.ndarray]]]:
+                              stride: int = 1) -> Tuple[float, Optional[dict[str, np.ndarray]],
+                                                        Optional[dict[str, np.ndarray]]]:
     """
     Create a transformed matrix from simulation data.
 
@@ -172,7 +173,8 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
         stride (int): Stride for selecting timesteps.
 
     Returns:
-        Tuple[float, dict[str, np.ndarray], dict[str, np.ndarray]]: A tuple containing the time between files, dof_info_dict,
+        Tuple[float, dict[str, np.ndarray], dict[str, np.ndarray]]:
+            A tuple containing the time between files, dof_info_dict,
     """
     logging.info(f"--- Creating matrix for case {case_name}...")
     input_path = Path(input_path)
@@ -244,7 +246,7 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
         dof_info_dict = {name: np.array(vector_data[key][:]) for name, key in zip(dof_info_name, dof_info)}
     else:
         dof_info_dict = None
-    
+
     if quantity in {"wss", "mps", "strain"}:
         xdmf_path_amplitude = input_path / xdmf_files["mps"]
         h5_ts_amplitude, _, _ = output_file_lists(xdmf_path_amplitude)
@@ -253,7 +255,8 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
         name_of_quantity_in_h5_amplitude = list(vector_data_amplitude.keys())[0]
         first_data_amplitude = name_of_quantity_in_h5_amplitude + "/" + name_of_quantity_in_h5_amplitude + "_0"
         dof_info_amplitude = [first_data_amplitude + "/" + name for name in dof_info_name]
-        dof_info_dict_amplitude = {name: np.array(vector_data_amplitude[key][:]) for name, key in zip(dof_info_name, dof_info_amplitude)}
+        dof_info_dict_amplitude = {name: np.array(vector_data_amplitude[key][:])
+                                   for name, key in zip(dof_info_name, dof_info_amplitude)}
         vector_data_amplitude.close()
     else:
         dof_info_dict_amplitude = None
