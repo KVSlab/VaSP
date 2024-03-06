@@ -583,8 +583,8 @@ def main():
             dof_info_amplitude = pickle.load(f)
     else:
         # Determine mesh paths based on save_deg
-        # if save_deg == 1:
-        mesh_path_solid = mesh_path_solid_sd1
+        if save_deg == 1:
+            mesh_path_solid = mesh_path_solid_sd1
         if quantity == "strain":
             _, dof_info, dof_info_amplitude = create_transformed_matrix(visualization_stress_strain_folder, formatted_data_folder,
                                                     mesh_path_solid, case_name, start_time, end_time, quantity,
