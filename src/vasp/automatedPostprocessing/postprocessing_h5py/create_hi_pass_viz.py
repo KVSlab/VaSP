@@ -233,10 +233,11 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
 
         elif quantity == "strain":
             # first open dof_info (dict)
-            assert dof_info is not None
-            for name, data in dof_info.items():
-                dof_array = vector_data.create_dataset(f"{array_name}/{name}", data=data)
-                dof_array[:] = data
+            if idx == 0:
+                assert dof_info is not None
+                for name, data in dof_info.items():
+                    dof_array = vector_data.create_dataset(f"{array_name}/{name}", data=data)
+                    dof_array[:] = data
 
             v_array = np.zeros((int(n_cells_fsi * 4), 9))
             v_array[:, 0] = components_data[0][:, idx]  # 11
@@ -254,10 +255,11 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
             att_type = "Tensor"
 
             if amplitude:
-                for name, data in dof_info.items():
-                    array_name = f"{viz_type_amplitude}/{viz_type_amplitude}_{idx}"
-                    dof_array = vector_data_amplitude.create_dataset(f"{array_name}/{name}", data=data)
-                    dof_array[:] = data
+                if idx == 0:
+                    for name, data in dof_info.items():
+                        array_name = f"{viz_type_amplitude}/{viz_type_amplitude}_{idx}"
+                        dof_array = vector_data_amplitude.create_dataset(f"{array_name}/{name}", data=data)
+                        dof_array[:] = data
 
                 v_array_amplitude = np.zeros((int(n_cells_fsi * 4), 9))
                 v_array_amplitude[:, 0] = components_data_amplitude[0][:, idx]  # 11
@@ -299,9 +301,10 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
 
                 array_name = f"{viz_type_magnitude}/{viz_type_magnitude}_{idx}"
                 assert dof_info_amplitude is not None
-                for name, data in dof_info_amplitude.items():
-                    dof_array = vector_data_mps.create_dataset(f"{array_name}/{name}", data=data)
-                    dof_array[:] = data
+                if idx == 0:
+                    for name, data in dof_info_amplitude.items():
+                        dof_array = vector_data_mps.create_dataset(f"{array_name}/{name}", data=data)
+                        dof_array[:] = data
                 v_array_mps = vector_data_mps.create_dataset(f"{array_name}/vector",
                                                              (int(n_cells_fsi * 4), 1))
                 v_array_mps[:, 0] = rms_magnitude[:, idx]
