@@ -157,9 +157,10 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
             output_path_amplitude.unlink()
 
     # Create H5 file
-    vector_data = h5py.File(output_path, "a")
-    vector_data_amplitude = h5py.File(output_path_amplitude, "a") if amplitude else None
-    vector_data_mps = h5py.File(output_path_magnitude, "a") if quantity == "strain" and amplitude else None
+    vector_data = h5py.File(output_path, "a", libver="latest")
+    vector_data_amplitude = h5py.File(output_path_amplitude, "a", libver="latest") if amplitude else None
+    vector_data_mps = h5py.File(output_path_magnitude, "a", libver="latest") \
+        if quantity == "strain" and amplitude else None
 
     logging.info("--- Creating mesh arrays for visualization...")
 
@@ -255,9 +256,9 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
             att_type = "Tensor"
 
             if amplitude:
+                array_name = f"{viz_type_amplitude}/{viz_type_amplitude}_{idx}"
                 if idx == 0:
                     for name, data in dof_info.items():
-                        array_name = f"{viz_type_amplitude}/{viz_type_amplitude}_{idx}"
                         dof_array = vector_data_amplitude.create_dataset(f"{array_name}/{name}", data=data)
                         dof_array[:] = data
 
