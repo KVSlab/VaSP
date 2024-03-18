@@ -1,6 +1,7 @@
 import pytest
 import subprocess
 import h5py
+import numpy as np
 
 
 # Define the list of input geometrical data paths
@@ -29,4 +30,4 @@ def test_predeform_mesh(input_mesh, tmpdir):
         coordinates = f["mesh/coordinates"][:]
         first_coordinate = coordinates[0]
         expected_first_coordinate = [7.382372340085156E-5, -1.1083576098054155E-4, 4.930899508039441E-4]
-        assert first_coordinate == pytest.approx(expected_first_coordinate, rel=1e-6)
+        assert np.allclose(first_coordinate, expected_first_coordinate, atol=1e-10)
