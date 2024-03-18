@@ -258,6 +258,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
             if amplitude:
                 array_name = f"{viz_type_amplitude}/{viz_type_amplitude}_{idx}"
                 if idx == 0:
+                    assert dof_info is not None
                     for name, data in dof_info.items():
                         dof_array = vector_data_amplitude.create_dataset(f"{array_name}/{name}", data=data)
                         dof_array[:] = data
