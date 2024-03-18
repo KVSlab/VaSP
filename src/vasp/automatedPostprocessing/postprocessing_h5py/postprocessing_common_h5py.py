@@ -647,17 +647,17 @@ def create_checkpoint_xdmf_file(num_ts: int, time_between_files: float, start_t:
         lines += f'''\
       <Grid Name="{viz_type}_{idx}" GridType="Uniform">
         <Topology NumberOfElements="{num_tetrachedra_str}" TopologyType="Tetrahedron" NodesPerElement="4">
-          <DataItem Dimensions="{num_tetrachedra_str} 4" NumberType="UInt" Format="HDF">{viz_type}.h5:{viz_type}/{viz_type}_{idx}/mesh/topology</DataItem>
+          <DataItem Dimensions="{num_tetrachedra_str} 4" NumberType="UInt" Format="HDF">{viz_type}.h5:{viz_type}/{viz_type}_0/mesh/topology</DataItem>
         </Topology>
         <Geometry GeometryType="XYZ">
           <DataItem Dimensions="{num_nodes_str} 3" Format="HDF">{viz_type}.h5:{viz_type}/{viz_type}_0/mesh/geometry</DataItem>
         </Geometry>
          <Time Value="{time_value}" />
         <Attribute ItemType="FiniteElementFunction" ElementFamily="DG" ElementDegree="1" ElementCell="tetrahedron" Name="{viz_type}" Center="Other" AttributeType="{att_type}">
-          <DataItem Dimensions="{total_num_dof_str} 1" NumberType="UInt" Format="HDF">{viz_type}.h5:{viz_type}/{viz_type}_{idx}/cell_dofs</DataItem>
+          <DataItem Dimensions="{total_num_dof_str} 1" NumberType="UInt" Format="HDF">{viz_type}.h5:{viz_type}/{viz_type}_0/cell_dofs</DataItem>
           <DataItem Dimensions="{total_num_dof_str} 1" NumberType="Float" Format="HDF">{viz_type}.h5:{viz_type}/{viz_type}_{idx}/vector</DataItem>
-          <DataItem Dimensions="{num_x_cell_dof_str} 1" NumberType="UInt" Format="HDF">{viz_type}.h5:{viz_type}/{viz_type}_{idx}/x_cell_dofs</DataItem>
-          <DataItem Dimensions="{num_tetrachedra_str} 1" NumberType="UInt" Format="HDF">{viz_type}.h5:{viz_type}/{viz_type}_{idx}/cells</DataItem>
+          <DataItem Dimensions="{num_x_cell_dof_str} 1" NumberType="UInt" Format="HDF">{viz_type}.h5:{viz_type}/{viz_type}_0/x_cell_dofs</DataItem>
+          <DataItem Dimensions="{num_tetrachedra_str} 1" NumberType="UInt" Format="HDF">{viz_type}.h5:{viz_type}/{viz_type}_0/cells</DataItem>
         </Attribute>
       </Grid>
 '''   # noqa

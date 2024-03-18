@@ -157,9 +157,10 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
             output_path_amplitude.unlink()
 
     # Create H5 file
-    vector_data = h5py.File(output_path, "a")
-    vector_data_amplitude = h5py.File(output_path_amplitude, "a") if amplitude else None
-    vector_data_mps = h5py.File(output_path_magnitude, "a") if quantity == "strain" and amplitude else None
+    vector_data = h5py.File(output_path, "a", libver="latest")
+    vector_data_amplitude = h5py.File(output_path_amplitude, "a", libver="latest") if amplitude else None
+    vector_data_mps = h5py.File(output_path_magnitude, "a", libver="latest") \
+        if quantity == "strain" and amplitude else None
 
     logging.info("--- Creating mesh arrays for visualization...")
 
@@ -233,10 +234,11 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
 
         elif quantity == "strain":
             # first open dof_info (dict)
-            assert dof_info is not None
-            for name, data in dof_info.items():
-                dof_array = vector_data.create_dataset(f"{array_name}/{name}", data=data)
-                dof_array[:] = data
+            if idx == 0:
+                assert dof_info is not None
+                for name, data in dof_info.items():
+                    dof_array = vector_data.create_dataset(f"{array_name}/{name}", data=data)
+                    dof_array[:] = data
 
             v_array = np.zeros((int(n_cells_fsi * 4), 9))
             v_array[:, 0] = components_data[0][:, idx]  # 11
@@ -254,10 +256,12 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
             att_type = "Tensor"
 
             if amplitude:
-                for name, data in dof_info.items():
-                    array_name = f"{viz_type_amplitude}/{viz_type_amplitude}_{idx}"
-                    dof_array = vector_data_amplitude.create_dataset(f"{array_name}/{name}", data=data)
-                    dof_array[:] = data
+                array_name = f"{viz_type_amplitude}/{viz_type_amplitude}_{idx}"
+                if idx == 0:
+                    assert dof_info is not None
+                    for name, data in dof_info.items():
+                        dof_array = vector_data_amplitude.create_dataset(f"{array_name}/{name}", data=data)
+                        dof_array[:] = data
 
                 v_array_amplitude = np.zeros((int(n_cells_fsi * 4), 9))
                 v_array_amplitude[:, 0] = components_data_amplitude[0][:, idx]  # 11
@@ -299,9 +303,10 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
 
                 array_name = f"{viz_type_magnitude}/{viz_type_magnitude}_{idx}"
                 assert dof_info_amplitude is not None
-                for name, data in dof_info_amplitude.items():
-                    dof_array = vector_data_mps.create_dataset(f"{array_name}/{name}", data=data)
-                    dof_array[:] = data
+                if idx == 0:
+                    for name, data in dof_info_amplitude.items():
+                        dof_array = vector_data_mps.create_dataset(f"{array_name}/{name}", data=data)
+                        dof_array[:] = data
                 v_array_mps = vector_data_mps.create_dataset(f"{array_name}/vector",
                                                              (int(n_cells_fsi * 4), 1))
                 v_array_mps[:, 0] = rms_magnitude[:, idx]
