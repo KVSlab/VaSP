@@ -4,7 +4,6 @@ import h5py
 
 
 # Define the list of input geometrical data paths
-# Since we will run turtleFSI from src/vasp/simulations/, we need to go up one level
 input_data_paths = [
     "../../../tests/test_data/cylinder/cylinder.h5"
 ]
