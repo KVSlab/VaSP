@@ -38,7 +38,8 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--stride", type=int, default=1, help="Save frequency of simulation")
     parser.add_argument("-st", "--start-time", type=float, default=None, help="Desired start time for postprocessing")
     parser.add_argument("-et", "--end-time", type=float, default=None, help="Desired end time for postprocessing")
-    parser.add_argument("--extract-solid-only", action="store_true", help="Extract solid displacement only")
+    parser.add_argument("--extract-entire-domain", action="store_true",
+                        help="Extract displacement for the entire domain")
     parser.add_argument("--log-level", type=int, default=20,
                         help="Specify the log level (default is 20, which is INFO)")
 
@@ -57,7 +58,7 @@ def create_hdf5(visualization_path, mesh_path, save_time_step, stride, start_tim
         stride: stride of the time steps to be saved
         start_t (float): desired start time for the output file
         end_t (float): desired end time for the output file
-        extracct_solid_only (bool): If True, only the solid domain is extracted for displacement.
+        extract_solid_only (bool): If True, only the solid domain is extracted for displacement.
                                     If False, both the fluid and solid domains are extracted.
         fluid_domain_id (int or list): ID of the fluid domain
         solid_domain_id (int or list): ID of the solid domain
@@ -253,8 +254,13 @@ def main() -> None:
         logging.info("--- Using non-refined mesh \n")
         assert mesh_path.exists(), f"Mesh file {mesh_path} not found."
 
+    if args.extract_entire_domain:
+        extract_solid_only = False
+    else:
+        extract_solid_only = True
+
     create_hdf5(visualization_path, mesh_path, save_time_step, args.stride,
-                args.start_time, args.end_time, args.extract_solid_only, fluid_domain_id, solid_domain_id)
+                args.start_time, args.end_time, extract_solid_only, fluid_domain_id, solid_domain_id)
 
 
 if __name__ == '__main__':
