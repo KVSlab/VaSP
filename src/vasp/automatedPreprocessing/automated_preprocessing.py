@@ -90,7 +90,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
     base_path = dir_path / case_name
     file_name_centerlines = base_path.with_name(base_path.name + "_centerlines.vtp")
     file_name_refine_region_centerlines = base_path.with_name(base_path.name + "_refine_region_centerline.vtp")
-    file_name_region_centerlines = base_path.with_name(base_path.name + "_sac_centerline_{}.vtp")
+    file_name_region_centerlines = base_path.with_name(base_path.name + "_region_centerline_{}.vtp")
     file_name_distance_to_sphere_diam = base_path.with_name(base_path.name + "_distance_to_sphere_diam.vtp")
     file_name_distance_to_sphere_const = base_path.with_name(base_path.name + "_distance_to_sphere_const.vtp")
     file_name_distance_to_sphere_curv = base_path.with_name(base_path.name + "_distance_to_sphere_curv.vtp")
@@ -197,10 +197,12 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
     misr_max = []
 
     if refine_region:
-        regions = get_regions_to_refine(capped_surface, region_points, base_path)
+        regions = get_regions_to_refine(capped_surface, region_points, str(base_path))
         for i in range(len(regions) // 3):
-            print("--- Region to refine ({}): {:.3f} {:.3f} {:.3f}"
-                  .format(i + 1, regions[3 * i], regions[3 * i + 1], regions[3 * i + 2]))
+            print(
+                f"--- Region to refine ({i + 1}): " +
+                f"{regions[3 * i]:.3f} {regions[3 * i + 1]:.3f} {regions[3 * i + 2]:.3f}\n"
+            )
 
         centerline_region, _, _ = compute_centerlines(source, regions, str(file_name_refine_region_centerlines),
                                                       capped_surface, resampling=resampling_step)
@@ -208,10 +210,10 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
         # Extract the region centerline
         refine_region_centerline = []
         info = get_parameters(str(base_path))
-        num_anu = info["number_of_regions"]
+        number_of_regions = info["number_of_regions"]
 
         # Compute mean distance between points
-        for i in range(num_anu):
+        for i in range(number_of_regions):
             file_name_region_centerlines_i = Path(str(file_name_region_centerlines).format(i))
             if not file_name_region_centerlines_i.is_file():
                 line = extract_single_line(centerline_region, i)
@@ -233,7 +235,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
             else:
                 refine_region_centerline.append(read_polydata(str(file_name_region_centerlines_i)))
 
-        # Merge the sac centerline
+        # Merge the refined region centerline
         region_centerlines = vtk_merge_polydata(refine_region_centerline)
 
         for region in refine_region_centerline:
