@@ -388,16 +388,20 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
             distance_to_sphere = read_polydata(str(file_name_distance_to_sphere_diam))
     elif meshing_method == "distancetospheres":
         if not file_name_distance_to_sphere_spheres.is_file():
-            if len(meshing_parameters) == 4:
-                if scale_factor is not None:
-                    meshing_parameters[0] *= scale_factor
-                    meshing_parameters[2] *= scale_factor
-                    meshing_parameters[3] *= scale_factor
-                distance_to_sphere = dist_sphere_spheres(surface_extended, file_name_distance_to_sphere_spheres,
-                                                         *meshing_parameters)
+            distance_to_sphere = surface_extended
+            if len(meshing_parameters) % 4 == 0:
+                times_to_run = len(meshing_parameters) // 4
+                for i in range(times_to_run):
+                    parameters = meshing_parameters[i * 4:(i + 1) * 4]
+                    if scale_factor is not None:
+                        parameters[0] *= scale_factor
+                        parameters[2] *= scale_factor
+                        parameters[3] *= scale_factor
+                    distance_to_sphere = \
+                        dist_sphere_spheres(distance_to_sphere, file_name_distance_to_sphere_spheres, *parameters)
             else:
                 print("ERROR: Invalid parameters for meshing method 'distancetospheres'. This should be " +
-                      "given as four parameters: 'offset', 'scale', 'min' and 'max.")
+                      "given as multiple of four parameters: 'offset', 'scale', 'min' and 'max.")
                 sys.exit(-1)
         else:
             distance_to_sphere = read_polydata(str(file_name_distance_to_sphere_spheres))
@@ -635,11 +639,13 @@ def read_command_line(input_path=None):
                         default="diameter",
                         help="Determines method of meshing. The method 'constant' is supplied with a constant edge " +
                              "length controlled by the -el argument, resulting in a constant density mesh. " +
-                             "The 'curvature' method and 'diameter' method produces a variable density mesh," +
-                             " based on the surface curvature and the distance from the " +
-                             "centerline to the surface, respectively. The 'distancetospheres' method allows to " +
-                             "place spheres where the cursor is pointing by pressing 'space'. By pressing 'd', the " +
-                             "surface is coloured by the distance to the spheres. By pressing 'a', a scaling " +
+                             "The 'curvature' method and 'diameter' method produces a variable density mesh, " +
+                             "based on the surface curvature and the distance from the " +
+                             "centerline to the surface, respectively. The 'distancetospheres' method produces a " +
+                             "variable density mesh based on a distance array given by user specified points " +
+                             "(spheres). Using this method will open an interactive window which allows to place " +
+                             "spheres where the cursor is pointing by pressing 'space'. By pressing 'd', the " +
+                             "surface is colored by the distance to the spheres. By pressing 'a', a scaling " +
                              "function can be specified by four parameters: 'offset', 'scale', 'min' and 'max'. " +
                              "These parameters for the scaling function can also be controlled by the -mp argument.")
 
@@ -731,10 +737,12 @@ def read_command_line(input_path=None):
                         nargs="+",
                         default=[0, 0.1, 0.4, 0.6],
                         help="Parameters for meshing method 'distancetospheres'. This should be given as " +
-                             "four numbers for the distancetosphere scaling function: 'offset', 'scale', 'min' " +
-                             "and 'max'. For example --meshing-parameters 0 0.1 0.3 0.4. " +
+                             "multiple sets of four numbers for the distancetosphere scaling function: 'offset', " +
+                             "'scale', 'min', and 'max'. Each set of four numbers corresponds to a separate run of " +
+                             "the function. For example --meshing-parameters 0 0.1 0.5 0.8 0 0.2 0.3 0.8 will run " +
+                             "the function twice. " +
                              "Note: If --scale-factor is used, 'offset', 'min', and 'max' parameters will be " +
-                             "adjusted accordingly.")
+                             "adjusted accordingly for each run.")
 
     remove_all = parser.add_mutually_exclusive_group(required=False)
     remove_all.add_argument('-ra', '--remove-all',
