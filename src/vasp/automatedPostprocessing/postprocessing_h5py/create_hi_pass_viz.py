@@ -220,7 +220,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
                     components_data_amplitude[component_index][idy, :] = \
                         calculate_windowed_rms(component_data[idy, :], window_size)
         else:
-            components_data_amplitude = components_data
+            components_data_amplitude = np.array(components_data)
 
     # 2. Loop through elements and load in the data
     for idx in tqdm(range(num_ts), desc="--- Saving data", unit=" timestep"):
