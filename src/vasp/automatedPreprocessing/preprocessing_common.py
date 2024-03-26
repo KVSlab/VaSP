@@ -8,7 +8,7 @@ import numpy as np
 import meshio
 from vtk import vtkPolyData
 from dolfin import Mesh, MeshFunction, File, HDF5File, FunctionSpace, Function, XDMFFile, cells, Edge
-from vmtk import vmtkdistancetospheres
+from vmtk import vmtkdistancetospheres, vmtkdijkstradistancetopoints
 from morphman import vmtkscripts, write_polydata
 
 from vasp.automatedPreprocessing.vmtkmeshgeneratorfsi import vmtkMeshGeneratorFsi
@@ -16,6 +16,7 @@ from vasp.automatedPreprocessing.vmtkmeshgeneratorfsi import vmtkMeshGeneratorFs
 # Global array names
 distanceToSpheresArrayName = "DistanceToSpheres"
 distanceToSpheresArrayNameSolid = "Thickness"
+dijkstraArrayName = "DijkstraDistanceToPoints"
 
 
 def distance_to_spheres_solid_thickness(surface: vtkPolyData, save_path: Union[str, Path],
@@ -53,11 +54,13 @@ def distance_to_spheres_solid_thickness(surface: vtkPolyData, save_path: Union[s
 
 def dist_sphere_spheres(surface: vtkPolyData, save_path: Union[str, Path],
                         distance_offset: float, distance_scale: float,
-                        min_distance: float, max_distance: float) -> vtkPolyData:
+                        min_distance: float, max_distance: float,
+                        distance_method: str = 'geodesic') -> vtkPolyData:
     """
     Determines the target edge length for each cell on the surface, including
     potential refinement or coarsening of certain user specified areas.
     Level of refinement/coarseness is determined based on the distance to the spheres.
+    The distance computation can be either 'euclidean' or 'geodesic' (default).
 
     Args:
         surface (vtkPolyData): Input surface model
@@ -66,17 +69,25 @@ def dist_sphere_spheres(surface: vtkPolyData, save_path: Union[str, Path],
         distance_scale (float): Scale applied to the distances
         min_distance (float): Minimum value for the distances
         max_distance (float): Maximum value for the distances
+        distance_method (str): Method to compute distances ('euclidean' or 'geodesic')
 
     Returns:
         surface (vtkPolyData): Processed surface model with info on cell specific target edge length
     """
-    distanceToSpheres = vmtkdistancetospheres.vmtkDistanceToSpheres()
+    if distance_method == 'euclidean':
+        distanceToSpheres = vmtkdistancetospheres.vmtkDistanceToSpheres()
+        distance_array_name = distanceToSpheresArrayName
+    elif distance_method == 'geodesic':
+        distanceToSpheres = vmtkdijkstradistancetopoints.vmtkDijkstraDistanceToPoints()
+        distance_array_name = dijkstraArrayName
+    else:
+        raise ValueError("Invalid distance computation method. Choose 'euclidean' or 'geodesic'.")
+
     distanceToSpheres.Surface = surface
     distanceToSpheres.DistanceOffset = distance_offset
     distanceToSpheres.DistanceScale = distance_scale
     distanceToSpheres.MinDistance = min_distance
     distanceToSpheres.MaxDistance = max_distance
-    distanceToSpheres.DistanceToSpheresArrayName = distanceToSpheresArrayName
     distanceToSpheres.Execute()
     distance_to_sphere = distanceToSpheres.Surface
 
@@ -93,7 +104,7 @@ def dist_sphere_spheres(surface: vtkPolyData, save_path: Union[str, Path],
     surfaceArrayOperation = vmtkscripts.vmtkSurfaceArrayOperation()
     surfaceArrayOperation.Surface = distance_to_sphere
     surfaceArrayOperation.InputArrayName = "Curvature"
-    surfaceArrayOperation.Input2ArrayName = distanceToSpheresArrayName
+    surfaceArrayOperation.Input2ArrayName = distance_array_name
     surfaceArrayOperation.ResultArrayName = "Size"
     surfaceArrayOperation.Operation = "multiply"
     surfaceArrayOperation.Execute()

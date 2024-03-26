@@ -34,7 +34,8 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
                        region_points, compress_mesh, scale_factor, scale_factor_h5, resampling_step, meshing_parameters,
                        remove_all, solid_thickness, solid_thickness_parameters, mesh_format, flow_rate_factor,
                        solid_side_wall_id, interface_fsi_id, solid_outer_wall_id, fluid_volume_id, solid_volume_id,
-                       mesh_generation_retries, no_solid, extract_branch, branch_group_ids, branch_ids_offset):
+                       mesh_generation_retries, no_solid, extract_branch, branch_group_ids, branch_ids_offset,
+                       distance_method):
     """
     Automatically generate mesh of surface model in .vtu and .xml format, including prescribed
     flow rates at inlet and outlet based on flow network model.
@@ -79,6 +80,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
         extract_branch (bool): Enable extraction of a specific branch, marking solid mesh IDs with an offset.
         branch_group_ids (list): Specify group IDs to extract for the branch.
         branch_ids_offset (int): Set offset for marking solid mesh IDs when extracting a branch.
+        distance_method (str): Change between 'euclidean' and 'geodesic' distance measure
     """
     # Get paths
     input_model_path = Path(input_model)
@@ -400,7 +402,8 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
                         parameters[2] *= scale_factor
                         parameters[3] *= scale_factor
                     distance_to_sphere = \
-                        dist_sphere_spheres(distance_to_sphere, file_name_distance_to_sphere_spheres, *parameters)
+                        dist_sphere_spheres(distance_to_sphere, file_name_distance_to_sphere_spheres, *parameters,
+                                            distance_method=distance_method)
             else:
                 print("ERROR: Invalid parameters for meshing method 'distancetospheres'. This should be " +
                       "given as multiple of four parameters: 'offset', 'scale', 'min' and 'max.")
@@ -746,6 +749,12 @@ def read_command_line(input_path=None):
                              "Note: If --scale-factor is used, 'offset', 'min', and 'max' parameters will be " +
                              "adjusted accordingly for each run.")
 
+    parser.add_argument('-dm', '--distance-method',
+                        type=str,
+                        choices=["euclidean", "geodesic"],
+                        default="geodesic",
+                        help="Determines method of computing distance between point of refinement and surface.")
+
     remove_all = parser.add_mutually_exclusive_group(required=False)
     remove_all.add_argument('-ra', '--remove-all',
                             action="store_true",
@@ -859,7 +868,8 @@ def read_command_line(input_path=None):
                 solid_outer_wall_id=args.solid_outer_wall_id, fluid_volume_id=args.fluid_volume_id,
                 solid_volume_id=args.solid_volume_id, mesh_generation_retries=args.mesh_generation_retries,
                 no_solid=args.no_solid, extract_branch=args.extract_branch,
-                branch_group_ids=args.branch_group_ids, branch_ids_offset=args.branch_ids_offset)
+                branch_group_ids=args.branch_group_ids, branch_ids_offset=args.branch_ids_offset,
+                distance_method=args.distance_method)
 
 
 def main_meshing():
