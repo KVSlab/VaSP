@@ -47,26 +47,26 @@ def test_refine_mesh_mpi(input_mesh, tmpdir):
     """
     Test refine_mesh function where turtleFSI is run with MPI
     """
-    # # 1. run turtleFSI to create some simulation results
+    # 1. run turtleFSI to create some simulation results
     cmd = ("mpirun -np 2 turtleFSI -p cylinder -dt 0.001 -T 0.002 --verbose True" +
            f" --theta 0.51 --folder {tmpdir} --sub-folder 1 --save-deg 2 --new-arguments mesh_path={input_mesh}")
     _ = subprocess.check_output(cmd, shell=True, cwd="src/vasp/simulations/", env=os.environ)
-    # # 2. run vasp-refine-mesh to refine the mesh
+    # 2. run vasp-refine-mesh to refine the mesh
     cmd = (f"vasp-refine-mesh --folder {tmpdir}/1/")
     _ = subprocess.check_output(cmd, shell=True)
 
-    # # check if the refined mesh exists
+    # check if the refined mesh exists
     refined_mesh_path = tmpdir / "1" / "Mesh" / "mesh_refined.h5"
     assert refined_mesh_path.exists()
 
-    # # check if the refined mesh has the correct number of nodes and cells
+    # check if the refined mesh has the correct number of nodes and cells
     with h5py.File(refined_mesh_path, "r") as f:
         num_nodes = f["mesh/coordinates"].shape[0]
         assert num_nodes == 2500
         num_cells = f["mesh/topology"].shape[0]
         assert num_cells == 13176
 
-    # # check if the number of refined cells is 8 times the number of original cells
+    # check if the number of refined cells is 8 times the number of original cells
     fsi_mesh_path = tmpdir / "1" / "Mesh" / "mesh.h5"
     with h5py.File(fsi_mesh_path, "r") as f:
         num_cells_fsi = f["mesh/topology"].shape[0]
