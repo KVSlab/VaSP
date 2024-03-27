@@ -148,7 +148,7 @@ def create_hdf5(visualization_path, mesh_path, save_time_step, stride, start_tim
     end_time = end_time if end_time is not None else timevalue_list[-1]
 
     start_time_index = int(start_time / save_time_step) - 1
-    end_time_index = int(end_time / save_time_step)
+    end_time_index = int(end_time / save_time_step) + 1
 
     # Initialize tqdm with the total number of iterations
     progress_bar = tqdm(total=end_time_index - start_time_index, desc="--- Converting data:", unit="step")
