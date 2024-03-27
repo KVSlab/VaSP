@@ -82,14 +82,10 @@ def read_command_line_spec() -> configargparse.Namespace:
                              "towards the boundary layer).")
     parser.add_argument('--n-samples', type=int, default=10000,
                         help="Number of samples to generate spectrogram data (ignored for PointList sampling).")
-    #parser.add_argument('--point-id', type=int, default=-1000000,
-    #                    help="Point ID for PointList sampling. Ignored for other sampling methods.")
-
     parser.add_argument("--point-ids", nargs="+", type=int, default=[-1000000],
                         help="Input list of points for spectrograms a list. For "
-                             "example: --point-ids 1003 1112 17560, gives you an average spectrogram for those three points"
+                             "example: --point-ids 1003 1112 17560, gives an average spectrogram for those points"
                              "Default is [-1000000].")
-
     parser.add_argument('--overlap-frac', type=float, default=0.75,
                         help="Fraction of overlap between adjacent windows.")
     parser.add_argument('--window', type=str, default="blackmanharris",
@@ -209,7 +205,6 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
 
     image_folder = folder_path / "Spectrograms"
     image_folder.mkdir(parents=True, exist_ok=True)
-    
 
     logging.info("\n--- Processing data and getting ID's")
 
@@ -289,17 +284,17 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
     # for "all" components, we read in each component from npz file (creating this file if it doesnt exist)
     # then we append all component dataframes together to create a spectrogram representing all components
     if component == "all":
-        component_list = ["x","y","z"]
+        component_list = ["x", "y", "z"]
     else:
-        component_list = [component] # if only one component selected (mag, x, y, or z)
-    
-    for id_comp,component_name in enumerate(component_list):
+        component_list = [component]  # if only one component selected (mag, x, y, or z)
+
+    for id_comp, component_name in enumerate(component_list):
 
         output_file_name = f"{quantity}_{component_name}.npz"
         formatted_data_path = formatted_data_folder / output_file_name
 
         logging.info("--- Preparing data")
-    
+
         # If the output file exists, don't re-make it
         if formatted_data_path.exists():
             logging.info(f'--- Formatted data already exists at: {formatted_data_path}\n')
@@ -311,18 +306,18 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
                 # Make the output h5 files with quantity magnitudes
                 create_transformed_matrix(visualization_path, formatted_data_folder, mesh_path,
                                           case_name, start_t, end_t, quantity, fluid_domain_id, solid_domain_id, stride)
-    
+
         logging.info("--- Reading data")
-    
+
         # Read in data for selected component
         df = read_npz_files(formatted_data_path)
         df = df.iloc[idx_sampled]
-        
+
         # for first component
         if id_comp == 0:
-            df_selected_components=df.copy()
-        else: # if "all" components selected
-            df_selected_components = df_selected_components._append(df)  
+            df_selected_components = df.copy()
+        else:  # if "all" components selected
+            df_selected_components = df_selected_components._append(df)
 
     return quantity_component_name, df_selected_components, case_name, image_folder, visualization_hi_pass_folder
 
@@ -834,14 +829,14 @@ def sonify_point(case_name: str, quantity: str, df, start_t: float, end_t: float
 
     # High-pass filter dataframe for spectrogram
     df_filtered = filter_time_data(df, fs, lowcut=lowcut, highcut=15000.0, order=6, btype='highpass')
-    
+
     num_points = df_filtered.shape[0]
     max_val_df = np.max(df_filtered)
     y2 = np.zeros(df_filtered.shape[1])
     for i in range(num_points):
-        y2 += df_filtered.iloc[i] / max_val_df # Add waveforms for each point together, normalized by overall max value
+        y2 += df_filtered.iloc[i] / max_val_df  # Add waveforms for each point together, normalized by overall max value
 
-    y2 = y2 / num_points # Normalize by number of points
+    y2 = y2 / num_points  # Normalize by number of points
 
     sound_filename = f"{quantity}_sound_{case_name}.wav"
     path_to_sound = Path(image_folder) / sound_filename
