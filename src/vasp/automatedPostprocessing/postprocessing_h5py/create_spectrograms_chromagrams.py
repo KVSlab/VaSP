@@ -246,7 +246,7 @@ def main():
                                  image_folder, flow_rate_file=None, amplitude_file=None, power_scaled=False,
                                  ylim=args.ylim)
 
-    if args.sampling_method == "SinglePoint":
+    if args.sampling_method == "PointList":
         spec.sonify_point(case_name, quantity, df, args.start_time, end_time, args.overlap_frac, args.lowcut,
                           image_folder)
 

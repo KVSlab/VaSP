@@ -77,13 +77,13 @@ def read_command_line_spec() -> configargparse.Namespace:
                         help="Component of the data to visualize. Choose 'x', 'y', 'z', or 'mag' (magnitude).")
     parser.add_argument('--sampling-method', type=str, default="RandomPoint",
                         help="Sampling method for spectrogram generation. Choose from 'RandomPoint' (random nodes), "
-                             "'SinglePoint' (single point specified by '--point-id'), or 'Spatial' (ensures uniform "
+                             "'PointList' (single point specified by '--point-id'), or 'Spatial' (ensures uniform "
                              "spatial sampling, e.g., in the case of fluid boundary layer, the sampling will not bias "
                              "towards the boundary layer).")
     parser.add_argument('--n-samples', type=int, default=10000,
-                        help="Number of samples to generate spectrogram data (ignored for SinglePoint sampling).")
+                        help="Number of samples to generate spectrogram data (ignored for PointList sampling).")
     #parser.add_argument('--point-id', type=int, default=-1000000,
-    #                    help="Point ID for SinglePoint sampling. Ignored for other sampling methods.")
+    #                    help="Point ID for PointList sampling. Ignored for other sampling methods.")
 
     parser.add_argument("--point-ids", nargs="+", type=int, default=[-1000000],
                         help="Input list of points for spectrograms a list. For "
@@ -183,8 +183,8 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
         quantity (str): Quantity to postprocess.
         interface_only (bool): Whether to include only interface ID's.
         component (str): Component of the data to be visualized.
-        point_ids (int): List of Point IDs (used when sampling_method="SinglePoint").
-        sampling_method (str): Method for sampling data ("RandomPoint", "SinglePoint", or "Spatial").
+        point_ids (int): List of Point IDs (used when sampling_method="PointList").
+        sampling_method (str): Method for sampling data ("RandomPoint", "PointList", or "Spatial").
         fluid_domain_id (int or list): ID of the fluid domain
         solid_domain_id (int or list): ID of the solid domain
 
@@ -292,21 +292,23 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
 
     if sampling_method == "RandomPoint":
         idx_sampled = np.random.choice(region_ids, n_samples)
-    elif sampling_method == "SinglePoint":
+        quantity = f"{quantity}_{component}_n_samples_{n_samples}"
+    elif sampling_method == "PointList":
         idx_sampled = np.array(point_ids)
         case_name = f"{case_name}_{sampling_method}_{point_ids}"
+        quantity = f"{quantity}_{component}"
         logging.info(f"--- Single Point spectrogram for point: {point_ids}")
     elif sampling_method == "Spatial":
         # See old code for implementation if needed
         raise NotImplementedError("Spatial sampling method is not implemented.")
     else:
         raise ValueError(f"Invalid sampling method: {sampling_method}. Please choose from 'RandomPoint', "
-                         "'SinglePoint', or 'Spatial'.")
+                         "'PointList', or 'Spatial'.")
 
     logging.info("--- Obtained sample points\n")
 
     df = df.iloc[idx_sampled]
-    quantity = f"{quantity}_{component}_n_samples_{n_samples}"
+    
 
     return quantity, df, case_name, image_folder, visualization_hi_pass_folder
 
@@ -827,7 +829,7 @@ def sonify_point(case_name: str, quantity: str, df, start_t: float, end_t: float
 
     y2 = y2 / num_points # Normalize
 
-    sound_filename = f"{quantity}_sound_{y2.name}_{case_name}.wav"
+    sound_filename = f"{quantity}_sound_{case_name}.wav"
     path_to_sound = Path(image_folder) / sound_filename
 
     wavfile.write(path_to_sound, int(fs), y2)
