@@ -209,28 +209,7 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
 
     image_folder = folder_path / "Spectrograms"
     image_folder.mkdir(parents=True, exist_ok=True)
-
-    output_file_name = f"{quantity}_{component}.npz"
-    formatted_data_path = formatted_data_folder / output_file_name
-
-    logging.info("--- Preparing data")
-
-    # If the output file exists, don't re-make it
-    if formatted_data_path.exists():
-        logging.info(f'--- Formatted data already exists at: {formatted_data_path}\n')
-    else:
-        if quantity == "wss":
-            create_transformed_matrix(visualization_separate_domain_folder, formatted_data_folder, mesh_path_fluid,
-                                      case_name, start_t, end_t, quantity, fluid_domain_id, solid_domain_id, stride)
-        else:
-            # Make the output h5 files with quantity magnitudes
-            create_transformed_matrix(visualization_path, formatted_data_folder, mesh_path,
-                                      case_name, start_t, end_t, quantity, fluid_domain_id, solid_domain_id, stride)
-
-    logging.info("--- Reading data")
-
-    # For spectrograms, we only want the magnitude
-    df = read_npz_files(formatted_data_path)
+    
 
     logging.info("\n--- Processing data and getting ID's")
 
@@ -292,11 +271,11 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
 
     if sampling_method == "RandomPoint":
         idx_sampled = np.random.choice(region_ids, n_samples)
-        quantity = f"{quantity}_{component}_n_samples_{n_samples}"
+        quantity_component_name = f"{quantity}_{component}_n_samples_{n_samples}"
     elif sampling_method == "PointList":
         idx_sampled = np.array(point_ids)
         case_name = f"{case_name}_{sampling_method}_{point_ids}"
-        quantity = f"{quantity}_{component}"
+        quantity_component_name = f"{quantity}_{component}"
         logging.info(f"--- Single Point spectrogram for point: {point_ids}")
     elif sampling_method == "Spatial":
         # See old code for implementation if needed
@@ -305,12 +284,47 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
         raise ValueError(f"Invalid sampling method: {sampling_method}. Please choose from 'RandomPoint', "
                          "'PointList', or 'Spatial'.")
 
-    logging.info("--- Obtained sample points\n")
+    logging.info("--- Obtained sample point IDs\n")
 
-    df = df.iloc[idx_sampled]
+    # for "all" components, we read in each component from npz file (creating this file if it doesnt exist)
+    # then we append all component dataframes together to create a spectrogram representing all components
+    if component == "all":
+        component_list = ["x","y","z"]
+    else:
+        component_list = [component] # if only one component selected (mag, x, y, or z)
     
+    for id_comp,component_name in enumerate(component_list):
 
-    return quantity, df, case_name, image_folder, visualization_hi_pass_folder
+        output_file_name = f"{quantity}_{component_name}.npz"
+        formatted_data_path = formatted_data_folder / output_file_name
+
+        logging.info("--- Preparing data")
+    
+        # If the output file exists, don't re-make it
+        if formatted_data_path.exists():
+            logging.info(f'--- Formatted data already exists at: {formatted_data_path}\n')
+        else:
+            if quantity == "wss":
+                create_transformed_matrix(visualization_separate_domain_folder, formatted_data_folder, mesh_path_fluid,
+                                          case_name, start_t, end_t, quantity, fluid_domain_id, solid_domain_id, stride)
+            else:
+                # Make the output h5 files with quantity magnitudes
+                create_transformed_matrix(visualization_path, formatted_data_folder, mesh_path,
+                                          case_name, start_t, end_t, quantity, fluid_domain_id, solid_domain_id, stride)
+    
+        logging.info("--- Reading data")
+    
+        # Read in data for selected component
+        df = read_npz_files(formatted_data_path)
+        df = df.iloc[idx_sampled]
+        
+        # for first component
+        if id_comp == 0:
+            df_selected_components=df.copy()
+        else: # if "all" components selected
+            df_selected_components = df_selected_components._append(df)  
+
+    return quantity_component_name, df_selected_components, case_name, image_folder, visualization_hi_pass_folder
 
 
 def find_points_in_sphere(center: np.ndarray, radius: float, coords: np.ndarray) -> np.ndarray:
@@ -825,9 +839,9 @@ def sonify_point(case_name: str, quantity: str, df, start_t: float, end_t: float
     max_val_df = np.max(df_filtered)
     y2 = np.zeros(df_filtered.shape[1])
     for i in range(num_points):
-        y2 += df_filtered.iloc[i] / max_val_df # Add waveforms for each point together
+        y2 += df_filtered.iloc[i] / max_val_df # Add waveforms for each point together, normalized by overall max value
 
-    y2 = y2 / num_points # Normalize
+    y2 = y2 / num_points # Normalize by number of points
 
     sound_filename = f"{quantity}_sound_{case_name}.wav"
     path_to_sound = Path(image_folder) / sound_filename
