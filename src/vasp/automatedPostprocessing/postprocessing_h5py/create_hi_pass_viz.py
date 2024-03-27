@@ -156,6 +156,10 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
             logging.debug(f"--- The file at {output_path_amplitude} already exists; overwriting.")
             output_path_amplitude.unlink()
 
+        if quantity == "strain" and output_path_magnitude.exists() and overwrite:
+            logging.debug(f"--- The file at {output_path_amplitude} already exists; overwriting.")
+            output_path_magnitude.unlink()
+
     # Create H5 file
     vector_data = h5py.File(output_path, "a", libver="latest")
     vector_data_amplitude = h5py.File(output_path_amplitude, "a", libver="latest") if amplitude else None
@@ -233,7 +237,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
             if amplitude:
                 v_array_amplitude = vector_data_amplitude.create_dataset(array_name, (n_nodes_fsi, 1))
                 v_array_amplitude[:, 0] = components_data_amplitude[0][:, idx]
-                rms_magnitude[:, idx] = components_data[0][:, idx]
+                rms_magnitude[:, idx] = components_data_amplitude[0][:, idx]
 
         elif quantity == "strain":
             # first open dof_info (dict)
@@ -553,15 +557,18 @@ def main():
     # Visualization folder for separate domains
     visualization_separate_domain_folder = folder / "Visualization_separate_domain"
 
-    try:
-        file_path_d = visualization_separate_domain_folder / "d_solid.h5"
-        assert file_path_d.exists(), f"Displacement file {file_path_d} not found."
-        logging.info("--- displacement is for the solid domain only \n")
-    except AssertionError:
-        file_path_d = visualization_separate_domain_folder / "d.h5"
-        assert file_path_d.exists(), f"Displacement file {file_path_d} not found."
-        logging.info("--- displacement is for the entire domain \n")
-        mesh_path_solid = mesh_path
+    # In case of strain, modify the path to the solid mesh as the strain might be
+    # computed for the solid domain only
+    if quantity == "strain":
+        try:
+            file_path_d = visualization_separate_domain_folder / "d_solid.h5"
+            assert file_path_d.exists(), f"Displacement file {file_path_d} not found."
+            logging.info("--- displacement is for the solid domain only \n")
+        except AssertionError:
+            file_path_d = visualization_separate_domain_folder / "d.h5"
+            assert file_path_d.exists(), f"Displacement file {file_path_d} not found."
+            logging.info("--- displacement is for the entire domain \n")
+            mesh_path_solid = mesh_path
 
     # Visualization folder for stress and strain
     visualization_stress_strain_folder = folder / "StressStrain"
