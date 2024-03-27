@@ -82,8 +82,14 @@ def read_command_line_spec() -> configargparse.Namespace:
                              "towards the boundary layer).")
     parser.add_argument('--n-samples', type=int, default=10000,
                         help="Number of samples to generate spectrogram data (ignored for SinglePoint sampling).")
-    parser.add_argument('--point-id', type=int, default=-1000000,
-                        help="Point ID for SinglePoint sampling. Ignored for other sampling methods.")
+    #parser.add_argument('--point-id', type=int, default=-1000000,
+    #                    help="Point ID for SinglePoint sampling. Ignored for other sampling methods.")
+
+    parser.add_argument("--point-ids", nargs="+", type=int, default=[-1000000],
+                        help="Input list of points for spectrograms a list. For "
+                             "example: --point-ids 1003 1112 17560, gives you an average spectrogram for those three points"
+                             "Default is [-1000000].")
+
     parser.add_argument('--overlap-frac', type=float, default=0.75,
                         help="Fraction of overlap between adjacent windows.")
     parser.add_argument('--window', type=str, default="blackmanharris",
@@ -154,7 +160,7 @@ def read_command_line_spec() -> configargparse.Namespace:
 def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path], save_deg: int, stride: int,
                           start_t: float, end_t: float, n_samples: int, sampling_region: str,
                           fluid_sampling_domain_id: int, solid_sampling_domain_id: int, fsi_region: list[float],
-                          quantity: str, interface_only: bool, component: str, point_id: int,
+                          quantity: str, interface_only: bool, component: str, point_ids: list[int],
                           fluid_domain_id: Union[int, list[int]], solid_domain_id: Union[int, list[int]],
                           sampling_method: str = "RandomPoint"):
     """
@@ -177,7 +183,7 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
         quantity (str): Quantity to postprocess.
         interface_only (bool): Whether to include only interface ID's.
         component (str): Component of the data to be visualized.
-        point_id (int): Point ID (used when sampling_method="SinglePoint").
+        point_ids (int): List of Point IDs (used when sampling_method="SinglePoint").
         sampling_method (str): Method for sampling data ("RandomPoint", "SinglePoint", or "Spatial").
         fluid_domain_id (int or list): ID of the fluid domain
         solid_domain_id (int or list): ID of the solid domain
@@ -287,9 +293,9 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
     if sampling_method == "RandomPoint":
         idx_sampled = np.random.choice(region_ids, n_samples)
     elif sampling_method == "SinglePoint":
-        idx_sampled = np.array([point_id])
-        case_name = f"{case_name}_{sampling_method}_{point_id}"
-        logging.info(f"--- Single Point spectrogram for point: {point_id}")
+        idx_sampled = np.array(point_ids)
+        case_name = f"{case_name}_{sampling_method}_{point_ids}"
+        logging.info(f"--- Single Point spectrogram for point: {point_ids}")
     elif sampling_method == "Spatial":
         # See old code for implementation if needed
         raise NotImplementedError("Spatial sampling method is not implemented.")
@@ -812,8 +818,14 @@ def sonify_point(case_name: str, quantity: str, df, start_t: float, end_t: float
 
     # High-pass filter dataframe for spectrogram
     df_filtered = filter_time_data(df, fs, lowcut=lowcut, highcut=15000.0, order=6, btype='highpass')
+    
+    num_points = df_filtered.shape[0]
+    max_val_df = np.max(df_filtered)
+    y2 = np.zeros(df_filtered.shape[1])
+    for i in range(num_points):
+        y2 += df_filtered.iloc[i] / max_val_df # Add waveforms for each point together
 
-    y2 = df_filtered.iloc[0] / np.max(df_filtered.iloc[0])
+    y2 = y2 / num_points # Normalize
 
     sound_filename = f"{quantity}_sound_{y2.name}_{case_name}.wav"
     path_to_sound = Path(image_folder) / sound_filename

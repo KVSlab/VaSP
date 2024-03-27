@@ -233,7 +233,7 @@ def main():
         spec.read_spectrogram_data(args.folder, args.mesh_path, save_deg, args.stride, args.start_time,
                                    end_time, args.n_samples, args.sampling_region, args.fluid_sampling_domain_id,
                                    args.solid_sampling_domain_id, fsi_region, args.quantity, args.interface_only,
-                                   args.component, args.point_id, fluid_domain_id, solid_domain_id,
+                                   args.component, args.point_ids, fluid_domain_id, solid_domain_id,
                                    sampling_method=args.sampling_method)
 
     # Should these files be used?
