@@ -74,16 +74,19 @@ def read_command_line_spec() -> configargparse.Namespace:
                              "spectrogram will be generated; otherwise, the volumetric spectrogram will include all "
                              "fluid in the sac or all nodes through the wall.")
     parser.add_argument('--component', type=str, default="mag",
-                        help="Component of the data to visualize. Choose 'x', 'y', 'z', or 'mag' (magnitude).")
+                        help="Component of the data to visualize. Choose 'x', 'y', 'z', 'mag' (magnitude) or 'all' "
+                             "(to combine all components).")
     parser.add_argument('--sampling-method', type=str, default="RandomPoint",
                         help="Sampling method for spectrogram generation. Choose from 'RandomPoint' (random nodes), "
-                             "'SinglePoint' (single point specified by '--point-id'), or 'Spatial' (ensures uniform "
+                             "'PointList' (list of points specified by '--point-ids'), or 'Spatial' (ensures uniform "
                              "spatial sampling, e.g., in the case of fluid boundary layer, the sampling will not bias "
                              "towards the boundary layer).")
     parser.add_argument('--n-samples', type=int, default=10000,
-                        help="Number of samples to generate spectrogram data (ignored for SinglePoint sampling).")
-    parser.add_argument('--point-id', type=int, default=-1000000,
-                        help="Point ID for SinglePoint sampling. Ignored for other sampling methods.")
+                        help="Number of samples to generate spectrogram data (ignored for PointList sampling).")
+    parser.add_argument("--point-ids", nargs="+", type=int, default=[-1000000],
+                        help="Input list of points for spectrograms a list. For "
+                             "example: --point-ids 1003 1112 17560, gives an average spectrogram for those points"
+                             "Default is [-1000000].")
     parser.add_argument('--overlap-frac', type=float, default=0.75,
                         help="Fraction of overlap between adjacent windows.")
     parser.add_argument('--window', type=str, default="blackmanharris",
@@ -154,7 +157,7 @@ def read_command_line_spec() -> configargparse.Namespace:
 def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path], save_deg: int, stride: int,
                           start_t: float, end_t: float, n_samples: int, sampling_region: str,
                           fluid_sampling_domain_id: int, solid_sampling_domain_id: int, fsi_region: list[float],
-                          quantity: str, interface_only: bool, component: str, point_id: int,
+                          quantity: str, interface_only: bool, component: str, point_ids: list[int],
                           fluid_domain_id: Union[int, list[int]], solid_domain_id: Union[int, list[int]],
                           sampling_method: str = "RandomPoint"):
     """
@@ -177,8 +180,8 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
         quantity (str): Quantity to postprocess.
         interface_only (bool): Whether to include only interface ID's.
         component (str): Component of the data to be visualized.
-        point_id (int): Point ID (used when sampling_method="SinglePoint").
-        sampling_method (str): Method for sampling data ("RandomPoint", "SinglePoint", or "Spatial").
+        point_ids (int): List of Point IDs (used when sampling_method="PointList").
+        sampling_method (str): Method for sampling data ("RandomPoint", "PointList", or "Spatial").
         fluid_domain_id (int or list): ID of the fluid domain
         solid_domain_id (int or list): ID of the solid domain
 
@@ -203,28 +206,6 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
 
     image_folder = folder_path / "Spectrograms"
     image_folder.mkdir(parents=True, exist_ok=True)
-
-    output_file_name = f"{quantity}_{component}.npz"
-    formatted_data_path = formatted_data_folder / output_file_name
-
-    logging.info("--- Preparing data")
-
-    # If the output file exists, don't re-make it
-    if formatted_data_path.exists():
-        logging.info(f'--- Formatted data already exists at: {formatted_data_path}\n')
-    else:
-        if quantity == "wss":
-            create_transformed_matrix(visualization_separate_domain_folder, formatted_data_folder, mesh_path_fluid,
-                                      case_name, start_t, end_t, quantity, fluid_domain_id, solid_domain_id, stride)
-        else:
-            # Make the output h5 files with quantity magnitudes
-            create_transformed_matrix(visualization_path, formatted_data_folder, mesh_path,
-                                      case_name, start_t, end_t, quantity, fluid_domain_id, solid_domain_id, stride)
-
-    logging.info("--- Reading data")
-
-    # For spectrograms, we only want the magnitude
-    df = read_npz_files(formatted_data_path)
 
     logging.info("\n--- Processing data and getting ID's")
 
@@ -286,23 +267,60 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
 
     if sampling_method == "RandomPoint":
         idx_sampled = np.random.choice(region_ids, n_samples)
-    elif sampling_method == "SinglePoint":
-        idx_sampled = np.array([point_id])
-        case_name = f"{case_name}_{sampling_method}_{point_id}"
-        logging.info(f"--- Single Point spectrogram for point: {point_id}")
+        quantity_component_name = f"{quantity}_{component}_n_samples_{n_samples}"
+    elif sampling_method == "PointList":
+        idx_sampled = np.array(point_ids)
+        case_name = f"{case_name}_{sampling_method}_{point_ids}"
+        quantity_component_name = f"{quantity}_{component}"
+        logging.info(f"--- Single Point spectrogram for point: {point_ids}")
     elif sampling_method == "Spatial":
         # See old code for implementation if needed
         raise NotImplementedError("Spatial sampling method is not implemented.")
     else:
         raise ValueError(f"Invalid sampling method: {sampling_method}. Please choose from 'RandomPoint', "
-                         "'SinglePoint', or 'Spatial'.")
+                         "'PointList', or 'Spatial'.")
 
-    logging.info("--- Obtained sample points\n")
+    logging.info("--- Obtained sample point IDs\n")
 
-    df = df.iloc[idx_sampled]
-    quantity = f"{quantity}_{component}_n_samples_{n_samples}"
+    # for "all" components, we read in each component from npz file (creating this file if it doesnt exist)
+    # then we append all component dataframes together to create a spectrogram representing all components
+    if component == "all":
+        component_list = ["x", "y", "z"]
+    else:
+        component_list = [component]  # if only one component selected (mag, x, y, or z)
 
-    return quantity, df, case_name, image_folder, visualization_hi_pass_folder
+    for id_comp, component_name in enumerate(component_list):
+
+        output_file_name = f"{quantity}_{component_name}.npz"
+        formatted_data_path = formatted_data_folder / output_file_name
+
+        logging.info("--- Preparing data")
+
+        # If the output file exists, don't re-make it
+        if formatted_data_path.exists():
+            logging.info(f'--- Formatted data already exists at: {formatted_data_path}\n')
+        else:
+            if quantity == "wss":
+                create_transformed_matrix(visualization_separate_domain_folder, formatted_data_folder, mesh_path_fluid,
+                                          case_name, start_t, end_t, quantity, fluid_domain_id, solid_domain_id, stride)
+            else:
+                # Make the output h5 files with quantity magnitudes
+                create_transformed_matrix(visualization_path, formatted_data_folder, mesh_path,
+                                          case_name, start_t, end_t, quantity, fluid_domain_id, solid_domain_id, stride)
+
+        logging.info("--- Reading data")
+
+        # Read in data for selected component
+        df = read_npz_files(formatted_data_path)
+        df = df.iloc[idx_sampled]
+
+        # for first component
+        if id_comp == 0:
+            df_selected_components = df.copy()
+        else:  # if "all" components selected
+            df_selected_components = df_selected_components._append(df)
+
+    return quantity_component_name, df_selected_components, case_name, image_folder, visualization_hi_pass_folder
 
 
 def find_points_in_sphere(center: np.ndarray, radius: float, coords: np.ndarray) -> np.ndarray:
@@ -813,9 +831,15 @@ def sonify_point(case_name: str, quantity: str, df, start_t: float, end_t: float
     # High-pass filter dataframe for spectrogram
     df_filtered = filter_time_data(df, fs, lowcut=lowcut, highcut=15000.0, order=6, btype='highpass')
 
-    y2 = df_filtered.iloc[0] / np.max(df_filtered.iloc[0])
+    num_points = df_filtered.shape[0]
+    max_val_df = np.max(df_filtered)
+    y2 = np.zeros(df_filtered.shape[1])
+    for i in range(num_points):
+        y2 += df_filtered.iloc[i] / max_val_df  # Add waveforms for each point together, normalized by overall max value
 
-    sound_filename = f"{quantity}_sound_{y2.name}_{case_name}.wav"
+    y2 = y2 / num_points  # Normalize by number of points
+
+    sound_filename = f"{quantity}_sound_{case_name}.wav"
     path_to_sound = Path(image_folder) / sound_filename
 
     wavfile.write(path_to_sound, int(fs), y2)
