@@ -74,10 +74,11 @@ def read_command_line_spec() -> configargparse.Namespace:
                              "spectrogram will be generated; otherwise, the volumetric spectrogram will include all "
                              "fluid in the sac or all nodes through the wall.")
     parser.add_argument('--component', type=str, default="mag",
-                        help="Component of the data to visualize. Choose 'x', 'y', 'z', or 'mag' (magnitude).")
+                        help="Component of the data to visualize. Choose 'x', 'y', 'z', 'mag' (magnitude) or 'all' "
+                             "(to combine all components).")
     parser.add_argument('--sampling-method', type=str, default="RandomPoint",
                         help="Sampling method for spectrogram generation. Choose from 'RandomPoint' (random nodes), "
-                             "'PointList' (single point specified by '--point-id'), or 'Spatial' (ensures uniform "
+                             "'PointList' (list of points specified by '--point-ids'), or 'Spatial' (ensures uniform "
                              "spatial sampling, e.g., in the case of fluid boundary layer, the sampling will not bias "
                              "towards the boundary layer).")
     parser.add_argument('--n-samples', type=int, default=10000,
