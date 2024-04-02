@@ -53,10 +53,6 @@ Post-processing scripts
    :members:
    :undoc-members:
 
-.. automodule:: vasp.automatedPostprocessing.postprocessing_h5py.create_spectrogram_from_components
-   :members:
-   :undoc-members:
-
 .. automodule:: vasp.automatedPostprocessing.postprocessing_h5py.create_spectrograms_chromagrams
    :members:
    :undoc-members:
