@@ -396,14 +396,13 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
             if len(meshing_parameters) % 4 == 0:
                 times_to_run = len(meshing_parameters) // 4
                 for i in range(times_to_run):
-                    parameters = meshing_parameters[i * 4:(i + 1) * 4]
+                    meshing_params = meshing_parameters[i * 4:(i + 1) * 4]
                     if scale_factor is not None:
-                        parameters[0] *= scale_factor
-                        parameters[2] *= scale_factor
-                        parameters[3] *= scale_factor
-                    distance_to_sphere = \
-                        dist_sphere_spheres(distance_to_sphere, file_name_distance_to_sphere_spheres, *parameters,
-                                            distance_method=distance_method)
+                        meshing_params[0] *= scale_factor
+                        meshing_params[2] *= scale_factor
+                        meshing_params[3] *= scale_factor
+                    distance_to_sphere = dist_sphere_spheres(distance_to_sphere, file_name_distance_to_sphere_spheres,
+                                                             *meshing_params, distance_method=distance_method)
             else:
                 print("ERROR: Invalid parameters for meshing method 'distancetospheres'. This should be " +
                       "given as multiple of four parameters: 'offset', 'scale', 'min' and 'max.")
