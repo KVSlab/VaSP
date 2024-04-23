@@ -14,14 +14,15 @@ from pathlib import Path
 import argparse
 
 from dolfin import Mesh, HDF5File, VectorFunctionSpace, Function, MPI, parameters, XDMFFile, TrialFunction, \
-    TestFunction, inner, ds, assemble, FacetNormal, sym, project, FunctionSpace, PETScDMCollection, grad, \
-    LUSolver, FunctionAssigner, BoundaryMesh, sqrt, Constant, dx, as_backend_type, IndexMap, assign
+    TestFunction, inner, ds, assemble, FacetNormal, sym, FunctionSpace, PETScDMCollection, grad, \
+    LUSolver, FunctionAssigner, BoundaryMesh
 
 from vampy.automatedPostprocessing.postprocessing_common import get_dataset_names
 from vasp.automatedPostprocessing.postprocessing_common import read_parameters_from_file
 from vasp.automatedPostprocessing.postprocessing_fenics.postprocessing_fenics_common import project_dg
 
 # set compiler arguments
+# this was necessary for num_sub_spaces() to work with MPI by Kei 2024
 parameters["reorder_dofs_serial"] = True
 
 
@@ -294,19 +295,21 @@ def compute_hemodyanamics(visualization_separate_domain_folder: Path, mesh_path:
         # Write temporal WSS
         tau.rename("WSS", "WSS")
         indices["WSS"].write_checkpoint(tau, "WSS", t, XDMFFile.Encoding.HDF5, append=True)
-      
+
+        # compute the magnitude of WSS
         local_size = tau.vector()[:].size // Vv_boundary.num_sub_spaces()
         work_vec = tau.vector().get_local()
         tau_vec = work_vec.reshape(local_size, Vv_boundary.dofmap().block_size()).copy()
         tau_tmp = Function(Vv_boundary)
         work_vec[:] = 0
+        # instead of using sqrt(inner(tau, tau)), we use np.linalg.norm to avoid the issue with inner(tau, tau) being
+        # negative value. Here, we simply compute the magnitude of the dofs
         work_vec[::Vv_boundary.num_sub_spaces()] = np.linalg.norm(tau_vec, axis=1)
         tau_tmp.vector().set_local(work_vec)
         tau_tmp.vector().apply('insert')
-        
         V0 = Vv_boundary.sub(0).collapse()
         tau_norm = Function(V0)
-        assigner = FunctionAssigner(V0,Vv_boundary.sub(0))
+        assigner = FunctionAssigner(V0, Vv_boundary.sub(0))
         assigner.assign(tau_norm, tau_tmp.sub(0))
         TAWSS.vector()[:] += tau_norm.vector().get_local()
 
@@ -370,6 +373,15 @@ def compute_hemodyanamics(visualization_separate_domain_folder: Path, mesh_path:
             indices[name].close()
             if MPI.rank(MPI.comm_world) == 0:
                 print(f"--- {name} is saved in {hemodynamic_indices_path}")
+
+    # assert that OSI is within 0 to 0.5
+    min = index_dict['OSI'].vector().get_local().min()
+    max = index_dict['OSI'].vector().get_local().max()
+
+    tol = 1e-12
+    assert -tol <= min < 0.5, "OSI min is not within 0 to 0.5"
+    assert -tol < max <= 0.5 + tol, "OSI max is not within 0 to 0.5"
+
 
 def main() -> None:
     if MPI.size(MPI.comm_world) == 1:
