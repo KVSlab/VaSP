@@ -14,14 +14,16 @@ from pathlib import Path
 import argparse
 
 from dolfin import Mesh, HDF5File, VectorFunctionSpace, Function, MPI, parameters, XDMFFile, TrialFunction, \
-    TestFunction, inner, ds, assemble, FacetNormal, sym, project, FunctionSpace, PETScDMCollection, grad, \
+    TestFunction, inner, ds, assemble, FacetNormal, sym, FunctionSpace, PETScDMCollection, grad, \
     LUSolver, FunctionAssigner, BoundaryMesh
+
 from vampy.automatedPostprocessing.postprocessing_common import get_dataset_names
 from vasp.automatedPostprocessing.postprocessing_common import read_parameters_from_file
 from vasp.automatedPostprocessing.postprocessing_fenics.postprocessing_fenics_common import project_dg
 
 # set compiler arguments
-parameters["reorder_dofs_serial"] = False
+# this was necessary for num_sub_spaces() to work with MPI by Kei 2024
+parameters["reorder_dofs_serial"] = True
 
 
 def parse_arguments():
@@ -217,7 +219,6 @@ def compute_hemodyanamics(visualization_separate_domain_folder: Path, mesh_path:
     # Create function space for the boundary mesh
     Vv_boundary = VectorFunctionSpace(boundary_mesh, "DG", 1)
     V_boundary = FunctionSpace(boundary_mesh, "DG", 1)
-
     # Create function space for hemodynamic indices with DG1 elements
     Vv = VectorFunctionSpace(mesh, "DG", 1)
 
@@ -295,9 +296,22 @@ def compute_hemodyanamics(visualization_separate_domain_folder: Path, mesh_path:
         tau.rename("WSS", "WSS")
         indices["WSS"].write_checkpoint(tau, "WSS", t, XDMFFile.Encoding.HDF5, append=True)
 
-        # Compute time-averaged WSS by accumulating WSS magnitude
-        tawss = project(inner(tau, tau) ** (1 / 2), V_boundary)
-        TAWSS.vector().axpy(1, tawss.vector())
+        # compute the magnitude of WSS
+        local_size = tau.vector()[:].size // Vv_boundary.num_sub_spaces()
+        work_vec = tau.vector().get_local()
+        tau_vec = work_vec.reshape(local_size, Vv_boundary.dofmap().block_size()).copy()
+        tau_tmp = Function(Vv_boundary)
+        work_vec[:] = 0
+        # instead of using sqrt(inner(tau, tau)), we use np.linalg.norm to avoid the issue with inner(tau, tau) being
+        # negative value. Here, we simply compute the magnitude of the dofs
+        work_vec[::Vv_boundary.num_sub_spaces()] = np.linalg.norm(tau_vec, axis=1)
+        tau_tmp.vector().set_local(work_vec)
+        tau_tmp.vector().apply('insert')
+        V0 = Vv_boundary.sub(0).collapse()
+        tau_norm = Function(V0)
+        assigner = FunctionAssigner(V0, Vv_boundary.sub(0))
+        assigner.assign(tau_norm, tau_tmp.sub(0))
+        TAWSS.vector()[:] += tau_norm.vector().get_local()
 
         # Simply accumulate WSS for computing OSI and ECAP later
         WSS_mean.vector().axpy(1, tau.vector())
@@ -323,12 +337,23 @@ def compute_hemodyanamics(visualization_separate_domain_folder: Path, mesh_path:
     index_dict['TWSSG'].vector()[:] = index_dict['TWSSG'].vector()[:] / counter
     index_dict['TAWSS'].vector()[:] = index_dict['TAWSS'].vector()[:] / counter
     WSS_mean.vector()[:] = WSS_mean.vector()[:] / counter
-    wss_mean = project(inner(WSS_mean, WSS_mean) ** (1 / 2), V_boundary)
-    wss_mean_vec = wss_mean.vector().get_local()
+    local_size = WSS_mean.vector()[:].size // Vv_boundary.num_sub_spaces()
+    work_vec = WSS_mean.vector().get_local()
+    wss_mean_vec = work_vec.reshape(local_size, Vv_boundary.dofmap().block_size()).copy()
+    wss_mean_mag_tmp = Function(Vv_boundary)
+    work_vec[:] = 0
+    work_vec[::Vv_boundary.num_sub_spaces()] = np.linalg.norm(wss_mean_vec, axis=1)
+    wss_mean_mag_tmp.vector().set_local(work_vec)
+    wss_mean_mag_tmp.vector().set_local(work_vec)
+
+    wss_mean_mag = Function(V0)
+    assigner = FunctionAssigner(V0, Vv_boundary.sub(0))
+    assigner.assign(wss_mean_mag, wss_mean_mag_tmp.sub(0))
     tawss_vec = index_dict['TAWSS'].vector().get_local()
+    wss_mean_mag = wss_mean_mag.vector().get_local()
     # Compute RRT, OSI, and ECAP based on mean and absolute WSS
-    index_dict['RRT'].vector().set_local(1 / wss_mean_vec)
-    index_dict['OSI'].vector().set_local(0.5 * (1 - wss_mean_vec / tawss_vec))
+    index_dict['RRT'].vector().set_local(1 / wss_mean_mag)
+    index_dict['OSI'].vector().set_local(0.5 * (1 - wss_mean_mag / tawss_vec))
     index_dict['ECAP'].vector().set_local(index_dict['OSI'].vector().get_local() / tawss_vec)
 
     for index in ['RRT', 'OSI', 'ECAP']:
@@ -348,6 +373,14 @@ def compute_hemodyanamics(visualization_separate_domain_folder: Path, mesh_path:
             indices[name].close()
             if MPI.rank(MPI.comm_world) == 0:
                 print(f"--- {name} is saved in {hemodynamic_indices_path}")
+
+    # assert that OSI is within 0 to 0.5
+    min = index_dict['OSI'].vector().get_local().min()
+    max = index_dict['OSI'].vector().get_local().max()
+
+    tol = 1e-12
+    assert -tol <= min < 0.5, "OSI min is not within 0 to 0.5"
+    assert -tol < max <= 0.5 + tol, "OSI max is not within 0 to 0.5"
 
 
 def main() -> None:

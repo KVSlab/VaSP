@@ -71,3 +71,18 @@ def test_compute_hemodynamics(tmpdir):
     surface_average = surface_integral / surface_area
 
     assert 1.95 < surface_average < 2.05
+
+    # Read OSI data and check the value
+    osi_data = hemodynamics_data / "OSI.xdmf"
+
+    osi = Function(V)
+
+    # checck that OSI is within 0 to 0.5
+    with XDMFFile(mesh.mpi_comm(), str(osi_data)) as infile:
+        infile.read_checkpoint(osi, "OSI", 0)
+
+    min = osi.vector().get_local().min()
+    max = osi.vector().get_local().max()
+    tol = 1e-12
+    assert -tol <= min < 0.5, "OSI min should be within 0 to 0.5"
+    assert -tol < max <= 0.5 + tol, "OSI max should be within 0 to 0.5"
