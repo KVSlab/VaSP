@@ -28,7 +28,7 @@ jobs:
     continue-on-error: true
 
     steps:
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
@@ -36,7 +36,7 @@ jobs:
         run: python3 -m pip install pip setuptools --upgrade
 
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install types-paramiko
         run: python3 -m pip install types-paramiko
@@ -71,12 +71,12 @@ jobs:
         shell: bash -l {0}
 
     steps:
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Upgrade pip and setuptools
         run: |
@@ -84,7 +84,7 @@ jobs:
 
       # See: https://github.com/marketplace/actions/setup-miniconda
       - name: Setup Mambaforge
-        uses: conda-incubator/setup-miniconda@v2
+        uses: conda-incubator/setup-miniconda@v3
         with:
           miniforge-variant: Mambaforge
           miniforge-version: latest
@@ -95,7 +95,7 @@ jobs:
       - name: Set cache date
         run: echo "DATE=$(date +'%Y%m%d')" >> $GITHUB_ENV
 
-      - uses: actions/cache@v2
+      - uses: actions/cache@v4
         with:
           path: ${{ matrix.prefix }}
           key: ${{ matrix.label }}-conda-${{ hashFiles('environment.yml') }}-${{ env.DATE }}-${{ env.CACHE_NUMBER }}
@@ -113,7 +113,7 @@ jobs:
 
       - name: Upload coverage report to codecov
         if: matrix.os == 'ubuntu-latest'
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage.xml
