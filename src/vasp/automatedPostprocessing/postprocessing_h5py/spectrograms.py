@@ -255,7 +255,6 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
     elif interface_only:
         # Use only the interface IDs
         region_ids = interface_ids
-        quantity = quantity + "_interface"
     elif quantity == "d":
         # For displacement spectrogram, we need to take only the solid IDs
         region_ids = solid_ids
