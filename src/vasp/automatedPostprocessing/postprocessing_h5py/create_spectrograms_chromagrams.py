@@ -68,7 +68,7 @@ def create_spectrogram_composite(case_name: str, quantity: str, df: pd.DataFrame
 
     # Set ylim if provided
     if ylim is not None:
-        plt.ylim([0, ylim])
+        plt.xlim([0, ylim])
 
     psd_filename = f"{quantity}_psd_{case_name}"
     path_to_psd_figure = Path(image_folder) / (psd_filename + '.png')
@@ -160,9 +160,9 @@ def create_spectrogram_composite(case_name: str, quantity: str, df: pd.DataFrame
         output_amplitudes = output_amplitudes[output_amplitudes[:, 0] <= end_t]
         ax5.plot(output_amplitudes[:, 0], output_amplitudes[:, 10], label=case_name)
         ax5.set_ylabel("Amplitude")
-        ax5.set_xlabel('Time (s)')
+        ax5.set_xlabel('Time [s]')
     else:
-        ax4.set_xlabel('Time (s)')
+        ax4.set_xlabel('Time [s]')
 
     # Name composite figure and save
     composite_figure_name = f"{quantity}_{case_name}_{num_windows}_windows_thresh{min_color}_composite_figure"
