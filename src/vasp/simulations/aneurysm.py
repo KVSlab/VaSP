@@ -7,7 +7,7 @@ import numpy as np
 from vampy.simulation.Womersley import make_womersley_bcs, compute_boundary_geometry_acrn
 from turtleFSI.problems import *
 from dolfin import HDF5File, Mesh, MeshFunction, facets, assemble, UserExpression, sqrt, FacetNormal, ds, \
-    DirichletBC, Measure, inner, parameters
+    DirichletBC, Measure, inner, parameters, VectorFunctionSpace, Function, XDMFFile
 
 from vasp.simulations.simulation_common import load_probe_points, calculate_and_print_flow_properties, \
     print_probe_points
@@ -33,10 +33,11 @@ def set_problem_parameters(default_variables, **namespace):
 
     default_variables.update(dict(
         # Temporal parameters
-        T=0.951,  # Simulation end time
+        T=1.902,  # Simulation end time
         dt=0.001,  # Timne step size
         theta=0.501,  # Theta scheme parameter
         save_step=1,  # Save frequency of files for visualisation
+        save_solution_after_tstep=951,  # Start saving the solution after this time step for the mean value
         checkpoint_step=50,  # Save frequency of checkpoint files
         # Linear solver parameters
         linear_solver="mumps",
@@ -198,14 +199,20 @@ def create_bcs(t, DVP, mesh, boundaries, mu_f,
                 inlet_area=inlet_area)
 
 
-def initiate(mesh_path, scale_probe, **namespace):
+def initiate(mesh_path, scale_probe, mesh, v_deg, p_deg, **namespace):
 
     probe_points = load_probe_points(mesh_path)
     # In case the probe points are in mm, scale them to meters
     if scale_probe:
         probe_points = probe_points * 0.001
 
-    return dict(probe_points=probe_points)
+    Vv = VectorFunctionSpace(mesh, "CG", v_deg)
+    V = FunctionSpace(mesh, "CG", p_deg)
+    d_mean = Function(Vv)
+    u_mean = Function(Vv)
+    p_mean = Function(V)
+
+    return dict(probe_points=probe_points, d_mean=d_mean, u_mean=u_mean, p_mean=p_mean)
 
 
 def pre_solve(t, inlet, p_out_bc_val, **namespace):
@@ -225,10 +232,39 @@ def pre_solve(t, inlet, p_out_bc_val, **namespace):
     return dict(inlet=inlet, p_out_bc_val=p_out_bc_val)
 
 
-def post_solve(dvp_, n, dsi, dt, mesh, inlet_area, mu_f, rho_f, probe_points, **namespace):
-
+def post_solve(dvp_, n, dsi, dt, mesh, inlet_area, mu_f, rho_f, probe_points, t,
+               save_solution_after_tstep, d_mean, u_mean, p_mean, **namespace):
+    d = dvp_["n"].sub(0, deepcopy=True)
     v = dvp_["n"].sub(1, deepcopy=True)
     p = dvp_["n"].sub(2, deepcopy=True)
 
     print_probe_points(v, p, probe_points)
     calculate_and_print_flow_properties(dt, mesh, v, inlet_area, mu_f, rho_f, n, dsi)
+
+    if t >= save_solution_after_tstep * dt:
+        # Here, we accumulate the velocity filed in u_mean
+        d_mean.vector().axpy(1, d.vector())
+        u_mean.vector().axpy(1, v.vector())
+        p_mean.vector().axpy(1, p.vector())
+        return dict(u_mean=u_mean, d_mean=d_mean, p_mean=p_mean)
+    else:
+        return None
+
+
+def finished(d_mean, u_mean, p_mean, visualization_folder, save_solution_after_tstep, T, dt, **namespace):
+    # Divide the accumulated vectors by the number of time steps
+    num_steps = T / dt - save_solution_after_tstep + 1
+    for data in [d_mean, u_mean, p_mean]:
+        data.vector()[:] = data.vector()[:] / num_steps
+
+    # Save u_mean as a XDMF file using the checkpoint
+    data_names = [
+        (d_mean, "d_mean.xdmf"),
+        (u_mean, "u_mean.xdmf"),
+        (p_mean, "p_mean.xdmf")
+    ]
+
+    for vector, data_name in data_names:
+        file_path = os.path.join(visualization_folder, data_name)
+        with XDMFFile(MPI.comm_world, file_path) as f:
+            f.write_checkpoint(vector, data_name, 0, XDMFFile.Encoding.HDF5)
