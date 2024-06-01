@@ -33,6 +33,7 @@ mpirun -np 4 turtleFSI -p my_problem -c my_config.config
 In this case, it is assumed that `my_problem.py` and `my_config.config` are located in the same folder as the current working directory.
 
 ## Monitoring tool during the simulation
+(simulation:log_plotter)=
 
 Due to the nature of vascular FSI simulations, it is usually the case that the simulation needs to be run on the supercomputer with many CPUs where the total simulation time may exceed one day. In such a case, it is crucial to monitor the progress of your simulations and check if the simulations are going as you wish. For that purpose, `vasp-log-plotter` can be used to plot the relevant quantities based on the log file generated during the run. 
 
