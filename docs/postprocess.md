@@ -97,8 +97,95 @@ In the following, we will give an overview and explanations for each scripts.
 
 
 ## **postprocessing_fenics**
-   - **Purpose**: Dedicated to postprocessing tasks related to the FEniCS project, which is used for solving partial differential equations.
-   - **Contents**: Contains scripts for computing hemodynamics, stress and strain metrics, creating HDF5 files, visualizing separate domains, and common FEniCS postprocessing utilities.
+   - **Purpose**: Dedicated to postprocessing tasks related to the FEniCS, for computing hemodynamic indices, stress and strain metrics, creating HDF5 files, visualizing separate domains, and common FEniCS postprocessing utilities.
+   
+   - `create_hdf5.py` - This script is the initial step in post-processing with FEniCS. It's necessary because FEniCS cannot directly read `.xdmf` visualization files for post-processing. The script generates a folder `Visualization_separate_domain` and   two HDF5 files inside:
+
+   1. `u.h5`: Contains velocity data for the fluid domain
+   2. `d_solid.h5`: Contains displacement data for the solid domain
+
+   These HDF5 files can be used by FEniCS for computing various metrics.
+
+   Usage:
+
+   The script is available as a command-line tool:
+
+   ```console
+   vasp-create-hdf5 --folder /path/to/your/result
+   ```
+   Additional options available as command-line arguments:
+
+   Time range selection:
+      --start-time <value>  : Specify the start time
+      --end-time <value>    : Specify the end time
+      --stride <value>      : Set the stride for time steps
+   Domain extraction:
+      --extract-entire-domain : Extract displacement for the entire domain
+
+   Example with options:
+   ```console
+   vasp-create-hdf5 --folder /path/to/your/result --start-time 0.951 --end-time 1.902 --stride 2 --extract-entire-domain
+   ```
+   This command will process data from time 0.951 to 1.902 (usually second cardiac cycle), using every second time step, and extract displacement for the entire domain. 
+   Note:
+   This script runs only in serial.
+
+   - `create_separate_domain_visualization.py` - This script generates separate visualization files for fluid and solid domains, using the HDF5 files created by the previous step.
+   
+   Usage:
+   Run the following command:
+
+   ```console
+   vasp-create-separate-domain-viz --folder /path/to/your/result
+   ```
+
+   Output:
+   The script creates files inside `Visualization_separate_domain`:
+
+   `velocity_fluid.xdmf`: Visualization file for fluid velocity
+   `displacement_solid.xdmf`: Visualization file for solid displacement
+
+   These files are generated based on the `.h5` files previously created.
+   Note:
+   This script supports parallel execution with MPI for potentially faster processing. To run in parallel, use:
+
+   ```console
+   mpirun -np <number_of_processes> vasp-create-separate-domain-viz --folder /path/to/your/result
+   ```
+
+   - `compute_hemodynamics.py` - This script computes hemodynamic indices defined in `VaMPy` (see Table1 at https://kvslab.github.io/VaMPy/quantities.html). The only difference from `VaMPy` is that WSS is defined as a first-order Discontinuous Galerkin function (DG1). This is because computing WSS involves taking the gradient of second-order Continuous Galerkin (CG2) function.
+
+   Usage:
+   Run the following command:
+   
+   ```console
+   vasp-compute-hemo --folder /path/to/your/result
+   ```
+
+   This script can be run in parallel with MPI.
+
+   Output:
+   All the hemodynamic indies will be stored inside a newly generated folder `Hemodynamic_indices`
+
+   - `compute_stress_strain.py` - This script computes the following solid mechanical metrics:
+
+   1. True (Cauchy) Stress -- tensor
+   2. Green-Lagrange Strain -- tensor
+   3. Maximum Principal Stress (True/Cauchy) -- scalar
+   4. Maximum Principal Strain (Green-Lagrange) -- scalar
+   
+   Usage:
+   Run the following command:
+   
+   ```console
+   vasp-compute-stress --folder /path/to/your/result
+   ```
+   This script can be run in parallel with MPI.
+
+   Output:
+   All the results will be stored inside a newly generated folder `StressStrain`
+
+
 
 ## **postprocessing_h5py**
    - **Purpose**: Focuses on postprocessing tasks involving HDF5 files, utilizing the `h5py` library.
