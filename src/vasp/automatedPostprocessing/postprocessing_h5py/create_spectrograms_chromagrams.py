@@ -79,13 +79,21 @@ def create_spectrogram_composite(case_name: str, quantity: str, df: pd.DataFrame
 
     # Create composite figure
     if amplitude_file and flow_rate_file:
-        fig1, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(5, sharex=True, gridspec_kw={'height_ratios': [1, 3, 1, 1, 1]})
+        fig1, axes = plt.subplots(5, sharex=True, gridspec_kw={'height_ratios': [1, 3, 1, 1, 1]})
+        assert isinstance(axes, np.ndarray) and axes.shape == (5,)
+        ax1, ax2, ax3, ax4, ax5 = axes
     elif flow_rate_file:
-        fig1, (ax1, ax2, ax3, ax4) = plt.subplots(4, sharex=True, gridspec_kw={'height_ratios': [1, 3, 1, 1]})
+        fig1, axes = plt.subplots(4, sharex=True, gridspec_kw={'height_ratios': [1, 3, 1, 1]})
+        assert isinstance(axes, np.ndarray) and axes.shape == (4,)
+        ax1, ax2, ax3, ax4 = axes
     elif amplitude_file:
-        fig1, (ax2, ax3, ax4, ax5) = plt.subplots(4, sharex=True, gridspec_kw={'height_ratios': [3, 1, 1, 1]})
+        fig1, axes = plt.subplots(4, sharex=True, gridspec_kw={'height_ratios': [3, 1, 1, 1]})
+        assert isinstance(axes, np.ndarray) and axes.shape == (4,)
+        ax2, ax3, ax4, ax5 = axes
     else:
-        fig1, (ax2, ax3, ax4) = plt.subplots(3, sharex=True, gridspec_kw={'height_ratios': [3, 1, 1]})
+        fig1, axes = plt.subplots(3, sharex=True, gridspec_kw={'height_ratios': [3, 1, 1]})
+        assert isinstance(axes, np.ndarray) and axes.shape == (3,)
+        ax2, ax3, ax4 = axes
 
     fig1.set_size_inches(7.5, 9)
 
