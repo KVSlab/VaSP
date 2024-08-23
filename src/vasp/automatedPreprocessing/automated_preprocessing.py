@@ -12,9 +12,9 @@ from morphman import get_uncapped_surface, write_polydata, get_parameters, vtk_c
     vtk_triangulate_surface, write_parameters, vmtk_cap_polydata, compute_centerlines, get_centerline_tolerance, \
     get_vtk_point_locator, extract_single_line, vtk_merge_polydata, get_point_data_array, smooth_voronoi_diagram, \
     create_new_surface, compute_centers, vmtk_smooth_surface, str2bool, vmtk_compute_voronoi_diagram, \
-    prepare_output_surface, vmtk_compute_geometric_features
+    prepare_output_surface, vmtk_compute_geometric_features, read_polydata
 
-from vampy.automatedPreprocessing.preprocessing_common import read_polydata, get_centers_for_meshing, \
+from vampy.automatedPreprocessing.preprocessing_common import get_centers_for_meshing, \
     dist_sphere_diam, dist_sphere_curvature, dist_sphere_constant, get_regions_to_refine, add_flow_extension, \
     write_mesh, mesh_alternative, find_boundaries, compute_flow_rate, setup_model_network, \
     radiusArrayName, scale_surface, get_furtest_surface_point, check_if_closed_surface
@@ -142,8 +142,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
         resampling_step *= scale_factor
 
     # Check if surface is closed and uncapps model if True
-    is_capped = check_if_closed_surface(surface)
-    if is_capped:
+    if check_if_closed_surface(surface):
         if not file_name_clipped_model.is_file():
             print("--- Clipping the models inlets and outlets.\n")
             # Value of gradients_limit should be generally low, to detect flat surfaces corresponding
@@ -157,7 +156,6 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
 
     # Get model parameters
     parameters = get_parameters(str(base_path))
-
     if "check_surface" not in parameters.keys():
         surface = vtk_clean_polydata(surface)
         surface = vtk_triangulate_surface(surface)
@@ -166,8 +164,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
         print_surface_info(surface)
         find_and_delete_nan_triangles(surface)
         surface = clean_surface(surface)
-        foundNaN = find_and_delete_nan_triangles(surface)
-        if foundNaN:
+        if find_and_delete_nan_triangles(surface):
             raise RuntimeError(("There is an issue with the surface. "
                                 "Nan coordinates or some other shenanigans."))
         else:
@@ -180,9 +177,9 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
     # Get centerlines
     print("--- Get centerlines\n")
     inlet, outlets = get_centers_for_meshing(surface, has_multiple_inlets, str(base_path))
-    has_outlet = len(outlets) != 0
 
     # Get point the furthest away from the inlet when only one boundary
+    has_outlet = len(outlets) != 0
     if not has_outlet:
         outlets = get_furtest_surface_point(inlet, surface)
 
@@ -212,7 +209,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
         # Extract the region centerline
         refine_region_centerline = []
         info = get_parameters(str(base_path))
-        number_of_regions = info["number_of_regions"]
+        number_of_regions = isave_pathnfo["number_of_regions"]
 
         # Compute mean distance between points
         for i in range(number_of_regions):
@@ -308,6 +305,8 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
 
     elif smoothing_method == "no_smooth" or None:
         print("--- No smoothing of surface\n")
+    else:
+        raise ValueError(f"Unknown smoothing method: {smoothing_method}")
 
     # Add flow extensions
     if add_flow_extensions:
