@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from pathlib import Path
-from typing import Union, TYPE_CHECKING
+from typing import Union
 
 import numpy as np
 import meshio
@@ -12,8 +12,7 @@ from morphman import vmtkscripts, write_polydata
 
 from vasp.automatedPreprocessing.vmtkmeshgeneratorfsi import vmtkMeshGeneratorFsi
 
-if TYPE_CHECKING:
-    from vtk import vtkPolyData
+from vtk import vtkPolyData
 
 # Global array names
 distanceToSpheresArrayName = "DistanceToSpheres"
