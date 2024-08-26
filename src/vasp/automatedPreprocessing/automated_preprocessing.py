@@ -209,7 +209,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
         # Extract the region centerline
         refine_region_centerline = []
         info = get_parameters(str(base_path))
-        number_of_regions = isave_pathnfo["number_of_regions"]
+        number_of_regions = info["number_of_regions"]
 
         # Compute mean distance between points
         for i in range(number_of_regions):
