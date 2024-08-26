@@ -33,13 +33,15 @@ def parse_arguments() -> argparse.Namespace:
 def generate_solid_probe(mesh_path: Path, fsi_region: list) -> None:
     """
     Generate probes in the solid region of the FSI mesh.
-    The probes are stored in the same folder as the input mesh file, with the extensions `_solid_probe.csv` and `_solid_probe.json`.
+    The probes are stored in the same folder as the input mesh file, with the extensions
+    `_solid_probe.csv` and `_solid_probe.json`.
 
     NOTE:
         The solid region is defined by mesh domain ID 2, while the fluid region is defined by mesh domain ID 1.
 
     :param mesh_path: Path to FSI mesh file (HDF5 format)
-    :param fsi_region: List of points defining the FSI region within the mesh, ordered (x_min, x_max, y_min, y_max, z_min, z_max)
+    :param fsi_region: List of points defining the FSI region within the mesh, ordered
+        `(x_min, x_max, y_min, y_max, z_min, z_max)`
     """
     fluid_domain_id = 1
     solid_domain_id = 2

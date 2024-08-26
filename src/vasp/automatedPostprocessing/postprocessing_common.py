@@ -12,7 +12,8 @@ import numpy as np
 import h5py
 
 
-def get_domain_ids(mesh_path:Path, fluid_domain_id:int, solid_domain_id:int)->Tuple[List[int], List[int], List[int]]:
+def get_domain_ids(
+        mesh_path: Path, fluid_domain_id: int, solid_domain_id: int) -> Tuple[List[int], List[int], List[int]]:
     """
     Given a mesh file, this function returns the IDs of the fluid and solid domains.
     The IDs is a list of integers that correspond to the index of the coordinates (nodes)
