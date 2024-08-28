@@ -1,6 +1,4 @@
-import sys
 from pathlib import Path
-from io import StringIO
 
 import pytest
 import numpy as np
@@ -8,7 +6,7 @@ from dolfin import Mesh, cpp
 
 from vasp.automatedPreprocessing.automated_preprocessing import read_command_line, \
     run_pre_processing
-from vasp.simulations.simulation_common import load_mesh_and_data, load_mesh_info, print_mesh_summary, \
+from vasp.simulations.simulation_common import load_mesh_and_data, load_mesh_info, \
     load_probe_points
 
 
@@ -154,48 +152,6 @@ def test_load_mesh_info(temporary_hdf5_file):
     assert mesh_info.branch_ids_offset == expected_branch_ids_offset, \
         f"Actual branch_ids_offset: {mesh_info.branch_ids_offset}, " + \
         f"Expected branch_ids_offset: {expected_branch_ids_offset}"
-
-
-def test_print_mesh_summary(temporary_hdf5_file):
-    """
-    Test the print_mesh_summary function by capturing and checking its printed output.
-    """
-    # Load the mesh and data from the temporary HDF5 file
-    mesh, boundaries, domains = load_mesh_and_data(temporary_hdf5_file)
-
-    # Redirect sys.stdout to capture print output
-    captured_output = StringIO()
-    sys.stdout = captured_output
-
-    # Call the print_mesh_summary function
-    print_mesh_summary(mesh)
-
-    # Reset sys.stdout to its original value
-    sys.stdout = sys.__stdout__
-
-    # Get the captured output as a string
-    printed_summary = captured_output.getvalue()
-
-    # Define expected summary strings
-    expected_strings = [
-        "=== Mesh Information Summary ===",
-        "X range: 29.932 to 36.8581 (delta: 6.9261)",
-        "Y range: 28.7532 to 34.3997 (delta: 5.6465)",
-        "Z range: 38.1364 to 44.7481 (delta: 6.6117)",
-        "Number of cells: 32283",
-        "Number of cells per processor: 32283",
-        "Number of edges: 0",
-        "Number of faces: 65699",
-        "Number of facets: 65699",
-        "Number of vertices: 5860",
-        "Volume: 69.56489929680801",
-        "Number of cells per volume: 464.07024701150266",
-    ]
-
-    # Check if each expected summary string is present in the printed output
-    for expected_string in expected_strings:
-        assert expected_string in printed_summary, \
-            f"Expected string '{expected_string}' not found in printed output:\n{printed_summary}"
 
 
 def test_load_probe_points(temporary_hdf5_file):

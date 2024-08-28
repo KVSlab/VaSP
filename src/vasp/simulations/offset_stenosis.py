@@ -5,11 +5,12 @@ import os
 import numpy as np
 
 from vampy.simulation.Womersley import make_womersley_bcs, compute_boundary_geometry_acrn
+from vampy.simulation.simulation_common import print_mesh_information
 from turtleFSI.problems import *
 from dolfin import HDF5File, Mesh, MeshFunction, facets, cells, UserExpression, FacetNormal, ds, \
     DirichletBC, Measure, inner, parameters, assemble
 
-from vasp.simulations.simulation_common import load_probe_points, print_probe_points, print_mesh_summary, \
+from vasp.simulations.simulation_common import load_probe_points, print_probe_points, \
     calculate_and_print_flow_properties, load_solid_probe_points, print_solid_probe_points
 
 # set compiler arguments
@@ -91,7 +92,7 @@ def get_mesh_domain_and_boundaries(mesh_path, fsi_region, dx_f_id, fsi_id, rigid
     domains = MeshFunction("size_t", mesh, 3)
     hdf.read(domains, "/domains")
 
-    print_mesh_summary(mesh)
+    print_mesh_information(mesh)
 
     # Only consider FSI in domain within this sphere
     sph_x = fsi_region[0]
