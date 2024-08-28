@@ -21,10 +21,11 @@ from vampy.automatedPreprocessing.preprocessing_common import read_polydata, get
 from vampy.automatedPreprocessing.repair_tools import find_and_delete_nan_triangles, clean_surface, print_surface_info
 from vampy.automatedPreprocessing.simulate import run_simulation
 from vampy.automatedPreprocessing.visualize import visualize_model
+from vampy.simulation.simulation_common import print_mesh_information
 
 from vasp.automatedPreprocessing.preprocessing_common import generate_mesh, distance_to_spheres_solid_thickness, \
     dist_sphere_spheres, convert_xml_mesh_to_hdf5, convert_vtu_mesh_to_xdmf, edge_length_evaluator
-from vasp.simulations.simulation_common import load_mesh_and_data, print_mesh_summary
+from vasp.simulations.simulation_common import load_mesh_and_data
 
 
 def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_factor, smoothing_iterations,
@@ -516,7 +517,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
 
         # Print mesh information
         dolfin_mesh, _, _ = load_mesh_and_data(file_name_hdf5_mesh)
-        print_mesh_summary(dolfin_mesh)
+        print_mesh_information(dolfin_mesh)
     elif mesh_format == "xdmf":
         print("--- Converting VTU mesh to XDMF\n")
         convert_vtu_mesh_to_xdmf(file_name_vtu_mesh, file_name_xdmf_mesh)
