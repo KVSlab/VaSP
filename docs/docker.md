@@ -5,7 +5,7 @@
 The released Docker image can be found [here](https://github.com/KVSlab/VaSP/pkgs/container/vasp).
 Below we assume that you have [Docker](https://docs.docker.com/get-docker/) installed on your system.
 Ensure Docker is running on your system by executing the following command in your terminal:
-```consolse
+```console
 docker info
 ```
 If Docker is running, this command will display detailed information about your Docker setup. If Docker is not running, you may see an error message, indicating that you need to start the Docker service.
