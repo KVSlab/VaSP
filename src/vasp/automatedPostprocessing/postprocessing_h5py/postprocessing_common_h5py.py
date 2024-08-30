@@ -101,7 +101,7 @@ def get_interface_ids(mesh_path: Union[str, Path], fluid_domain_id: Union[int, l
     Returns:
         np.ndarray: Array containing the interface node IDs.
     """
-    fluid_ids, solid_ids, _ = get_domain_ids(mesh_path, fluid_domain_id, solid_domain_id)
+    fluid_ids, solid_ids, _ = get_domain_ids(Path(mesh_path), fluid_domain_id, solid_domain_id)
 
     # Find the intersection of fluid and solid node ID's
     interface_ids_set = set(fluid_ids) & set(solid_ids)
@@ -193,7 +193,7 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
     # Get node ID's from input mesh. If save_deg=2, you can supply the original mesh to get the data for the
     # corner nodes, or supply a refined mesh to get the data for all nodes (very computationally intensive)
     if quantity in {"d", "v", "p"}:
-        _, _, all_ids = get_domain_ids(mesh_path, fluid_domain_id, solid_domain_id)
+        _, _, all_ids = get_domain_ids(Path(mesh_path), fluid_domain_id, solid_domain_id)
         ids = all_ids
 
     # Get name of xdmf file

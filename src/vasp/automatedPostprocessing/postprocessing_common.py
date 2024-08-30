@@ -9,11 +9,16 @@ from pathlib import Path
 from typing import Union, Optional, Dict, Tuple, List
 
 import numpy as np
+import numpy.typing as npt
 import h5py
 
 
 def get_domain_ids(
-        mesh_path: Path, fluid_domain_id: int, solid_domain_id: int) -> Tuple[List[int], List[int], List[int]]:
+        mesh_path: Path,
+        fluid_domain_id: Union[int, List[int]],
+        solid_domain_id: Union[int, List[int]]) -> Tuple[npt.NDArray[np.integer],
+                                                         npt.NDArray[np.integer],
+                                                         npt.NDArray[np.integer]]:
     """
     Given a mesh file, this function returns the IDs of the fluid and solid domains.
     The IDs is a list of integers that correspond to the index of the coordinates (nodes)
