@@ -21,7 +21,7 @@ def test_compute_hemodynamics(tmpdir):
     Ref. https://en.wikipedia.org/wiki/Hagen–Poiseuille_equation
          https://github.com/keiyamamo/turtleFSI/blob/pipe/turtleFSI/problems/pipe_laminar.py
     """
-    folder_path = Path("tests/test_data/hemodynamics_data")
+    folder_path = Path(__file__).parent / "test_data/hemodynamics_data"
 
     # Copy the data to temporary folder
     tmpdir_path = Path(tmpdir)

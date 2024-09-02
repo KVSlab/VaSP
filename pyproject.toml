@@ -5,10 +5,12 @@ requires = ["setuptools>=61.0.0", "wheel"]
 name = "vasp"
 version = "0.1.0"
 description = "Vascular Fluid Structure Interaction Pipline"
-authors = [{name = "Kei Yamamoto", email = "keiya@simula.no"},
-           {name = "Johannes Ring", email = "johannr@simula.no"},
-           {name = "David A. Bruneau", email = "david.bruneau@mail.utoronto.ca"},
-           {name = "Jørgen S. Dokken", email = "dokken@simula.no"}]
+authors = [
+    { name = "Kei Yamamoto", email = "keiya@simula.no" },
+    { name = "Johannes Ring", email = "johannr@simula.no" },
+    { name = "David A. Bruneau", email = "david.bruneau@mail.utoronto.ca" },
+    { name = "Jørgen S. Dokken", email = "dokken@simula.no" },
+]
 license = { file = "LICENSE" }
 readme = "README.md"
 dependencies = [
@@ -33,17 +35,9 @@ vasp-create-spectrum = "vasp.automatedPostprocessing.postprocessing_h5py.create_
 vasp-create-hi-pass-viz = "vasp.automatedPostprocessing.postprocessing_h5py.create_hi_pass_viz:main"
 
 [project.optional-dependencies]
-test = [
-    "flake8",
-    'mypy',
-    "pytest",
-    "pytest-cov",
-    "pytest-xdist",
-]
+test = ["flake8", 'mypy', "pytest", "pytest-cov", "pytest-xdist"]
 
-docs = [
-    "jupyter-book"
-]
+docs = ["jupyter-book"]
 
 [tool.pytest.ini_options]
 addopts = [
@@ -51,21 +45,13 @@ addopts = [
     "--cov=./",
     "--cov-report=xml",
     "--cov-report=term-missing",
-    "-v"
+    "-v",
 ]
-testpaths = [
-    "tests"
-]
+testpaths = ["tests"]
 
 [tool.mypy]
 ignore_missing_imports = true
 # Folders to exclude
-exclude = [
-    "docs/",
-    "build/",
-]
+exclude = ["docs/", "build/"]
 # Folder to check with mypy
-files = [
-    "src",
-    "tests"
-]
+files = ["src", "tests"]

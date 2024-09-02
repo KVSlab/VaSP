@@ -6,12 +6,13 @@ from typing import Union
 
 import numpy as np
 import meshio
-from vtk import vtkPolyData
 from dolfin import Mesh, MeshFunction, File, HDF5File, FunctionSpace, Function, XDMFFile, cells, Edge
 from vmtk import vmtkdistancetospheres, vmtkdijkstradistancetopoints
 from morphman import vmtkscripts, write_polydata
 
 from vasp.automatedPreprocessing.vmtkmeshgeneratorfsi import vmtkMeshGeneratorFsi
+
+from vtk import vtkPolyData
 
 # Global array names
 distanceToSpheresArrayName = "DistanceToSpheres"
@@ -24,6 +25,7 @@ def distance_to_spheres_solid_thickness(surface: vtkPolyData, save_path: Union[s
                                         min_distance: float = 0.25, max_distance: float = 0.3) -> vtkPolyData:
     """
     Determines the solid thickness using vmtkdistancetospheres.
+    Write the distance data to `save_path`.
 
     Args:
         surface (vtkPolyData): Input surface model
