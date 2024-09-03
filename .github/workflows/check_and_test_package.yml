@@ -91,6 +91,7 @@ jobs:
           channels: conda-forge
           activate-environment: vasp
           use-mamba: true
+          architecture: x64
 
       - name: Set cache date
         run: echo "DATE=$(date +'%Y%m%d')" >> $GITHUB_ENV
