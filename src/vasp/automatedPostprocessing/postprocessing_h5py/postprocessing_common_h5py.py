@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Contributions:
 #   2023 Daniel Macdonald
-#   2023 Mehdi Najafi
 
 """
 This file contains helper functions for creating visualizations outside of FEniCS.
