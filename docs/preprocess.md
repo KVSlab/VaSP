@@ -10,14 +10,13 @@ vasp-generate-mesh --input-model /[some_path]/my_mesh.vtp
 
 which should produce the following files in the same folder as `my_mesh.vtp`
 
-<ul>
-  <li>my_mesh.h5: input mesh for FSI simulation</li>
-  <li>my_mesh.vtu: default output mesh file from VMTK</li>
-  <li>my_mesh.xml or my_mesh.xml.gz (compressed or not): FEniCS compatible version of the mesh, not used in VaSP</li>
-  <li>my_mesh_edge_length.h5/xmdf: averaged edge length for each cells. This can be used to check the quality of the mesh</li>
-  <li>my_mesh_boundaries.pvd/vtu: boundary mesh with IDs for each boundaries.</li>
-  <li>my_mesh_domains.pvd/vtu: volume mesh with IDs for each domains.</li>
-</ul>
+  * `my_mesh.h5`: input mesh for FSI simulation</li>
+  * `my_mesh.vtu`: default output mesh file from VMTK</li>
+  * `my_mesh.xml` or `my_mesh.xml.gz` (compressed or not): FEniCS compatible version of the mesh, not used in VaSP</li>
+  * `my_mesh_edge_length.h5/xmdf`: averaged edge length for each cells. This can be used to check the quality of the mesh</li>
+  * `my_mesh_boundaries.pvd/vtu`: boundary mesh with IDs for each boundaries.</li>
+  * `my_mesh_domains.pvd/vtu`: volume mesh with IDs for each domains.</li>
+
 
 Among the files generated after pre-processing, `my_mesh.h5` will be used as an input to the FSI simulation. However, `.h5` file cannot be viewed by Paraview, and thus we have added other files such as `my_mesh_boundaries.pvd` and `my_mesh_domains.pvd` for viewing the mesh and IDs with Paraview.
 
@@ -31,16 +30,23 @@ vasp-generate-mesh --help
 
 To perform FSI simulations, fluid and solid regions need to be generated and marked so that different partial differential equations can be solved on each domain. In `VaSP`, the provided surface mesh will represent the interface of the fluid and solid domain. Then, fluid mesh is created inside the surface mesh to fill the provided surface mesh while solid mesh is created outside the surface mesh to cover the fluid mesh. This mechanism of generating two different mesh works very well for blood vessels. We extended VMTK, a framework for generating mesh based for image-based vascular modelling, to enable the solid mesh generation by utilizing the functionality of adding boundary layer meshing. {numref}`domains` is an example of FSI mesh with fluid and solid regions marked as 1 and 2, respectively.
 
-```{figure} figures/case9_domain_ids.png
+```{figure} figures/mesh_id.png
 ---
 name: domains
 ---
-Fluid and Solid domain with unique ID
+Fluid and Solid domain with unique IDs
 ```
 
 ## Boundary IDs
 
-Similar to the domains, boundaries also need to be marked separately for applying different boundary conditions. Below is a list of boundaries that are necessary to be identified for performing FSI simulations. 
+Similar to the domains, boundaries also need to be marked separately for applying different boundary conditions, as shown in {numref}`boundary`. These boundary IDs can be viewed by opening `{your_mesh_name}_boundaries.pvd`.
+
+```{attention}
+While most boundary IDs are fixed, fluid inlet and outlet IDs can vary depending on the input mesh.
+Therefore, it is necessary to open the `{your_mesh_name}_boundaries.pvd` and visually check those IDs.
+```
+
+Below is a list of boundaries that are necessary to be identified for performing FSI simulations. 
 
 <ol>
   <li>Fluid inlet</li>
@@ -56,5 +62,9 @@ The third boundary, fluid and solid interface, is required to distinguish static
 
 The fourth boundary is usually used to fix the solid inlet and outlet while the last boundary is used to specify Robin boundary condition at the outer wall of the vascular system for representing surrounding environment.
 
-#TODO: insert figure for the boundary
-
+```{figure} figures/boundary_id.png
+---
+name: boundary
+---
+Boundaries with unique IDs
+```
