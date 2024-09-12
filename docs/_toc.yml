@@ -17,7 +17,6 @@ parts:
     - file: preprocess
     - file: simulation
     - file: postprocess
-    - file: cluster
     - file: features
 
   - caption: Tutorials
