@@ -24,7 +24,8 @@ from vampy.automatedPreprocessing.visualize import visualize_model
 from vampy.simulation.simulation_common import print_mesh_information
 
 from vasp.automatedPreprocessing.preprocessing_common import generate_mesh, distance_to_spheres_solid_thickness, \
-    dist_sphere_spheres, convert_xml_mesh_to_hdf5, convert_vtu_mesh_to_xdmf, edge_length_evaluator
+    dist_sphere_spheres, convert_xml_mesh_to_hdf5, convert_vtu_mesh_to_xdmf, edge_length_evaluator, \
+    check_flatten_boundary
 from vasp.simulations.simulation_common import load_mesh_and_data
 
 
@@ -178,6 +179,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
     # Get centerlines
     print("--- Get centerlines\n")
     inlet, outlets = get_centers_for_meshing(surface, has_multiple_inlets, str(base_path))
+    num_inlets_outlets = len(inlet) // 3 + len(outlets) // 3
 
     # Get point the furthest away from the inlet when only one boundary
     has_outlet = len(outlets) != 0
@@ -509,6 +511,10 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
     if mesh_format == "hdf5":
         print("--- Converting XML mesh to HDF5\n")
         convert_xml_mesh_to_hdf5(file_name_xml_mesh, scale_factor_h5)
+
+        # NOTE: stdev threshold is currently hardcoded, not sure if this should be a command line argument
+        print("--- Flattening the inlet/outlet if needed\n")
+        check_flatten_boundary(num_inlets_outlets, file_name_hdf5_mesh, threshold_stdev=0.001)
 
         # Evaluate edge length for inspection
         print("--- Evaluating edge length\n")
