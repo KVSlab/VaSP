@@ -171,13 +171,12 @@ def generate_mesh(surface: vtkPolyData, number_of_sublayers_fluid: int, number_o
     meshGenerator.BranchIdsOffset = branch_ids_offset
 
     # Solid thickness handling
-    if solid_thickness == 'variable':
+    if solid_thickness in ["variable", "painted"]:
         meshGenerator.ElementSizeModeSolid = "edgelengtharray"
         meshGenerator.TargetEdgeLengthArrayNameSolid = distanceToSpheresArrayNameSolid
     else:
         meshGenerator.ElementSizeModeSolid = "edgelength"
         meshGenerator.SolidThickness = solid_thickness_parameters[0]
-
     # IDs
     meshGenerator.SolidSideWallId = solid_side_wall_id
     meshGenerator.InterfaceFsiId = interface_fsi_id

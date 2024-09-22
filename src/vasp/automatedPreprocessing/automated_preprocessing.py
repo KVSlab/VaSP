@@ -5,6 +5,7 @@
 
 import sys
 from pathlib import Path
+import pyvista as pv
 
 import configargparse
 import numpy as np
@@ -12,7 +13,7 @@ from morphman import get_uncapped_surface, write_polydata, get_parameters, vtk_c
     vtk_triangulate_surface, write_parameters, vmtk_cap_polydata, compute_centerlines, get_centerline_tolerance, \
     get_vtk_point_locator, extract_single_line, vtk_merge_polydata, get_point_data_array, smooth_voronoi_diagram, \
     create_new_surface, compute_centers, vmtk_smooth_surface, str2bool, vmtk_compute_voronoi_diagram, \
-    prepare_output_surface, vmtk_compute_geometric_features, read_polydata
+    prepare_output_surface, vmtk_compute_geometric_features, read_polydata, create_vtk_array
 
 from vampy.automatedPreprocessing.preprocessing_common import get_centers_for_meshing, \
     dist_sphere_diam, dist_sphere_curvature, dist_sphere_constant, get_regions_to_refine, add_flow_extension, \
@@ -431,6 +432,26 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
                 sys.exit(-1)
         else:
             distance_to_sphere = read_polydata(str(file_name_distance_to_sphere_solid_thickness))
+    elif solid_thickness == "painted":
+        surface_pv = pv.wrap(surface_extended)
+        aneudraw_data = base_path.with_name(base_path.name + "_aneudraw_surface.vtp")
+        aneudraw = pv.read(aneudraw_data)
+        point_array = pv.point_array(aneudraw,"Thickness")
+        points = pv.PolyData(aneudraw.points)
+        points['Thickness'] = point_array
+        
+        # Run the interpolation
+        interpolated = surface_pv.interpolate(points, radius=0.4, null_value=0.3) # may need to modify this interpolation radius for each mesh
+        p = pv.Plotter()
+        #p.add_mesh(points, point_size=30.0, render_points_as_spheres=True)
+        p.add_mesh(interpolated, scalars="Thickness")
+        p.show()
+        aneudrawInterpolatedFile = base_path.with_name(base_path.name + "_aneudraw_interpolated.vtp")
+        interpolated.save(aneudrawInterpolatedFile)
+        thickness_array = create_vtk_array(interpolated["Thickness"], "Thickness")
+        distance_to_sphere.GetPointData().AddArray(thickness_array)
+        write_polydata(distance_to_sphere, str(file_name_distance_to_sphere_solid_thickness))
+        
     else:
         if len(solid_thickness_parameters) != 1 or solid_thickness_parameters[0] <= 0:
             print("ERROR: Invalid parameter for constant solid thickness. This should be a " +
@@ -568,6 +589,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
         file_name_voronoi, file_name_voronoi_smooth, file_name_voronoi_surface, file_name_surface_smooth,
         file_name_model_flow_ext, file_name_clipped_model, file_name_flow_centerlines, file_name_surface_name
     ]
+    exit(1)
     for file_path in files_to_remove:
         if file_path.exists():
             file_path.unlink()
@@ -762,7 +784,7 @@ def read_command_line(input_path=None):
 
     parser.add_argument('-st', '--solid-thickness',
                         type=str,
-                        choices=["constant", "variable"],
+                        choices=["constant", "variable", "painted"],
                         default="constant",
                         help="Determines whether to use constant or variable thickness for the solid. " +
                              "Use --solid-thickness-parameters to adjust distancetospheres parameters " +
