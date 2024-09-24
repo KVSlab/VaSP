@@ -5,7 +5,6 @@
 
 import sys
 from pathlib import Path
-import pyvista as pv
 
 import configargparse
 import numpy as np
@@ -433,25 +432,31 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
         else:
             distance_to_sphere = read_polydata(str(file_name_distance_to_sphere_solid_thickness))
     elif solid_thickness == "painted":
+        try:
+            import pyvista as pv
+        except ImportError:
+            print("ERROR: Painted solid thickness requires PyVista to be installed.")
+            sys.exit(-1)
+
         surface_pv = pv.wrap(surface_extended)
         aneudraw_data = base_path.with_name(base_path.name + "_aneudraw_surface.vtp")
+        assert aneudraw_data.is_file(), "ERROR: Aneudraw file is missing."
+
         aneudraw = pv.read(aneudraw_data)
-        point_array = pv.point_array(aneudraw,"Thickness")
+        point_array = pv.point_array(aneudraw, "Thickness")
         points = pv.PolyData(aneudraw.points)
         points['Thickness'] = point_array
-        
-        # Run the interpolation
-        interpolated = surface_pv.interpolate(points, radius=0.4, null_value=0.3) # may need to modify this interpolation radius for each mesh
-        p = pv.Plotter()
-        #p.add_mesh(points, point_size=30.0, render_points_as_spheres=True)
-        p.add_mesh(interpolated, scalars="Thickness")
-        p.show()
+
+        # Run the interpolation from the aneudraw data to the surface mesh generated within this script
+        # may need to modify this interpolation radius for each mesh
+        interpolated = surface_pv.interpolate(points, radius=0.4, null_value=solid_thickness_parameters[0])
         aneudrawInterpolatedFile = base_path.with_name(base_path.name + "_aneudraw_interpolated.vtp")
         interpolated.save(aneudrawInterpolatedFile)
         thickness_array = create_vtk_array(interpolated["Thickness"], "Thickness")
         distance_to_sphere.GetPointData().AddArray(thickness_array)
         write_polydata(distance_to_sphere, str(file_name_distance_to_sphere_solid_thickness))
-        
+        print("--- Constructed solid thickness from painted surface mesh\n")
+
     else:
         if len(solid_thickness_parameters) != 1 or solid_thickness_parameters[0] <= 0:
             print("ERROR: Invalid parameter for constant solid thickness. This should be a " +
