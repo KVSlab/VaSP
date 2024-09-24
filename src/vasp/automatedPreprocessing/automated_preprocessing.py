@@ -792,9 +792,11 @@ def read_command_line(input_path=None):
                         type=str,
                         choices=["constant", "variable", "painted"],
                         default="constant",
-                        help="Determines whether to use constant or variable thickness for the solid. " +
+                        help="Determines whether to use constant, variable, or painted thickness for the solid. " +
                              "Use --solid-thickness-parameters to adjust distancetospheres parameters " +
-                             "when using variable thickness.")
+                             "when using variable thickness. To use pained thickness, the mesh with _aneudraw " +
+                             "suffix, which contains thickness information, must be present in the same " +
+                             "directory as the input model.")
 
     parser.add_argument('-stp', '--solid-thickness-parameters',
                         type=float,
