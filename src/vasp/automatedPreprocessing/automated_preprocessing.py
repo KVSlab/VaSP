@@ -594,10 +594,11 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
         file_name_voronoi, file_name_voronoi_smooth, file_name_voronoi_surface, file_name_surface_smooth,
         file_name_model_flow_ext, file_name_clipped_model, file_name_flow_centerlines, file_name_surface_name
     ]
-    exit(1)
-    for file_path in files_to_remove:
-        if file_path.exists():
-            file_path.unlink()
+    # In case of painted mesh, other files are necessary to create identical mesh with constant thickness
+    if not solid_thickness == "painted":
+        for file_path in files_to_remove:
+            if file_path.exists():
+                file_path.unlink()
 
 
 def read_command_line(input_path=None):
