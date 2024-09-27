@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import sys
+import datetime
 from pathlib import Path
 
 import configargparse
@@ -27,6 +28,21 @@ from vasp.automatedPreprocessing.preprocessing_common import generate_mesh, dist
     dist_sphere_spheres, convert_xml_mesh_to_hdf5, convert_vtu_mesh_to_xdmf, edge_length_evaluator, \
     check_flatten_boundary
 from vasp.simulations.simulation_common import load_mesh_and_data
+
+
+def save_command_to_file(file_path):
+    """
+    Save the command-line arguments to a file.
+
+    Args:
+        file_path (str): Path to the file where the command-line arguments should be saved.
+    """
+    # Join the command-line arguments into a single string
+    command = ' '.join(sys.argv)
+
+    # Open the file in append mode and write the command
+    with open(file_path, 'a') as f:
+        f.write(command + '\n')
 
 
 def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_factor, smoothing_iterations,
@@ -89,6 +105,10 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
     case_name = input_model_path.stem
     dir_path = input_model_path.parent
     print(f"\n--- Working on case: {case_name} \n")
+
+    # Get unique time stamp and save given command to file
+    time_stamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+    save_command_to_file(dir_path / f"commands_{time_stamp}.txt")
 
     # Naming conventions
     base_path = dir_path / case_name
