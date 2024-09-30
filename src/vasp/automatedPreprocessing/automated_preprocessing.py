@@ -818,10 +818,11 @@ def read_command_line(input_path=None):
                              "used when no nearby thickness data is available, the second value is the radius of " +
                              "the Gaussian kernel for interpolation, and the third value is the sharpness parameter" +
                              "of the Gaussian kernel to adjust the falloff rate." +
-                             "For example, --solid-thickness-parameters 0.3 0.4 2.0." +
+                             "For example, --solid-thickness-parameters 0.3 0.4 1.0." +
                              "Note: If --scale-factor is used, 'offset', 'min', and 'max' parameters will be " +
                              "adjusted accordingly for 'variable' solid thickness, and the constant value will " +
-                             "also be scaled for 'constant' solid thickness.")
+                             "also be scaled for 'constant' solid thickness." +
+                             "Defaults: [0.3] for 'constant', [0.3, 0.4, 1.0] for 'painted'.")
 
     parser.add_argument('-mf', '--mesh-format',
                         type=str,
@@ -877,6 +878,12 @@ def read_command_line(input_path=None):
     if args.refine_region and args.region_points is not None:
         if len(args.region_points) % 3 != 0:
             raise ValueError("ERROR: Please provide the region points as a multiple of 3.")
+
+    # Check if --solid-thickness is 'painted' and set default values accordingly
+    if args.solid_thickness == "painted" and len(args.solid_thickness_parameters) == 1:
+        args.solid_thickness_parameters = [args.solid_thickness_parameters[0], 0.4, 1.0]
+    elif args.solid_thickness == "painted" and len(args.solid_thickness_parameters) != 3:
+        raise ValueError("ERROR: solid thickness parameters for 'painted' thickness should be three floats: ")
 
     if args.verbosity:
         print()
