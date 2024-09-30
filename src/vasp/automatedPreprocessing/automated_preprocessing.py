@@ -5,6 +5,7 @@
 
 import sys
 from pathlib import Path
+import vtk
 
 import configargparse
 import numpy as np
@@ -433,6 +434,39 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
                 sys.exit(-1)
         else:
             distance_to_sphere = read_polydata(str(file_name_distance_to_sphere_solid_thickness))
+    elif solid_thickness == "painted":
+        file_name_aneudraw_data = base_path.with_name(base_path.name + "_aneudraw_surface.vtp")
+        assert file_name_aneudraw_data.is_file(), "ERROR: Aneudraw file is missing."
+        aneudraw = read_polydata(str(file_name_aneudraw_data))
+        thickness_array = aneudraw.GetPointData().GetArray("Thickness")
+
+        # Create points for interpolation
+        points = vtk.vtkPolyData()
+        points.SetPoints(aneudraw.GetPoints())
+        points.GetPointData().AddArray(thickness_array)
+
+        # Use a Gaussian kernel for interpolation
+        gaussian_kernel = vtk.vtkGaussianKernel()
+        gaussian_kernel.SetRadius(solid_thickness_parameters[1])
+        gaussian_kernel.SetSharpness(solid_thickness_parameters[2])
+
+        # Set up the interpolator with a Gaussian kernel
+        interpolator = vtk.vtkPointInterpolator()
+        interpolator.SetInputData(surface_extended)
+        interpolator.SetSourceData(points)
+        interpolator.SetNullValue(solid_thickness_parameters[0])
+        interpolator.SetKernel(gaussian_kernel)
+        interpolator.Update()
+
+        interpolated = interpolator.GetOutput()
+        aneudraw_interpolated_file = base_path.with_name(base_path.name + "_aneudraw_interpolated.vtp")
+        write_polydata(interpolated, str(aneudraw_interpolated_file))
+
+        thickness_array_interpolated = interpolated.GetPointData().GetArray("Thickness")
+        distance_to_sphere.GetPointData().AddArray(thickness_array_interpolated)
+
+        print("--- Constructed solid thickness from painted surface mesh\n")
+
     else:
         if len(solid_thickness_parameters) != 1 or solid_thickness_parameters[0] <= 0:
             print("ERROR: Invalid parameter for constant solid thickness. This should be a " +
@@ -574,9 +608,11 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
         file_name_voronoi, file_name_voronoi_smooth, file_name_voronoi_surface, file_name_surface_smooth,
         file_name_model_flow_ext, file_name_clipped_model, file_name_flow_centerlines, file_name_surface_name
     ]
-    for file_path in files_to_remove:
-        if file_path.exists():
-            file_path.unlink()
+    # In case of painted mesh, other files are necessary to create identical mesh with constant thickness
+    if not solid_thickness == "painted":
+        for file_path in files_to_remove:
+            if file_path.exists():
+                file_path.unlink()
 
 
 def read_command_line(input_path=None):
@@ -768,11 +804,13 @@ def read_command_line(input_path=None):
 
     parser.add_argument('-st', '--solid-thickness',
                         type=str,
-                        choices=["constant", "variable"],
+                        choices=["constant", "variable", "painted"],
                         default="constant",
-                        help="Determines whether to use constant or variable thickness for the solid. " +
+                        help="Determines whether to use constant, variable, or painted thickness for the solid. " +
                              "Use --solid-thickness-parameters to adjust distancetospheres parameters " +
-                             "when using variable thickness.")
+                             "when using variable thickness. To use pained thickness, the mesh with _aneudraw " +
+                             "suffix, which contains thickness information, must be present in the same " +
+                             "directory as the input model.")
 
     parser.add_argument('-stp', '--solid-thickness-parameters',
                         type=float,
@@ -780,11 +818,17 @@ def read_command_line(input_path=None):
                         default=[0.3],
                         help="Parameters for solid thickness [m]. For 'constant' solid thickness, provide a single " +
                              "float. For 'variable' solid thickness, provide four floats for the distancetosphere " +
-                             "scaling function: 'offset', 'scale', 'min' and 'max'. " +
-                             "For example --solid-thickness-parameters 0 0.1 0.25 0.3. " +
+                             "scaling function: 'offset', 'scale', 'min', and 'max'. " +
+                             "For example, --solid-thickness-parameters 0 0.1 0.25 0.3. " +
+                             "For 'painted' solid thickness, provide three floats: the first value is the null value " +
+                             "used when no nearby thickness data is available, the second value is the radius of " +
+                             "the Gaussian kernel for interpolation, and the third value is the sharpness parameter" +
+                             "of the Gaussian kernel to adjust the falloff rate." +
+                             "For example, --solid-thickness-parameters 0.3 0.4 1.0." +
                              "Note: If --scale-factor is used, 'offset', 'min', and 'max' parameters will be " +
-                             "adjusted accordingly for 'variable' solid thickness, and the constant value will also " +
-                             "be scaled for 'constant' solid thickness.")
+                             "adjusted accordingly for 'variable' solid thickness, and the constant value will " +
+                             "also be scaled for 'constant' solid thickness." +
+                             "Defaults: [0.3] for 'constant', [0.3, 0.4, 1.0] for 'painted'.")
 
     parser.add_argument('-mf', '--mesh-format',
                         type=str,
@@ -840,6 +884,12 @@ def read_command_line(input_path=None):
     if args.refine_region and args.region_points is not None:
         if len(args.region_points) % 3 != 0:
             raise ValueError("ERROR: Please provide the region points as a multiple of 3.")
+
+    # Check if --solid-thickness is 'painted' and set default values accordingly
+    if args.solid_thickness == "painted" and len(args.solid_thickness_parameters) == 1:
+        args.solid_thickness_parameters = [args.solid_thickness_parameters[0], 0.4, 1.0]
+    elif args.solid_thickness == "painted" and len(args.solid_thickness_parameters) != 3:
+        raise ValueError("ERROR: solid thickness parameters for 'painted' thickness should be three floats.")
 
     if args.verbosity:
         print()
