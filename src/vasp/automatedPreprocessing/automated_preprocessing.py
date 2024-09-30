@@ -883,7 +883,7 @@ def read_command_line(input_path=None):
     if args.solid_thickness == "painted" and len(args.solid_thickness_parameters) == 1:
         args.solid_thickness_parameters = [args.solid_thickness_parameters[0], 0.4, 1.0]
     elif args.solid_thickness == "painted" and len(args.solid_thickness_parameters) != 3:
-        raise ValueError("ERROR: solid thickness parameters for 'painted' thickness should be three floats: ")
+        raise ValueError("ERROR: solid thickness parameters for 'painted' thickness should be three floats.")
 
     if args.verbosity:
         print()
