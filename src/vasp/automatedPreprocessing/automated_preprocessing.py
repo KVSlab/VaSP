@@ -5,6 +5,7 @@
 
 import sys
 from pathlib import Path
+import vtk
 
 import configargparse
 import numpy as np
@@ -12,7 +13,7 @@ from morphman import get_uncapped_surface, write_polydata, get_parameters, vtk_c
     vtk_triangulate_surface, write_parameters, vmtk_cap_polydata, compute_centerlines, get_centerline_tolerance, \
     get_vtk_point_locator, extract_single_line, vtk_merge_polydata, get_point_data_array, smooth_voronoi_diagram, \
     create_new_surface, compute_centers, vmtk_smooth_surface, str2bool, vmtk_compute_voronoi_diagram, \
-    prepare_output_surface, vmtk_compute_geometric_features, read_polydata, create_vtk_array
+    prepare_output_surface, vmtk_compute_geometric_features, read_polydata
 
 from vampy.automatedPreprocessing.preprocessing_common import get_centers_for_meshing, \
     dist_sphere_diam, dist_sphere_curvature, dist_sphere_constant, get_regions_to_refine, add_flow_extension, \
@@ -432,29 +433,36 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
         else:
             distance_to_sphere = read_polydata(str(file_name_distance_to_sphere_solid_thickness))
     elif solid_thickness == "painted":
-        try:
-            import pyvista as pv
-        except ImportError:
-            print("ERROR: Painted solid thickness requires PyVista to be installed.")
-            sys.exit(-1)
+        file_name_aneudraw_data = base_path.with_name(base_path.name + "_aneudraw_surface.vtp")
+        assert file_name_aneudraw_data.is_file(), "ERROR: Aneudraw file is missing."
+        aneudraw = read_polydata(str(file_name_aneudraw_data))
+        thickness_array = aneudraw.GetPointData().GetArray("Thickness")
 
-        surface_pv = pv.wrap(surface_extended)
-        aneudraw_data = base_path.with_name(base_path.name + "_aneudraw_surface.vtp")
-        assert aneudraw_data.is_file(), "ERROR: Aneudraw file is missing."
+        # Create points for interpolation
+        points = vtk.vtkPolyData()
+        points.SetPoints(aneudraw.GetPoints())
+        points.GetPointData().AddArray(thickness_array)
 
-        aneudraw = pv.read(aneudraw_data)
-        point_array = pv.point_array(aneudraw, "Thickness")
-        points = pv.PolyData(aneudraw.points)
-        points['Thickness'] = point_array
+        # Use a Gaussian kernel for interpolation
+        gaussian_kernel = vtk.vtkGaussianKernel()
+        gaussian_kernel.SetRadius(solid_thickness_parameters[1])
+        gaussian_kernel.SetSharpness(solid_thickness_parameters[2])
 
-        # Run the interpolation from the aneudraw data to the surface mesh generated within this script
-        # may need to modify this interpolation radius for each mesh
-        interpolated = surface_pv.interpolate(points, radius=0.4, null_value=solid_thickness_parameters[0])
-        aneudrawInterpolatedFile = base_path.with_name(base_path.name + "_aneudraw_interpolated.vtp")
-        interpolated.save(aneudrawInterpolatedFile)
-        thickness_array = create_vtk_array(interpolated["Thickness"], "Thickness")
-        distance_to_sphere.GetPointData().AddArray(thickness_array)
-        write_polydata(distance_to_sphere, str(file_name_distance_to_sphere_solid_thickness))
+        # Set up the interpolator with a Gaussian kernel
+        interpolator = vtk.vtkPointInterpolator()
+        interpolator.SetInputData(surface_extended)
+        interpolator.SetSourceData(points)
+        interpolator.SetNullValue(solid_thickness_parameters[0])
+        interpolator.SetKernel(gaussian_kernel)
+        interpolator.Update()
+
+        interpolated = interpolator.GetOutput()
+        aneudraw_interpolated_file = base_path.with_name(base_path.name + "_aneudraw_interpolated.vtp")
+        write_polydata(interpolated, str(aneudraw_interpolated_file))
+
+        thickness_array_interpolated = interpolated.GetPointData().GetArray("Thickness")
+        distance_to_sphere.GetPointData().AddArray(thickness_array_interpolated)
+
         print("--- Constructed solid thickness from painted surface mesh\n")
 
     else:
@@ -804,11 +812,16 @@ def read_command_line(input_path=None):
                         default=[0.3],
                         help="Parameters for solid thickness [m]. For 'constant' solid thickness, provide a single " +
                              "float. For 'variable' solid thickness, provide four floats for the distancetosphere " +
-                             "scaling function: 'offset', 'scale', 'min' and 'max'. " +
-                             "For example --solid-thickness-parameters 0 0.1 0.25 0.3. " +
+                             "scaling function: 'offset', 'scale', 'min', and 'max'. " +
+                             "For example, --solid-thickness-parameters 0 0.1 0.25 0.3. " +
+                             "For 'painted' solid thickness, provide three floats: the first value is the null value " +
+                             "used when no nearby thickness data is available, the second value is the radius of " +
+                             "the Gaussian kernel for interpolation, and the third value is the sharpness parameter" +
+                             "of the Gaussian kernel to adjust the falloff rate." +
+                             "For example, --solid-thickness-parameters 0.3 0.4 2.0." +
                              "Note: If --scale-factor is used, 'offset', 'min', and 'max' parameters will be " +
-                             "adjusted accordingly for 'variable' solid thickness, and the constant value will also " +
-                             "be scaled for 'constant' solid thickness.")
+                             "adjusted accordingly for 'variable' solid thickness, and the constant value will " +
+                             "also be scaled for 'constant' solid thickness.")
 
     parser.add_argument('-mf', '--mesh-format',
                         type=str,
