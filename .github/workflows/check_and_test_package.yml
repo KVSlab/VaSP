@@ -83,10 +83,9 @@ jobs:
           python3 -m pip install --break-system-packages pip setuptools --upgrade
 
       # See: https://github.com/marketplace/actions/setup-miniconda
-      - name: Setup Mambaforge
+      - name: Setup Conda environment
         uses: conda-incubator/setup-miniconda@v3
         with:
-          miniforge-variant: Mambaforge
           miniforge-version: latest
           channels: conda-forge
           activate-environment: vasp
