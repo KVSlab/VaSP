@@ -180,6 +180,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
         topo_array[...] = topo_array_fsi
 
     if quantity in {"d", "v", "p"} and amplitude:
+        assert vector_data_amplitude is not None
         geo_array = vector_data_amplitude.create_dataset("Mesh/0/mesh/geometry", (n_nodes_fsi, 3))
         geo_array[...] = coord_array_fsi
         topo_array = vector_data_amplitude.create_dataset("Mesh/0/mesh/topology", (n_elements_fsi, 4), dtype="i")
@@ -235,6 +236,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
             att_type = "Scalar"
 
             if amplitude:
+                assert vector_data_amplitude is not None
                 v_array_amplitude = vector_data_amplitude.create_dataset(array_name, (n_nodes_fsi, 1))
                 v_array_amplitude[:, 0] = components_data_amplitude[0][:, idx]
                 rms_magnitude[:, idx] = components_data_amplitude[0][:, idx]
@@ -263,6 +265,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
             att_type = "Tensor"
 
             if amplitude:
+                assert vector_data_amplitude is not None
                 array_name = f"{viz_type_amplitude}/{viz_type_amplitude}_{idx}"
                 if idx == 0:
                     assert dof_info is not None
@@ -310,6 +313,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
 
                 array_name = f"{viz_type_magnitude}/{viz_type_magnitude}_{idx}"
                 assert dof_info_amplitude is not None
+                assert vector_data_mps is not None
                 if idx == 0:
                     for name, data in dof_info_amplitude.items():
                         dof_array = vector_data_mps.create_dataset(f"{array_name}/{name}", data=data)
@@ -326,6 +330,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
             att_type = "Vector"
 
             if amplitude:
+                assert vector_data_amplitude is not None
                 v_array_amplitude = vector_data_amplitude.create_dataset(array_name, (n_nodes_fsi, 3))
                 v_array_amplitude[:, 0] = components_data_amplitude[1][:, idx]
                 v_array_amplitude[:, 1] = components_data_amplitude[2][:, idx]

@@ -460,6 +460,7 @@ def get_spectrogram(dfNearest: pd.DataFrame, fsamp: float, nWindow: int, overlap
         bins = np.linspace(start_t, end_t, 100)
         Pxx_mean = interp_spline(freqs, bins)
 
+    assert Pxx_mean is not None, "Pxx_mean is None"
     Pxx_mean[Pxx_mean < 0] = 1e-16
 
     return Pxx_mean, freqs, bins
