@@ -290,7 +290,7 @@ def calculate_and_print_flow_properties(dt: float, mesh: Mesh, v: Function, inle
     # compute the minimum cell diameter in the mesh
     h = mesh.hmin()
     h_min = MPI.min(MPI.comm_world, h)
-    
+
     if MPI.rank(comm) == 0:
         # Calculate mean, min, and max velocities
         v_mean = np.mean(V_mean)
@@ -314,5 +314,3 @@ def calculate_and_print_flow_properties(dt: float, mesh: Mesh, v: Function, inle
         print(f"  Velocity (mean, min, max): {v_mean}, {v_min}, {v_max}")
         print(f"  CFL (mean, min, max): {CFL_mean}, {CFL_min}, {CFL_max}")
         print(f"  Reynolds Numbers (mean, min, max): {Re_mean}, {Re_min}, {Re_max}")
-    
-    exit(0)

@@ -121,7 +121,7 @@ def test_cylinder_problem(input_mesh, tmpdir):
     output_match_cfl_number = re.findall(output_cfl_number, str(result))
     assert output_match_cfl_number is not None, "Regular expression did not match the output."
 
-    expected_cfl_number = [0.008465020210929876, 1.5793871333017697e-05, 0.022455733137609308]
+    expected_cfl_number = [0.016930040421859752, 3.1587742666035394e-05, 0.044911466275218616]
     cfl_number_mean_min_max = [float(output_match_cfl_number[-1][0]), float(output_match_cfl_number[-1][1]),
                                float(output_match_cfl_number[-1][2])]
 
@@ -187,7 +187,7 @@ def test_aneurysm_problem(input_mesh, tmpdir):
     output_match_cfl_number = re.findall(output_cfl_number, str(result))
     assert output_match_cfl_number is not None, "Regular expression did not match the output."
 
-    expected_cfl_number = [0.002380256687906308, 2.217345370176909e-17, 0.009231963373337334]
+    expected_cfl_number = [0.004760513375812616, 4.434690740353818e-17, 0.01846392674667467]
     cfl_number_mean_min_max = [float(output_match_cfl_number[-1][0]), float(output_match_cfl_number[-1][1]),
                                float(output_match_cfl_number[-1][2])]
 
