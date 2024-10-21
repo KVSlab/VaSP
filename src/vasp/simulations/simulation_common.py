@@ -272,7 +272,6 @@ def calculate_and_print_flow_properties(dt: float, mesh: Mesh, v: Function, inle
     # Calculate the DG vector of velocity magnitudes
     DG = FunctionSpace(mesh, "DG", 0)
     V_vector = local_project(sqrt(inner(v, v)), DG, local_rhs).vector().get_local()
-    h = mesh.hmin()
 
     # Calculate flow rate at the inlet
     flow_rate_inlet = abs(assemble(inner(v, n) * dsi))
@@ -288,6 +287,10 @@ def calculate_and_print_flow_properties(dt: float, mesh: Mesh, v: Function, inle
     V_min = comm.gather(local_V_min, 0)
     V_max = comm.gather(local_V_max, 0)
 
+    # compute the minimum cell diameter in the mesh
+    h = mesh.hmin()
+    h_min = MPI.min(MPI.comm_world, h)
+
     if MPI.rank(comm) == 0:
         # Calculate mean, min, and max velocities
         v_mean = np.mean(V_mean)
@@ -301,9 +304,9 @@ def calculate_and_print_flow_properties(dt: float, mesh: Mesh, v: Function, inle
         Re_max = rho_f * v_max * diam_inlet / mu_f
 
         # Calculate CFL numbers
-        CFL_mean = v_mean * dt / h
-        CFL_min = v_min * dt / h
-        CFL_max = v_max * dt / h
+        CFL_mean = v_mean * dt / h_min * v.ufl_element().degree()
+        CFL_min = v_min * dt / h_min * v.ufl_element().degree()
+        CFL_max = v_max * dt / h_min * v.ufl_element().degree()
 
         # Print the flow properties
         print("Flow Properties:")
