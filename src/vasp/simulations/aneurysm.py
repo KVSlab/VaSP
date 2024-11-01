@@ -1,7 +1,7 @@
 """
 Problem file for aneurysm FSI simulation
 """
-import os
+from pathlib import Path
 import numpy as np
 
 from vampy.simulation.Womersley import make_womersley_bcs, compute_boundary_geometry_acrn
@@ -34,7 +34,7 @@ def set_problem_parameters(default_variables, **namespace):
 
     default_variables.update(dict(
         # Temporal parameters
-        T=1.902,  # Simulation end time
+        T=0.002,  # Simulation end time
         dt=0.001,  # Timne step size
         theta=0.501,  # Theta scheme parameter
         save_step=1,  # Save frequency of files for visualisation
@@ -122,7 +122,7 @@ def create_bcs(t, DVP, mesh, boundaries, mu_f,
                Q_mean, P_FC_File, P_mean, T_Cycle, **namespace):
 
     # Load fourier coefficients for the velocity and scale by flow rate
-    An, Bn = np.loadtxt(os.path.join(os.path.dirname(os.path.abspath(__file__)), FC_file)).T
+    An, Bn = np.loadtxt(Path(__file__).parent / FC_file).T
     # Convert to complex fourier coefficients
     Cn = (An - Bn * 1j) * Q_mean
     _, tmp_center, tmp_radius, tmp_normal = compute_boundary_geometry_acrn(mesh, inlet_id, boundaries)
@@ -147,7 +147,7 @@ def create_bcs(t, DVP, mesh, boundaries, mu_f,
     bcs = u_inlet + [d_inlet, u_inlet_s, d_inlet_s, d_rigid]
 
     # Load Fourier coefficients for the pressure
-    An_P, Bn_P = np.loadtxt(os.path.join(os.path.dirname(os.path.abspath(__file__)), P_FC_File)).T
+    An_P, Bn_P = np.loadtxt(Path(__file__).parent / P_FC_File).T
 
     # Apply pulsatile pressure at the fsi interface by modifying the variational form
     n = FacetNormal(mesh)
@@ -229,6 +229,6 @@ def finished(d_mean, u_mean, p_mean, visualization_folder, save_solution_after_t
     ]
 
     for vector, data_name in data_names:
-        file_path = os.path.join(visualization_folder, data_name)
-        with XDMFFile(MPI.comm_world, file_path) as f:
+        file_path = Path(visualization_folder) / data_name
+        with XDMFFile(MPI.comm_world, str(file_path)) as f:
             f.write_checkpoint(vector, data_name, 0, XDMFFile.Encoding.HDF5)

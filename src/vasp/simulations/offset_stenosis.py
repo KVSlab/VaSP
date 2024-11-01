@@ -1,12 +1,12 @@
 """
 Problem file for offset stenosis FSI simulation
 """
-import os
+from pathlib import Path
 import numpy as np
 
 from vampy.simulation.Womersley import make_womersley_bcs, compute_boundary_geometry_acrn
 from vampy.simulation.simulation_common import print_mesh_information
-from turtleFSI.problems import *
+from turtleFSI.problems import *  # noqa: F401
 from dolfin import HDF5File, Mesh, MeshFunction, facets, assemble, sqrt, cells, FacetNormal, ds, \
     DirichletBC, Measure, inner, parameters
 
@@ -153,7 +153,7 @@ def create_bcs(t, DVP, mesh, boundaries, mu_f,
                Q_mean, P_FC_File, P_mean, T_Cycle, **namespace):
 
     # Load Fourier coefficients for the velocity and scale by flow rate
-    An, Bn = np.loadtxt(os.path.join(os.path.dirname(os.path.abspath(__file__)), FC_file)).T
+    An, Bn = np.loadtxt(Path(__file__).parent / FC_file).T
     # Convert to complex fourier coefficients
     Cn = (An - Bn * 1j) * Q_mean
     _, tmp_center, tmp_radius, tmp_normal = compute_boundary_geometry_acrn(mesh, inlet_id, boundaries)
@@ -178,7 +178,7 @@ def create_bcs(t, DVP, mesh, boundaries, mu_f,
     bcs = u_inlet + [d_inlet, u_inlet_s, d_inlet_s, d_rigid]
 
     # Load Fourier coefficients for the pressure
-    An_P, Bn_P = np.loadtxt(os.path.join(os.path.dirname(os.path.abspath(__file__)), P_FC_File)).T
+    An_P, Bn_P = np.loadtxt(Path(__file__).parent / P_FC_File).T
 
     # Apply pulsatile pressure at the fsi interface by modifying the variational form
     n = FacetNormal(mesh)
