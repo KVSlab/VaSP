@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 from mpi4py import MPI as mpi
 from dolfin import Mesh, assemble, MPI, HDF5File, Measure, inner, MeshFunction, FunctionSpace, \
-    Function, sqrt, Expression, TrialFunction, TestFunction, LocalSolver, dx
+    Function, sqrt, Expression, TrialFunction, TestFunction, LocalSolver, dx, UserExpression
 
 
 def load_mesh_and_data(mesh_path: Union[str, Path]) -> Tuple[Mesh, MeshFunction, MeshFunction]:
@@ -314,3 +314,56 @@ def calculate_and_print_flow_properties(dt: float, mesh: Mesh, v: Function, inle
         print(f"  Velocity (mean, min, max): {v_mean}, {v_min}, {v_max}")
         print(f"  CFL (mean, min, max): {CFL_mean}, {CFL_min}, {CFL_max}")
         print(f"  Reynolds Numbers (mean, min, max): {Re_mean}, {Re_min}, {Re_max}")
+
+
+class InterfacePressure(UserExpression):
+    """
+    An expression for the fluid-solid interface pressure based on Fourier coefficients.
+    """
+    def __init__(self, t, t_ramp_start, t_ramp_end, An, Bn, period, P_mean, **kwargs):
+        """
+        Initialize the interface pressure expression.
+        """
+        self.t = t
+        self.t_ramp_start = t_ramp_start
+        self.t_ramp_end = t_ramp_end
+        self.An = An
+        self.Bn = Bn
+        self.omega = (2.0 * np.pi / period)
+        self.P_mean = P_mean
+        self.p_0 = 0.0  # Initial pressure
+        self.P = self.p_0  # Apply initial pressure to inner pressure variable
+        super().__init__(**kwargs)
+
+    def update(self, t):
+        """
+        Update the interface pressure at a given time.
+        """
+        self.t = t
+        # apply a sigmoid ramp to the pressure
+        if self.t < self.t_ramp_start:
+            ramp_factor = 0.0
+        if self.t_ramp_start <= self.t < self.t_ramp_end:
+            ramp_factor = -0.5 * np.cos(np.pi * (self.t - self.t_ramp_start) / (self.t_ramp_end - self.t_ramp_start)) \
+                + 0.5
+        if self.t >= self.t_ramp_end:
+            ramp_factor = 1.0
+        if MPI.rank(MPI.comm_world) == 0:
+            print("ramp_factor = {} m^3/s".format(ramp_factor))
+
+        # Calculate Pn (normalized pressure) from Fourier Coefficients
+        Pn = 0 + 0j
+        for i in range(len(self.An)):
+            Pn = Pn + (self.An[i] - self.Bn[i] * 1j) * np.exp(1j * i * self.omega * self.t)
+        Pn = abs(Pn)
+
+        # Multiply by mean pressure and ramp factor
+        self.P = ramp_factor * Pn * self.P_mean
+        if MPI.rank(MPI.comm_world) == 0:
+            print("Instantaneous normal stress prescribed at the FSI interface {} Pa".format(self.P))
+
+    def eval(self, value, x):
+        value[0] = self.P
+
+    def value_shape(self):
+        return ()
