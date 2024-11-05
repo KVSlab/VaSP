@@ -49,7 +49,7 @@ def test_create_hdf5_solid_only(input_mesh, tmpdir):
         assert np.isclose(first_time, 2.235075700301419E-9, atol=1e-10)
         last_time = f["displacement/vector_2"][0]
         assert np.isclose(last_time, 1.3776599148439903E-8, atol=1e-10)
-    
+
     # 7. create separate visualization
     cmd = (f"vasp-create-separate-domain-viz --folder {tmpdir}/1/")
     _ = subprocess.check_output(cmd, shell=True)
@@ -148,7 +148,7 @@ def test_create_hdf5_with_stride(input_mesh, tmpdir):
         assert np.isclose(first_time, 2.235075700301419E-9, atol=1e-10)
         last_time = f["displacement/vector_1"][0]
         assert np.isclose(last_time, 1.3776599148439903E-8, atol=1e-10)
-    
+
     # 7. create separate visualization
     cmd = (f"vasp-create-separate-domain-viz --folder {tmpdir}/1/")
     _ = subprocess.check_output(cmd, shell=True)
@@ -204,7 +204,7 @@ def test_create_hdf5_with_time(input_mesh, tmpdir):
         assert np.isclose(first_time, 2.235075700301419E-9, atol=1e-10)
         last_time = f["displacement/vector_1"][0]
         assert np.isclose(last_time, 7.0569699656660426E-9, atol=1e-10)
-    
+
     # 7. create separate visualization
     cmd = (f"vasp-create-separate-domain-viz --folder {tmpdir}/1/")
     _ = subprocess.check_output(cmd, shell=True)
@@ -219,4 +219,3 @@ def test_create_hdf5_with_time(input_mesh, tmpdir):
     displacement_xdmf_path = tmpdir / "1" / "Visualization_separate_domain" / "displacement_solid.xdmf"
     assert displacement_h5_path.exists(), "Separate visualization for displacement does not exist"
     assert displacement_xdmf_path.exists(), "Separate visualization for displacement does not exist"
-
