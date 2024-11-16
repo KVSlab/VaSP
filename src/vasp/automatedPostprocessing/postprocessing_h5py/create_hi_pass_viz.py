@@ -229,7 +229,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
 
     # 2. Loop through elements and load in the data
     for idx in tqdm(range(num_ts), desc="--- Saving data", unit=" timestep"):
-        array_name = f"VisualisationVector/{idx}" if quantity in {"d", "v"} else f"{viz_type}/{viz_type}_{idx}"
+        array_name = f"VisualisationVector/{idx}" if quantity in {"d", "v", "p"} else f"{viz_type}/{viz_type}_{idx}"
         if quantity == "p":
             v_array = vector_data.create_dataset(array_name, (n_nodes_fsi, 1))
             v_array[:, 0] = components_data[0][:, idx]
