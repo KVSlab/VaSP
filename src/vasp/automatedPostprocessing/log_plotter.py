@@ -62,13 +62,15 @@ def parse_log_file(log_file: str) -> Dict[str, Any]:
             "reynolds_mean": [],
             "reynolds_min": [],
             "reynolds_max": [],
-        }
+        },
+        "min_jacobian": []
     }
 
     # Define regular expressions for matching specific lines
     time_step_pattern = re.compile(r"Solved for timestep (.*), t = (.*) in (.*) s")
     ramp_factor_pattern = re.compile(r"ramp_factor = (.*) m\^3/s")
-    pressure_pattern = re.compile(r"Instantaneous normal stress prescribed at the FSI interface (.*) Pa")
+    # pressure_pattern = re.compile(r"Instantaneous normal stress prescribed at the FSI interface (.*) Pa")
+    pressure_pattern = re.compile(r"P = (.*) Pa")
     newton_iteration_pattern = \
         re.compile(r'Newton iteration (.*): r \(atol\) = (.*) \(tol = .*\), r \(rel\) = (.*) \(tol = .*\)')
     probe_point_pattern = re.compile(r"Probe Point (.*): Velocity: \((.*), (.*), (.*)\) \| Pressure: (.*)")
@@ -77,6 +79,7 @@ def parse_log_file(log_file: str) -> Dict[str, Any]:
     velocity_pattern = re.compile(r"\s*Velocity \(mean, min, max\): (.*), (.*), (.*)")
     cfl_pattern = re.compile(r"\s*CFL \(mean, min, max\): (.*), (.*), (.*)")
     reynolds_pattern = re.compile(r"\s*Reynolds Numbers \(mean, min, max\): (.*), (.*), (.*)")
+    min_jacobian_pattern = re.compile(r"Minimum jacobian: (.*)")
 
     # Open and read the log file line by line
     with open(log_file, 'r') as file:
@@ -159,6 +162,10 @@ def parse_log_file(log_file: str) -> Dict[str, Any]:
                 data["flow_properties"]["reynolds_min"].append(float(match.group(2)))
                 data["flow_properties"]["reynolds_max"].append(float(match.group(3)))
 
+            match = min_jacobian_pattern.match(line)
+            if match:
+                data["min_jacobian"].append(float(match.group(1)))
+
     # Convert lists to numpy arrays
     data["time_step"] = np.array(data["time_step"])
     data["time"] = np.array(data["time"])
@@ -167,6 +174,7 @@ def parse_log_file(log_file: str) -> Dict[str, Any]:
     data["pressure"] = np.array(data["pressure"])
     data["newton_iteration"]["atol"] = np.array(data["newton_iteration"]["atol"])
     data["newton_iteration"]["rtol"] = np.array(data["newton_iteration"]["rtol"])
+    data["min_jacobian"] = np.array(data["min_jacobian"])
 
     for probe_point in data["probe_points"]:
         data["probe_points"][probe_point]["velocity"] = np.array(data["probe_points"][probe_point]["velocity"])
@@ -1115,6 +1123,7 @@ def parse_command_line_args() -> argparse.Namespace:
     parser.add_argument("--plot-velocity", action="store_true", help="Plot velocity (mean, min and max)")
     parser.add_argument("--plot-cfl", action="store_true", help="Plot CFL numbers (mean, min and max)")
     parser.add_argument("--plot-reynolds", action="store_true", help="Plot Reynolds numbers (mean, min and max)")
+    parser.add_argument("--plot-min-jacobian", action="store_true", help="Plot minimum Jacobian")
     parser.add_argument("--probe-points", type=int, nargs="+", help="List of probe points to plot")
     parser.add_argument("--start-cycle", type=int, default=1,
                         help="Cycle to start plotting data from (default: 1, start at first cycle)")
@@ -1144,7 +1153,7 @@ def main() -> None:
     # Enable --plot-all by default if no specific --plot options are provided
     plot_types = ['cpu_time', 'ramp_factor', 'pressure', 'newton_iteration_atol', 'newton_iteration_rtol',
                   'probe_points', 'probe_points_displacement', 'flow_rate', 'velocity', 'cfl', 'reynolds',
-                  'probe_points_tke']
+                  'probe_points_tke', 'min_jacobian']
     args.plot_all = args.plot_all or all(not getattr(args, f'plot_{plot_type}') for plot_type in plot_types)
 
     # Create logger and set log level
@@ -1193,6 +1202,7 @@ def main() -> None:
     reynolds_mean = parsed_data.get("flow_properties", {}).get("reynolds_mean", [])
     reynolds_min = parsed_data.get("flow_properties", {}).get("reynolds_min", [])
     reynolds_max = parsed_data.get("flow_properties", {}).get("reynolds_max", [])
+    min_jacobian = parsed_data.get("min_jacobian", [])
 
     # Compute average over cycles for all data (except Newton iteration) if enabled
     if args.compute_average:
@@ -1410,6 +1420,18 @@ def main() -> None:
             # Call the plot function to plot probe points
             plot_probe_points_tke(tke_data, selected_probe_points=args.probe_points, save_to_file=args.save,
                                   figure_size=args.figure_size, output_directory=args.output_directory,
+                                  start=start, end=end)
+
+    if check_and_warn_empty("Minimum Jacobian", min_jacobian, args.plot_all or args.plot_min_jacobian):
+        if args.compare_cycles:
+            # Call the plot function to plot minimum Jacobian comparison across multiple cycles
+            plot_variable_comparison(min_jacobian, "Minimum Jacobian", time_steps_per_cycle, save_to_file=args.save,
+                                     output_directory=args.output_directory, figure_size=args.figure_size,
+                                     start_cycle=start_cycle, end_cycle=end_cycle)
+        else:
+            # Call the plot function to plot minimum Jacobian vs. time
+            plot_variable_vs_time(time, min_jacobian, "Minimum Jacobian", save_to_file=args.save,
+                                  output_directory=args.output_directory, figure_size=args.figure_size,
                                   start=start, end=end)
 
     if not args.save:
