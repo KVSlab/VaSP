@@ -69,8 +69,7 @@ def parse_log_file(log_file: str) -> Dict[str, Any]:
     # Define regular expressions for matching specific lines
     time_step_pattern = re.compile(r"Solved for timestep (.*), t = (.*) in (.*) s")
     ramp_factor_pattern = re.compile(r"ramp_factor = (.*) m\^3/s")
-    # pressure_pattern = re.compile(r"Instantaneous normal stress prescribed at the FSI interface (.*) Pa")
-    pressure_pattern = re.compile(r"P = (.*) Pa")
+    pressure_pattern = re.compile(r"Instantaneous normal stress prescribed at the FSI interface (.*) Pa")
     newton_iteration_pattern = \
         re.compile(r'Newton iteration (.*): r \(atol\) = (.*) \(tol = .*\), r \(rel\) = (.*) \(tol = .*\)')
     probe_point_pattern = re.compile(r"Probe Point (.*): Velocity: \((.*), (.*), (.*)\) \| Pressure: (.*)")
