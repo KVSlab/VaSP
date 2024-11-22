@@ -171,6 +171,7 @@ def generate_mesh(surface: vtkPolyData, number_of_sublayers_fluid: int, number_o
     meshGenerator.ExtractBranch = extract_branch
     meshGenerator.BranchGroupIds = branch_group_ids
     meshGenerator.BranchIdsOffset = branch_ids_offset
+    meshGenerator.ThicknessMethod = solid_thickness
 
     # Solid thickness handling
     if solid_thickness in ["variable", "painted"]:

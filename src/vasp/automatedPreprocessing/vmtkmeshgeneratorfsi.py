@@ -81,6 +81,8 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
         self.BranchIdsOffset = 1000
         self.Centerlines = None
 
+        self.ThicknessMethod = "constant"
+
         self.Mesh = None
         self.RemeshedSurface = None
 
@@ -201,7 +203,8 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
             boundaryLayer.Mesh = surfaceToMesh.Mesh
             boundaryLayer.WarpVectorsArrayName = 'Normals'
             boundaryLayer.NegateWarpVectors = True
-            boundaryLayer.ThicknessArrayName = self.TargetEdgeLengthArrayName
+            boundaryLayer.ThicknessArrayName = self.
+            
             if self.ElementSizeMode == 'edgelength':
                 boundaryLayer.ConstantThickness = True
             else:
@@ -314,6 +317,25 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
 
                 # Update the cell data in the original mesh
                 boundaryLayer2.Mesh.GetCellData().Update()
+            
+            elif self.ThicknessMethod == "painted":
+                self.PrintLog("Painted wall thickness enabled. Making solid mech with unique cell IDs for different thicknesses.")
+                # Create cell locators for the solid mesh
+                solidCellLocator = vtk.vtkCellLocator()
+                solidCellLocator.SetDataSet(boundaryLayer2.Mesh)
+                solidCellLocator.BuildLocator()
+
+                # Get the solid cell ID's from the original mesh
+                solidCellIds = boundaryLayer2.Mesh.GetCellData().GetScalars(self.CellEntityIdsArrayName)
+                # TODO: convert it to numpy array
+
+                # we need to get the thickness array
+                thicknessArray = boundaryLayer2.Mesh.GetCellData().GetArray(self.TargetEdgeLengthArrayNameSolid)                
+
+                # NOTE: I need to obtain thickness from the distancetospehres
+                for solidCellId in solidCellIds:
+                    break
+
 
             if not self.BoundaryLayerOnCaps:
 
