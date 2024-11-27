@@ -4,6 +4,7 @@
 from pathlib import Path
 from typing import Union
 
+import vtk
 import h5py
 import numpy as np
 import meshio
@@ -456,3 +457,113 @@ normals is {}, less than threshold of {}".format(
         vectorData.close()
         flat_in_out_mesh_path.unlink()
         print("No changes made to the mesh file")
+
+
+def map_thickness_to_mesh(mesh: vtkPolyData, surface: vtkPolyData) -> vtkPolyData:
+    """
+    Map the thickness values from a surface to the points in a mesh.
+
+    Args:
+        mesh (vtkPolyData): The input mesh.
+        surface (vtkPolyData): The surface with a "Thickness" array.
+        thickness_array_name (str): Name of the thickness array in the surface.
+
+    Returns:
+        vtkPolyData: The updated mesh with a mapped thickness array.
+    """
+    # Ensure the surface has the thickness array
+    thickness_array = surface.GetPointData().GetArray(distanceToSpheresArrayNameSolid)
+
+    # Create a new thickness array for the mesh
+    new_thickness_array = vtk.vtkFloatArray()
+    new_thickness_array.SetName(distanceToSpheresArrayNameSolid)
+    new_thickness_array.SetNumberOfComponents(1)
+    new_thickness_array.SetNumberOfTuples(mesh.GetNumberOfPoints())
+
+    # Setup a point locator for the surface
+    point_locator = vtk.vtkPointLocator()
+    point_locator.SetDataSet(surface)
+    point_locator.BuildLocator()
+
+    # Map the thickness values
+    for i in range(mesh.GetNumberOfPoints()):
+        point = mesh.GetPoint(i)
+        closest_point_id = point_locator.FindClosestPoint(point)
+        thickness_value = thickness_array.GetTuple1(closest_point_id)
+        new_thickness_array.SetTuple1(i, thickness_value)
+
+    # Add the new thickness array to the mesh
+    mesh.GetPointData().AddArray(new_thickness_array)
+    return mesh
+
+
+def update_entity_ids_by_thickness(mesh: vtkPolyData, entity_id_mapping: dict, volume_entity_id: int) -> vtkPolyData:
+    """
+    Update the entity IDs of cells in the mesh based on average thickness of their points.
+    Only update cells with the same entity ID as `volume_entity_id`.
+    Falls back to the original entity ID if no matching range is found.
+
+    Args:
+        mesh (vtkPolyData): The input mesh.
+        entity_id_mapping (dict): Mapping of thickness ranges to entity IDs.
+                                  Keys should be tuples defining ranges (min_thickness, max_thickness),
+                                  values should be the entity IDs to assign.
+        volume_entity_id (int): The cell entity ID that should be updated.
+
+    Returns:
+        vtkPolyData: Mesh with updated cell entity IDs.
+    """
+    # Fetch the thickness array
+    thickness_array = mesh.GetPointData().GetArray(distanceToSpheresArrayNameSolid)
+
+    # Fetch the original cell entity IDs
+    original_entity_ids_array = mesh.GetCellData().GetArray("CellEntityIds")
+
+    # Create a new array for updated cell entity IDs
+    updated_entity_ids_array = vtk.vtkIntArray()
+    updated_entity_ids_array.SetName("CellEntityIds")
+    updated_entity_ids_array.SetNumberOfTuples(mesh.GetNumberOfCells())
+
+    # Sort the entity_id_mapping by range to ensure proper assignment
+    sorted_mapping = sorted(entity_id_mapping.items(), key=lambda x: x[0])
+
+    # Iterate through each cell to compute average thickness
+    cell_point_ids = vtk.vtkIdList()
+    for cell_id in range(mesh.GetNumberOfCells()):
+        # Get the original entity ID for the current cell
+        original_entity_id = original_entity_ids_array.GetValue(cell_id)
+
+        # Skip cells that do not match the volume entity ID
+        if original_entity_id != volume_entity_id:
+            updated_entity_ids_array.SetValue(cell_id, original_entity_id)
+            continue
+
+        # Get the points of the current cell
+        mesh.GetCellPoints(cell_id, cell_point_ids)
+        point_ids = [cell_point_ids.GetId(i) for i in range(cell_point_ids.GetNumberOfIds())]
+
+        # Fetch thickness values for these points
+        thickness_values = [thickness_array.GetTuple1(pid) for pid in point_ids]
+
+        # Compute the average thickness for the cell
+        avg_thickness = sum(thickness_values) / len(thickness_values) if thickness_values else 0
+
+        # Determine the entity ID based on the average thickness and the mapping
+        new_entity_id = None
+        for (min_thickness, max_thickness), entity_id in sorted_mapping:
+            if min_thickness <= avg_thickness <= max_thickness:
+                new_entity_id = entity_id
+                break
+
+        # Fall back to the original entity ID if no match is found
+        if new_entity_id is None:
+            new_entity_id = original_entity_id
+
+        # Assign the determined or original entity ID to the updated array
+        updated_entity_ids_array.SetValue(cell_id, new_entity_id)
+
+    # Replace the original entity IDs array with the updated array
+    mesh.GetCellData().RemoveArray("CellEntityIds")
+    mesh.GetCellData().AddArray(updated_entity_ids_array)
+
+    return mesh
