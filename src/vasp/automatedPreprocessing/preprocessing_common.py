@@ -466,7 +466,6 @@ def map_thickness_to_mesh(mesh: vtkPolyData, surface: vtkPolyData) -> vtkPolyDat
     Args:
         mesh (vtkPolyData): The input mesh.
         surface (vtkPolyData): The surface with a "Thickness" array.
-        thickness_array_name (str): Name of the thickness array in the surface.
 
     Returns:
         vtkPolyData: The updated mesh with a mapped thickness array.
