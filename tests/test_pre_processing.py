@@ -391,8 +391,6 @@ def test_mesh_model_with_thickness_to_entity_id_mapping(tmpdir):
     # Run pre processing and assert mesh sizes
     model_path, mesh_vtu, mesh_hdf5 = run_pre_processing_with_common_input(model_path, common_input)
     assert_mesh_sizes(mesh_vtu, mesh_hdf5, expected_num_points, expected_num_cells)
-    from morphman import write_polydata
-    write_polydata(mesh_vtu, "/tmp/test_mapping_test.vtu")
 
     # Verify entity ID counts
     cell_entity_ids = mesh_vtu.GetCellData().GetArray("CellEntityIds")
