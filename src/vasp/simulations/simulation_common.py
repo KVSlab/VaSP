@@ -6,6 +6,7 @@ import numpy as np
 from mpi4py import MPI as mpi
 from dolfin import Mesh, assemble, MPI, HDF5File, Measure, inner, MeshFunction, FunctionSpace, \
     Function, sqrt, Expression, TrialFunction, TestFunction, LocalSolver, dx, UserExpression
+from turtleFSI.modules.common import J_
 
 
 def load_mesh_and_data(mesh_path: Union[str, Path]) -> Tuple[Mesh, MeshFunction, MeshFunction]:
@@ -314,6 +315,37 @@ def calculate_and_print_flow_properties(dt: float, mesh: Mesh, v: Function, inle
         print(f"  Velocity (mean, min, max): {v_mean}, {v_min}, {v_max}")
         print(f"  CFL (mean, min, max): {CFL_mean}, {CFL_min}, {CFL_max}")
         print(f"  Reynolds Numbers (mean, min, max): {Re_mean}, {Re_min}, {Re_max}")
+
+
+def compute_minimum_jacobian(mesh: Mesh, d: Function, local_rhs: bool = False) -> float:
+    """
+    Compute the minimum Jacobian of the mesh. The minimum Jacobian is a measure of the mesh distortion.
+    The value 1 indicates no distortion, while a value less than 0 indicates mesh entanglement.
+
+    Args:
+        mesh (dolfin.Mesh): The mesh object.
+        d (dolfin.Function): The displacement function.
+        local_rhs (bool, optional): If True, solve using a local right-hand side assembly.
+
+    Returns:
+        float: The minimum Jacobian of the displacement.
+    """
+    # Create a function space for the Jacobian
+    DG = FunctionSpace(mesh, "DG", 0)
+    # compute the Jacobian of the displacement
+    jacobian = J_(d)
+    # project the Jacobian to the DG function space
+    projected_jacobian = local_project(jacobian, DG, local_rhs)
+    min_jacobian = np.min(projected_jacobian.vector().get_local())
+    global_min_jacobian = MPI.min(MPI.comm_world, min_jacobian)
+
+    if MPI.rank(MPI.comm_world) == 0:
+        print(f"Minimum Jacobian: {global_min_jacobian}")
+
+        if global_min_jacobian <= 0:
+            print("Warning: Negative Jacobian detected.")
+
+    return min_jacobian
 
 
 class InterfacePressure(UserExpression):
