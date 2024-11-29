@@ -1,6 +1,7 @@
 import subprocess
 import pytest
 from pathlib import Path
+import numpy as np
 
 import vtk
 from dolfin import Mesh, HDF5File, XDMFFile, FunctionSpace, Function
@@ -329,6 +330,55 @@ def test_mesh_model_with_variable_solid_thickness(tmpdir):
     assert diameter_at_inlet == expected_diameter_at_inlet, \
         f"VTU mesh has diameter {diameter_at_inlet} at inlet, expected {expected_diameter_at_inlet}"
     assert diameter_at_outlet == expected_diameter_at_outlet, \
+        f"VTU mesh has diameter {diameter_at_outlet} at outlet, expected {expected_diameter_at_outlet}"
+
+
+def test_mesh_model_with_painted_solid_thickness(tmpdir):
+    """
+    Test meshing procedure on a specific 3D model with painted solid thickness.
+    """
+    # Define test data paths
+    original_model_path = Path("tests/test_data/cylinder/cylinder.vtp")
+    thickness_file_path = original_model_path.with_name(original_model_path.stem + "_aneudraw_surface.vtp")
+
+    # Copy the original model to tmpdir
+    model_path = copy_original_model_to_tmpdir(original_model_path, tmpdir)
+
+    # Copy the thickness file to tmpdir
+    copied_thickness_file_path = model_path.with_name(model_path.stem + "_aneudraw_surface.vtp")
+    copied_thickness_file_path.write_text(thickness_file_path.read_text())
+
+    # Define expected values
+    expected_num_points = 273
+    expected_num_cells = 1175
+    expected_diameter_at_inlet = 1.7317981719970703
+    expected_diameter_at_outlet = 1.7225000858306885
+
+    # Get default input parameters
+    common_input = read_command_line(str(model_path))
+    common_input.update(
+        dict(
+            solid_thickness="painted",
+            solid_thickness_parameters=[0.3, 0.4, 0.1],
+            meshing_method="constant",
+            edge_length=0.5,
+            add_flow_extensions=False,
+            visualize=False,
+            compress_mesh=False
+        )
+    )
+
+    # Run pre processing and assert mesh sizes
+    model_path, mesh_vtu, mesh_hdf5 = run_pre_processing_with_common_input(model_path, common_input)
+    assert_mesh_sizes(mesh_vtu, mesh_hdf5, expected_num_points, expected_num_cells)
+
+    # Compute diameter at inlet and outlet
+    diameter_at_inlet = compute_cylinder_diameter_at_cut(mesh_vtu, [0, -0.6, 0], [0, 1, 0])
+    diameter_at_outlet = compute_cylinder_diameter_at_cut(mesh_vtu, [0, 0.6, 0], [0, 1, 0])
+
+    assert np.isclose(diameter_at_inlet, expected_diameter_at_inlet, rtol=1e-6), \
+        f"VTU mesh has diameter {diameter_at_inlet} at inlet, expected {expected_diameter_at_inlet}"
+    assert np.isclose(diameter_at_outlet, expected_diameter_at_outlet, rtol=1e-6), \
         f"VTU mesh has diameter {diameter_at_outlet} at outlet, expected {expected_diameter_at_outlet}"
 
 
