@@ -332,6 +332,86 @@ def test_mesh_model_with_variable_solid_thickness(tmpdir):
         f"VTU mesh has diameter {diameter_at_outlet} at outlet, expected {expected_diameter_at_outlet}"
 
 
+def test_mesh_model_with_thickness_to_entity_id_mapping(tmpdir):
+    """
+    Test meshing procedure with thickness-to-entity-ID mapping by verifying the count of entity IDs per range.
+    """
+    # Define test data paths
+    original_model_path = Path("tests/test_data/cylinder/cylinder.vtp")
+    sphere_file_path = original_model_path.with_name("stored_" + original_model_path.stem +
+                                                     "_variable_solid_thickness_distance_to_sphere_solid_thickness.vtp")
+
+    # Copy the original model to tmpdir
+    model_path = copy_original_model_to_tmpdir(original_model_path, tmpdir)
+
+    # Copy the sphere file to tmpdir
+    copied_sphere_file_path = model_path.with_name(model_path.stem + "_distance_to_sphere_solid_thickness.vtp")
+    copied_sphere_file_path.write_text(sphere_file_path.read_text())
+
+    # Define expected values
+    expected_num_points = 5687
+    expected_num_cells = 31335
+    expected_entity_id_counts = {
+        0: 21399,   # Entity ID 0 (fluid volume ID) should have 21399 cells
+        1: 7923,    # Entity ID 1 (solid volume ID) should have 7923 cells
+        2: 120,     # Entity ID 2 (inlet ID) should have 120 cells
+        3: 102,     # Entity ID 3 (outlet ID) should have 102 cells
+        11: 136,    # Entity ID 11 (solid sidewall ID) should have 136 cells
+        22: 1656,   # Entity ID 22 (interface FSI ID) should have 1656 cells
+        33: 1656,   # Entity ID 33 (solid outer wall ID) should have 1656 cells
+        100: 760,   # Entity ID 100 should have 760 cells
+        200: 932,   # Entity ID 200 should have 932 cells
+        300: 909,   # Entity ID 300 should have 909 cells
+        400: 1068,  # Entity ID 400 should have 1068 cells
+    }
+
+    # Get default input parameters
+    common_input = read_command_line(str(model_path))
+    common_input.update(
+        dict(
+            solid_thickness="variable",
+            solid_thickness_parameters=[0, 0.1, 0.2, 0.4],
+            meshing_method="diameter",
+            smoothing_method="no_smooth",
+            refine_region=False,
+            coarsening_factor=1.3,
+            visualize=False,
+            compress_mesh=False,
+            outlet_flow_extension_length=5,
+            inlet_flow_extension_length=5,
+            thickness_to_entity_id_mapping={
+                (0.21, 0.25): 100,  # Thickness range -> Entity ID
+                (0.25, 0.3): 200,
+                (0.3, 0.35): 300,
+                (0.35, 0.4): 400,
+            },
+        )
+    )
+
+    # Run pre processing and assert mesh sizes
+    model_path, mesh_vtu, mesh_hdf5 = run_pre_processing_with_common_input(model_path, common_input)
+    assert_mesh_sizes(mesh_vtu, mesh_hdf5, expected_num_points, expected_num_cells)
+
+    # Verify entity ID counts
+    cell_entity_ids = mesh_vtu.GetCellData().GetArray("CellEntityIds")
+
+    # Count occurrences of each entity ID
+    entity_id_counts = {}
+    for cell_id in range(mesh_vtu.GetNumberOfCells()):
+        entity_id = cell_entity_ids.GetValue(cell_id)
+        entity_id_counts[entity_id] = entity_id_counts.get(entity_id, 0) + 1
+
+    # Verify the counts match expectations
+    for entity_id, expected_count in expected_entity_id_counts.items():
+        actual_count = entity_id_counts.get(entity_id, 0)
+        assert actual_count == expected_count, \
+            f"Entity ID {entity_id} has {actual_count} cells, expected {expected_count}"
+
+    # Check for unexpected entity IDs
+    unexpected_ids = set(entity_id_counts) - set(expected_entity_id_counts)
+    assert not unexpected_ids, f"Unexpected entity IDs found: {unexpected_ids}"
+
+
 def test_xdmf_mesh_format(tmpdir):
     """
     Test meshing procedure with generated mesh in XDMF format.

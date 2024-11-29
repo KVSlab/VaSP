@@ -27,7 +27,7 @@ from vampy.simulation.simulation_common import print_mesh_information
 
 from vasp.automatedPreprocessing.preprocessing_common import generate_mesh, distance_to_spheres_solid_thickness, \
     dist_sphere_spheres, convert_xml_mesh_to_hdf5, convert_vtu_mesh_to_xdmf, edge_length_evaluator, \
-    check_flatten_boundary
+    check_flatten_boundary, map_thickness_to_mesh, update_entity_ids_by_thickness
 from vasp.simulations.simulation_common import load_mesh_and_data
 
 
@@ -54,7 +54,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
                        remove_all, solid_thickness, solid_thickness_parameters, mesh_format, flow_rate_factor,
                        solid_side_wall_id, interface_fsi_id, solid_outer_wall_id, fluid_volume_id, solid_volume_id,
                        mesh_generation_retries, no_solid, extract_branch, branch_group_ids, branch_ids_offset,
-                       distance_method):
+                       distance_method, thickness_to_entity_id_mapping):
     """
     Automatically generate mesh of surface model in .vtu and .xml format, including prescribed
     flow rates at inlet and outlet based on flow network model.
@@ -100,6 +100,7 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
         branch_group_ids (list): Specify group IDs to extract for the branch.
         branch_ids_offset (int): Set offset for marking solid mesh IDs when extracting a branch.
         distance_method (str): Change between 'euclidean' and 'geodesic' distance measure
+        thickness_to_entity_id_mapping (dict): Mapping of thickness ranges to entity IDs
     """
     # Get paths
     input_model_path = Path(input_model)
@@ -539,6 +540,15 @@ def run_pre_processing(input_model, verbose_print, smoothing_method, smoothing_f
         assert mesh.GetNumberOfPoints() > 0, "No points in mesh, try to remesh."
         assert remeshed_surface.GetNumberOfPoints() > 0, "No points in surface mesh, try to remesh."
 
+        if thickness_to_entity_id_mapping and solid_thickness in ("variable", "painted"):
+            # Map thickness values to input mesh
+            print("--- Mapping thickness values to mesh...")
+            mesh = map_thickness_to_mesh(mesh, distance_to_sphere)
+
+            # Update entity IDs based on thickness values
+            print("--- Updating entity IDs based on thickness values...")
+            mesh = update_entity_ids_by_thickness(mesh, thickness_to_entity_id_mapping, solid_volume_id)
+
         if mesh_format in ("xml", "hdf5"):
             write_mesh(compress_mesh, str(file_name_surface_name), str(file_name_vtu_mesh), str(file_name_xml_mesh),
                        mesh, remeshed_surface)
@@ -892,6 +902,13 @@ def read_command_line(input_path=None):
     parser.add_argument('-bo', '--branch-ids-offset', default=1000, type=int,
                         help="Set the offset for marking solid mesh IDs when extracting a branch.")
 
+    parser.add_argument("-tm", "--thickness-to-entity-id-mapping", type=float, nargs='+', default=[],
+                        help="Mapping of thickness ranges to entity IDs in the format: min1 max1 id1 min2 max2 id2 ..."
+                             "Default is no mapping."
+                             "For example, --thickness-to-entity-id-mapping 0.2 0.3 100 0.3 0.4 200 will map the "
+                             "cells with thickness between 0.2 and 0.3 to entity ID 100, and the cells with thickness "
+                             "between 0.3 and 0.4 to entity ID 200.")
+
     # Parse path to get default values
     if required:
         args = parser.parse_args()
@@ -910,6 +927,13 @@ def read_command_line(input_path=None):
         args.solid_thickness_parameters = [args.solid_thickness_parameters[0], 0.4, 1.0]
     elif args.solid_thickness == "painted" and len(args.solid_thickness_parameters) != 3:
         raise ValueError("ERROR: solid thickness parameters for 'painted' thickness should be three floats.")
+
+    # Parse the thickness to entity ID mapping
+    args_mapping = args.thickness_to_entity_id_mapping
+    if len(args_mapping) % 3 != 0:
+        raise ValueError("Thickness to entity ID mapping must be a multiple of 3: min, max, and ID.")
+    thickness_to_entity_id_mapping = \
+        {(args_mapping[i], args_mapping[i + 1]): int(args_mapping[i + 2]) for i in range(0, len(args_mapping), 3)}
 
     if args.verbosity:
         print()
@@ -944,7 +968,7 @@ def read_command_line(input_path=None):
                 solid_volume_id=args.solid_volume_id, mesh_generation_retries=args.mesh_generation_retries,
                 no_solid=args.no_solid, extract_branch=args.extract_branch,
                 branch_group_ids=args.branch_group_ids, branch_ids_offset=args.branch_ids_offset,
-                distance_method=args.distance_method)
+                distance_method=args.distance_method, thickness_to_entity_id_mapping=thickness_to_entity_id_mapping)
 
 
 def main_meshing():
