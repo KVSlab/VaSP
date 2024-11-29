@@ -1,6 +1,7 @@
 import subprocess
 import pytest
 from pathlib import Path
+import numpy as np
 
 import vtk
 from dolfin import Mesh, HDF5File, XDMFFile, FunctionSpace, Function
@@ -375,9 +376,9 @@ def test_mesh_model_with_painted_solid_thickness(tmpdir):
     diameter_at_inlet = compute_cylinder_diameter_at_cut(mesh_vtu, [0, -0.6, 0], [0, 1, 0])
     diameter_at_outlet = compute_cylinder_diameter_at_cut(mesh_vtu, [0, 0.6, 0], [0, 1, 0])
 
-    assert diameter_at_inlet == expected_diameter_at_inlet, \
+    assert np.isclose(diameter_at_inlet, expected_diameter_at_inlet, rtol=1e-6), \
         f"VTU mesh has diameter {diameter_at_inlet} at inlet, expected {expected_diameter_at_inlet}"
-    assert diameter_at_outlet == expected_diameter_at_outlet, \
+    assert np.isclose(diameter_at_outlet, expected_diameter_at_outlet, rtol=1e-6), \
         f"VTU mesh has diameter {diameter_at_outlet} at outlet, expected {expected_diameter_at_outlet}"
 
 
