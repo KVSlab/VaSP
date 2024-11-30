@@ -265,6 +265,10 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
         # For pressure and velocity spectrogram, we need to take only the fluid IDs
         region_ids = fluid_ids
 
+    if len(region_ids) == 0:
+        logging.error(f"ERROR: No nodes found in the specified fsi region: {fsi_region}.")
+        sys.exit(-1)
+
     logging.info(f"\n--- Sampling data using '{sampling_method}' sampling method")
 
     if sampling_method == "RandomPoint":
