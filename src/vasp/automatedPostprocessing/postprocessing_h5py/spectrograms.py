@@ -55,11 +55,14 @@ def read_command_line_spec() -> configargparse.Namespace:
                         help="End time of the simulation (in seconds).")
     parser.add_argument('--lowcut', type=float, default=25,
                         help="Cutoff frequency (Hz) for the high-pass filter.")
-    parser.add_argument('--ylim', type=float, default=None,
+    parser.add_argument('--ylim', type=float, default=800,
                         help="Set the y-limit of the spectrogram graph (Hz).")
     parser.add_argument('--sampling-region', type=str, default="sphere",
                         help="Specify the sampling region. Choose 'sphere' to sample within a sphere, 'domain' to "
                              "sample within a specified domain or 'box' to sample within a box.")
+    parser.add_argument('--fsi-region', nargs="+", type=float, default=None,
+                        help="Region for sampling data. For 'sphere', input x, y, z coordinates of sphere center and "
+                             "radius. For 'box', input x_min, x_max, y_min, y_max, z_min, z_max.")
     parser.add_argument('--fluid-sampling-domain-id', type=int, default=1,
                         help="Domain ID for the fluid region to be sampled. Input a labelled mesh with this ID. Used "
                              "only when sampling region is 'domain'.")
@@ -73,7 +76,7 @@ def read_command_line_spec() -> configargparse.Namespace:
                         help="Generate spectrogram only for the fluid-solid interface. If present, interface-only "
                              "spectrogram will be generated; otherwise, the volumetric spectrogram will include all "
                              "fluid in the sac or all nodes through the wall.")
-    parser.add_argument('--component', type=str, default="mag",
+    parser.add_argument('--component', type=str, default="all",
                         help="Component of the data to visualize. Choose 'x', 'y', 'z', 'mag' (magnitude) or 'all' "
                              "(to combine all components).")
     parser.add_argument('--sampling-method', type=str, default="RandomPoint",
@@ -81,7 +84,7 @@ def read_command_line_spec() -> configargparse.Namespace:
                              "'PointList' (list of points specified by '--point-ids'), or 'Spatial' (ensures uniform "
                              "spatial sampling, e.g., in the case of fluid boundary layer, the sampling will not bias "
                              "towards the boundary layer).")
-    parser.add_argument('--n-samples', type=int, default=10000,
+    parser.add_argument('--n-samples', type=int, default=1000,
                         help="Number of samples to generate spectrogram data (ignored for PointList sampling).")
     parser.add_argument("--point-ids", nargs="+", type=int, default=[-1000000],
                         help="Input list of points for spectrograms a list. For "
@@ -261,6 +264,10 @@ def read_spectrogram_data(folder: Union[str, Path], mesh_path: Union[str, Path],
     else:
         # For pressure and velocity spectrogram, we need to take only the fluid IDs
         region_ids = fluid_ids
+
+    if len(region_ids) == 0:
+        logging.error(f"ERROR: No nodes found in the specified fsi region: {fsi_region}.")
+        sys.exit(-1)
 
     logging.info(f"\n--- Sampling data using '{sampling_method}' sampling method")
 

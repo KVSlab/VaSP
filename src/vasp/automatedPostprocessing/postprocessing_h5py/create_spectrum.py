@@ -83,11 +83,11 @@ def main():
     parameters = read_parameters_from_file(args.folder)
 
     # Extract parameters
-    fsi_region = parameters["fsi_region"]
+    fsi_region = parameters["fsi_region"] if args.fsi_region is None else args.fsi_region
     fluid_domain_id = parameters["dx_f_id"]
     solid_domain_id = parameters["dx_s_id"]
     end_time = args.end_time if args.end_time is not None else parameters["T"]
-    save_deg = args.save_deg if args.save_deg is not None else parameters["save_deg"]
+    save_deg = args.save_deg if args.save_deg is not None else (1 if args.quantity == 'p' else parameters["save_deg"])
 
     # Create or read in spectrogram dataframe
     quantity, df, case_name, image_folder, visualization_hi_pass_folder = \
