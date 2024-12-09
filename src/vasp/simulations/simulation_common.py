@@ -173,8 +173,8 @@ def print_probe_points(v: Function, p: Function, probe_points: List[np.ndarray])
         p.set_allow_extrapolation(False)
 
     for i, point in enumerate(probe_points):
-        u_eval = peval(v, point.tolist())
-        pp = peval(p, point.tolist())
+        u_eval = peval(v, [float(x) for x in point.tolist()])
+        pp = peval(p, [float(x) for x in point.tolist()])
 
         if MPI.rank(MPI.comm_world) == 0:
             print(f"Probe Point {i}: Velocity: ({u_eval[0]}, {u_eval[1]}, {u_eval[2]}) | Pressure: {pp}")
@@ -193,7 +193,7 @@ def print_solid_probe_points(d: Function, probe_points: List[np.ndarray]) -> Non
         d.set_allow_extrapolation(False)
 
     for i, point in enumerate(probe_points):
-        d_eval = peval(d, point.tolist())
+        d_eval = peval(d, [float(x) for x in point.tolist()])
         if MPI.rank(MPI.comm_world) == 0:
             print(f"Probe Point {i}: Displacement: {d_eval[0], d_eval[1], d_eval[2]}")
 
