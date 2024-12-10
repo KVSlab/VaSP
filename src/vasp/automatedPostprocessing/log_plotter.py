@@ -24,6 +24,7 @@ import pickle
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.axes import Axes
 
 
 def parse_log_file(log_file: str) -> Dict[str, Any]:
@@ -512,7 +513,7 @@ def plot_probe_points(time: np.ndarray, probe_points: Dict[int, Dict[str, np.nda
 
         # Flatten the axes array for easier iteration
         assert isinstance(axes_array, np.ndarray)
-        axes = axes_array.flatten().tolist()
+        axes = [ax for ax in axes_array.flatten() if isinstance(ax, Axes)]
 
     for i, (probe_point, data) in enumerate(selected_probe_data.items()):
         ax = axes[i]
@@ -594,7 +595,7 @@ def plot_probe_points_displacement(time: np.ndarray, probe_points: Dict[int, Dic
 
         # Flatten the axes array for easier iteration
         assert isinstance(axes_array, np.ndarray)
-        axes = axes_array.flatten().tolist()
+        axes = [ax for ax in axes_array.flatten() if isinstance(ax, Axes)]
 
     for i, (probe_point, data) in enumerate(selected_probe_data.items()):
         ax = axes[i]
@@ -1023,7 +1024,7 @@ def plot_probe_points_tke(tke_data: Dict[int, Tuple[np.ndarray, np.ndarray, np.n
 
         # Flatten the axes array for easier iteration
         assert isinstance(axes_array, np.ndarray)
-        axes = axes_array.flatten().tolist()
+        axes = [ax for ax in axes_array.flatten() if isinstance(ax, Axes)]
 
     # Add common title
     fig.suptitle("Turbulent Kinetic Energy (TKE) for Probe Points", fontsize=16)
