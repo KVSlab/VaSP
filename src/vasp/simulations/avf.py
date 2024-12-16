@@ -8,7 +8,7 @@ from dolfin import HDF5File, Mesh, MeshFunction, facets, UserExpression, FacetNo
     DirichletBC, Measure, inner, parameters, assemble, Constant, SpatialCoordinate
 
 from vasp.simulations.simulation_common import load_probe_points, calculate_and_print_flow_properties, \
-    print_probe_points
+    print_probe_points, compute_minimum_jacobian
 
 # set compiler arguments
 parameters["form_compiler"]["quadrature_degree"] = 6
@@ -304,9 +304,10 @@ def pre_solve(t, u_inflow_exp1, u_inflow_exp2, p_out_bc_val, **namespace):
 
 
 def post_solve(dvp_, n, dsi1, dt, mesh, inlet_area, mu_f, rho_f, probe_points, **namespace):
-
+    d = dvp_["n"].sub(0, deepcopy=True)
     v = dvp_["n"].sub(1, deepcopy=True)
     p = dvp_["n"].sub(2, deepcopy=True)
 
     print_probe_points(v, p, probe_points)
     calculate_and_print_flow_properties(dt, mesh, v, inlet_area, mu_f, rho_f, n, dsi1)
+    compute_minimum_jacobian(mesh, d)
