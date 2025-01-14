@@ -352,6 +352,42 @@ Solid stress and strain computed based on solid displacement
 While this section comes after `post-processing fenics`, all the post-processing in this section can be performed as long as you have meshes from the `post-processing mesh`.
 ```
 
+We first start by generating [spectrograms](https://en.wikipedia.org/wiki/Spectrogram#:~:text=A%20spectrogram%20is%20a%20visual,may%20be%20called%20waterfall%20displays.), which represent the evolution of frequency over time. To do so, run:
+
+```console
+vasp-create-spectrograms-chromagrams --folder offset_stenosis_results/1 -q d --component all --start-time 0.951 --end-time 1.902 --ylim 500
+```
+
+Here, `-q` indicates the quantity of interest, namely displacement (d), velocity (v), or pressure (p). The second flag `--component` specifies which directional component to use, where `all` means that we use all x, y, and z components to generate spectrograms. `--start-time`/`end-time` and `--ylim` are used to specify the time-window, i.e. x-axis, and maximum frequency, i.e. y-axis, of the resulting spectrograms. In this example, we focus on the second cardiac cycle (0.951 ~ 1.902 s) and up to 500 Hz. {numref}`stenosis_spectrogram` is an example of the figure you get as a result. For detailed explanation of chromagram and spectral bandness index, please refer to {cite}`MacDonald2022b`
+
+```{figure} figures/stenosis_spectrogram.png
+---
+name: stenosis_spectrogram
+---
+Displacement spectrogram (top), chromagram (middle), and spectral bandness index (SBI, bottom)
+```
+
+Now, from the spectogram, it is quite clear that there are some concentration of the frequency contents, as evident from narrow frequency bands. Physically, those frequency are associated with the specific directional motion of the wall, called mode shapes. To extract and visualize such motions, you can use `vasp-create-hi-pass-viz` command. For example, two distinct modes (70 ~ 90 Hz and  150 ~ 170 Hz) can be extracted by running the following command:
+
+```console
+vasp-create-hi-pass-viz --folder offset_stenosis_results/1 -q d --start-time 0.951 --end-time 1.902 --bands 70 90
+```
+and
+```console
+vasp-create-hi-pass-viz --folder offset_stenosis_results/1 -q d --start-time 0.951 --end-time 1.902 --bands 150 170
+```
+
+Those two modes correspond to the specific motion of the stenosis wall, as shown in {numref}`stenosis_modes`.
+
+
+```{figure} figures/stenosis_modes.png
+---
+name: stenosis_modes
+---
+Mode shapes of stenosis with expansion/contraction (mode1) and left/right (mode2) motions
+```
+
+
 
 
 
