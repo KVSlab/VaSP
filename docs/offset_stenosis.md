@@ -328,7 +328,7 @@ and
 vasp-compute-stress --folder offset_stenosis_results/1
 ```
 
-{numref}`stenosis_hemo` and {numref}`stenosis_stress`, respectively, show computed hemodynamics and stresss/strain.
+{numref}`stenosis_hemo` and {numref}`stenosis_stress`, respectively, show computed hemodynamics and stress/strain.
 
 
 ```{figure} figures/stenosis_hemo.png
