@@ -358,7 +358,7 @@ We first start by generating [spectrograms](https://en.wikipedia.org/wiki/Spectr
 vasp-create-spectrograms-chromagrams --folder offset_stenosis_results/1 -q d --component all --start-time 0.951 --end-time 1.902 --ylim 500
 ```
 
-Here, `-q` indicates the quantity of interest, namely displacement (d), velocity (v), or pressure (p). The second flag `--component` specifies which directional component to use, where `all` means that we use all x, y, and z components to generate spectrograms. `--start-time`/`end-time` and `--ylim` are used to specify the time-window, i.e. x-axis, and maximum frequency, i.e. y-axis, of the resulting spectrograms. In this example, we focus on the second cardiac cycle (0.951 ~ 1.902 s) and up to 500 Hz. {numref}`stenosis_spectrogram` is an example of the figure you get as a result. For detailed explanation of chromagram and spectral bandness index, please refer to {cite}`MacDonald2022b`
+Here, `-q` indicates the quantity of interest, namely displacement (d), velocity (v), or pressure (p). The second flag `--component` specifies which directional component to use, where `all` means that we use all x, y, and z components to generate spectrograms. `--start-time`/`end-time` and `--ylim` are used to specify the time-window, i.e. x-axis, and maximum frequency, i.e. y-axis, of the resulting spectrograms. In this example, we focus on the second cardiac cycle (0.951 ~ 1.902 s) and up to 500 Hz. {numref}`stenosis_spectrogram` is an example of the figure you get as a result. For detailed explanation of chromagram and spectral bandness index, please refer to MacDonald et al. {cite}`MacDonald2022b`
 
 ```{figure} figures/stenosis_spectrogram.png
 ---
@@ -386,10 +386,6 @@ name: stenosis_modes
 ---
 Mode shapes of stenosis with expansion/contraction (mode1) and left/right (mode2) motions
 ```
-
-
-
-
 
 ```{bibliography}
 :filter: docname in docnames
