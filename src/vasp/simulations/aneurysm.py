@@ -11,7 +11,7 @@ from dolfin import HDF5File, Mesh, MeshFunction, facets, assemble, sqrt, FacetNo
     DirichletBC, Measure, inner, parameters, VectorFunctionSpace, Function, XDMFFile
 
 from vasp.simulations.simulation_common import load_probe_points, calculate_and_print_flow_properties, \
-    print_probe_points, InterfacePressure
+    print_probe_points, InterfacePressure, compute_minimum_jacobian
 
 # set compiler arguments
 parameters["form_compiler"]["quadrature_degree"] = 6
@@ -204,6 +204,7 @@ def post_solve(dvp_, n, dsi, dt, mesh, inlet_area, mu_f, rho_f, probe_points, t,
 
     print_probe_points(v, p, probe_points)
     calculate_and_print_flow_properties(dt, mesh, v, inlet_area, mu_f, rho_f, n, dsi)
+    compute_minimum_jacobian(mesh, d)
 
     if t >= save_solution_after_tstep * dt:
         # Here, we accumulate the velocity filed in u_mean
