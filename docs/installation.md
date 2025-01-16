@@ -25,3 +25,6 @@ with `conda` can be found [here](install:conda).
 To install `VaSP` and all its dependencies to an *isolated environment*, we recommend using the dedicated Docker
 container. Instructions for installing `VaSP` with Docker can be found [here](install:docker).
 
+## Installing in high-performance computing (HPC) clusters
+
+To install and use `VaSP`, it is recommended to first install `FEniCS` on the cluster and then install `turtleFSI`, `VaMPy`, and `VaSP` separately. To install `FEniCS`, it is recommended to build it from source and instructions can be found [here](https://fenics.readthedocs.io/en/latest/installation.html). After installing `FEniCS`, you can install `turtleFSI`, `VaMPy`, and `VaSP` via `pip`.
