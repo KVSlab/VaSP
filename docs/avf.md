@@ -28,7 +28,7 @@ name: avf_meshing
 An interactive method for specifying variable wall thickness, using VMTK. Press `d` on the keyboard to display the distances to the sphere, which will define the local wall thickness. In this case, the red regions will have a wall thickness of 0.15, while the blue regions will have a wall thickness of 0.3.
 ```
 
-The third option `-eb` (or `--extract-branch`) option enables the extraction of specific branches from the mesh, such as the artery or vein in an arteriovenous fistula (AVF). When this option is enabled, `VaSP` assigns a unique solid mesh ID to the extracted branch, with an optional ID offset, controlled by `--branch-ids-offset`. This offset allows for the modification of the original solid ID number. For instance, if the original ID for a solid is 2 and the offset is set to 1000, the extracted branch will be assigned a new solid ID of 1002. This feature is particularly useful when you want to separately treat specific branches, like the artery and vein, with different wall properties. Again, with this option enabled, a render window will pop up, allowing you to specify the branch interactively.
+The third option `-eb` (or `--extract-branch`) option enables the extraction of specific branches from the mesh, such as the artery or vein in an AVF. When this option is enabled, `VaSP` assigns a unique solid mesh ID to the extracted branch, with an optional ID offset, controlled by `--branch-ids-offset`. This offset allows for the modification of the original solid ID number. For instance, if the original ID for a solid is 2 and the offset is set to 1000, the extracted branch will be assigned a new solid ID of 1002. This feature is particularly useful when you want to separately treat specific branches, like the artery and vein, with different wall properties. Again, with this option enabled, a render window will pop up, allowing you to specify the branch interactively.
 
 ```{figure} figures/avf_branch.gif
 ---
@@ -73,21 +73,23 @@ def set_problem_parameters(default_variables, **namespace):
 Moreover, we use patient-specific boundary conditions for the AVF model. The following code snippet shows how to define the boundary conditions for the AVF model:
 
 ```python
-# read patient-specific data
-patient_data = np.loadtxt(patient_data_path, skiprows=1, delimiter=",", usecols=(0, 1, 2))
-v_PA = patient_data[:, 0]
-v_DA = patient_data[:, 1]
-PV = patient_data[:, 2]
+def create_bcs(DVP, mesh, boundaries, T, dt, fsi_id, inlet_id1, inlet_id2, rigid_id, psi, F_solid_linear,
+               vel_t_ramp, p_t_ramp_start, p_t_ramp_end, p_deg, v_deg, patient_data_path, **namespace):
+    # read patient-specific data
+    patient_data = np.loadtxt(patient_data_path, skiprows=1, delimiter=",", usecols=(0, 1, 2))
+    v_PA = patient_data[:, 0]
+    v_DA = patient_data[:, 1]
+    PV = patient_data[:, 2]
 
-len_v = len(v_PA)
-t_v = np.arange(len(v_PA))
-num_t = int(T / dt)  # 30.000 timesteps = 3s (T) / 0.0001s (dt)
-tnew = np.linspace(0, len_v, num=num_t)
+    len_v = len(v_PA)
+    t_v = np.arange(len(v_PA))
+    num_t = int(T / dt)  # 30.000 timesteps = 3s (T) / 0.0001s (dt)
+    tnew = np.linspace(0, len_v, num=num_t)
 
-interp_DA = np.array(np.interp(tnew, t_v, v_DA))
-interp_PA = np.array(np.interp(tnew, t_v, v_PA))
-# pressure interpolation (velocity and pressure waveforms must be syncronized)
-interp_P = np.array(np.interp(tnew, t_v, PV))
+    interp_DA = np.array(np.interp(tnew, t_v, v_DA))
+    interp_PA = np.array(np.interp(tnew, t_v, v_PA))
+    # pressure interpolation (velocity and pressure waveforms must be syncronized)
+    interp_P = np.array(np.interp(tnew, t_v, PV))
 ```
 
 In this code snippet, patient-specific boundary conditions are defined by interpolating measured data to match the simulation's temporal resolution. The patient data is read from a CSV file, which extracts the velocity values for the proximal artery (`v_PA`), distal artery (`v_DA`), and the pressure values (`PV`). The time indices for the original dataset are then generated as t_v.
