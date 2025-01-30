@@ -9,6 +9,8 @@ from turtleFSI.problems import *
 from dolfin import HDF5File, Mesh, MeshFunction, assemble, UserExpression, FacetNormal, ds, \
     DirichletBC, Measure, inner, parameters, SpatialCoordinate, Constant, facets, sqrt
 
+from vasp.simulations.simulation_common import calculate_and_print_flow_properties
+
 # set compiler arguments
 parameters["form_compiler"]["quadrature_degree"] = 6
 parameters["form_compiler"]["optimize"] = True
@@ -29,9 +31,9 @@ def set_problem_parameters(default_variables, **namespace):
     default_variables.update(
         dict(
             # Temporal parameters
-            T=0.3,  # Simulation end time
-            dt=0.001,  # Time step size
-            theta=0.501,  # Theta scheme (implicit/explicit time stepping)
+            T=1.0,  # Simulation end time
+            dt=0.01,  # Time step size
+            theta=1.0,  # backward Euler time integration
             save_step=10,  # Save frequency of files for visualisation
             checkpoint_step=50,  # Save frequency of checkpoint files
             # Linear solver parameters
@@ -40,6 +42,7 @@ def set_problem_parameters(default_variables, **namespace):
             rtol=1e-6,  # Relative tolerance in the Newton solver
             recompute=20,  # Recompute the Jacobian matix within time steps
             recompute_tstep=20,  # Recompute the Jacobian matix over time steps
+            lmbda=0.5,  # Damping parameter for the Newton solver
             # boundary condition parameters
             mesh_path="mesh/cylinder.h5",
             inlet_id=2,  # inlet id for the fluid
@@ -57,14 +60,13 @@ def set_problem_parameters(default_variables, **namespace):
             P_final=10000,  # Steady State pressure applied to wall
             # should be your cycle-averaged gage pressure for your main simulation
             t_start_v=0.0,  # Start time for ramping up velocity
-            t_end_v=0.1,  # End time for ramping up velocity
-            t_start_p=0.1,  # Start time for ramping up pressure
-            t_end_p=0.2,  # End time for ramping up pressure (should be earlier than simulation end time)
+            t_end_v=0.2,  # End time for ramping up velocity
+            t_start_p=0.2,  # Start time for ramping up pressure
+            t_end_p=0.9,  # End time for ramping up pressure (should be earlier than simulation end time)
             # Solid parameters
             rho_s=1.0e3,  # Solid density [kg/m3]
-            mu_s=mu_s_val,  # Solid shear modulus or 2nd Lame Coef. [Pa]
-            nu_s=nu_s_val,  # Solid Poisson ratio [-]
-            lambda_s=lambda_s_val,  # Solid 1st Lame Coef. [Pa]
+            solid_properties={"dx_s_id": 2, "material_model": "MooneyRivlin", "rho_s": 1.0E3, "mu_s": mu_s_val,
+                              "lambda_s": lambda_s_val, "C01": 0.02e6, "C10": 0.0, "C11": 1.8e6},
             dx_s_id=2,  # ID of marker in the solid domain
             fsi_region=[0.0, 0.0, 0.0, 0.004],  # x, y, and z coordinate of FSI region center,
                                                 # and radius of FSI region sphere
@@ -72,7 +74,12 @@ def set_problem_parameters(default_variables, **namespace):
             extrapolation="laplace",  # laplace, elastic, biharmonic, no-extrapolation
             extrapolation_sub_type="constant",  # ["constant","small_constant","volume","volume_change","bc1","bc2"]
             folder="predeform_results",  # output folder generated for simulation
-            save_deg=1,  # save_deg=1 saves corner nodes only, save_deg=2 saves corner + mid-point nodes for viz
+            save_deg=1,  # NOTE: save_deg=1 is required for predeform simulations
+            # Robin BC parameters
+            k_s=[1E5],
+            c_s=[10],
+            ds_s_id=[33],
+            robin_bc=True,
         )
     )
 
@@ -203,6 +210,12 @@ def create_bcs(DVP, mesh, boundaries, t_start_v, t_end_v, t_start_p, t_end_p, P_
     n_len = np.sqrt(sum([ni[i] ** 2 for i in range(ndim)]))  # Should always be 1!?
     normal = ni / n_len
 
+    # compute inlet area
+    inlet_area = assemble(1 * dsi)
+
+    if MPI.rank(MPI.comm_world) == 0:
+        print("Inlet area = ", inlet_area)
+
     # Parabolic Inlet Velocity Profile
     u_inflow_exp = VelInPara(t=0.0, t_start=t_start_v, t_end=t_end_v, v_max_final=v_max_final,
                              n=normal, dsi=dsi, mesh=mesh, degree=3)
@@ -219,7 +232,7 @@ def create_bcs(DVP, mesh, boundaries, t_start_v, t_end_v, t_start_p, t_end_p, P_
     bcs = [u_inlet, d_inlet, u_inlet_s, d_inlet_s, d_rigid]
 
     return dict(bcs=bcs, u_inflow_exp=u_inflow_exp, p_out_bc_val=p_out_bc_val,
-                F_solid_linear=F_solid_linear)
+                F_solid_linear=F_solid_linear, inlet_area=inlet_area, n=n, dsi=dsi)
 
 
 def pre_solve(t, u_inflow_exp, p_out_bc_val, **namespace):
@@ -227,3 +240,9 @@ def pre_solve(t, u_inflow_exp, p_out_bc_val, **namespace):
     u_inflow_exp.update(t)
     p_out_bc_val.update(t)
     return dict(u_inflow_exp=u_inflow_exp, p_out_bc_val=p_out_bc_val)
+
+
+def post_solve(dvp_, n, dsi, dt, mesh, inlet_area, mu_f, rho_f, **namespace):
+
+    v = dvp_["n"].sub(1, deepcopy=True)
+    calculate_and_print_flow_properties(dt, mesh, v, inlet_area, mu_f, rho_f, n, dsi)
