@@ -463,11 +463,11 @@ def parse_command_line_args() -> Tuple[Path, Path, int, int, float, float, str,
     parser.add_argument("-q", "--quantity", type=str, default="v",
                         help="Quantity to postprocess. Choose 'v' for velocity, 'd' for displacement, 'p' for pressure,"
                              " or 'strain' for strain. Default is 'v'.")
-    parser.add_argument("--bands", nargs="+", type=int, default=[25, 100000],
+    parser.add_argument("--bands", nargs="+", type=int, default=[25, 1000],
                         help="Input lower and upper band for band-pass filtered displacement, in a list of pairs. For "
                              "example: --bands 100 150 175 200, gives you band-pass filtered visualization for the "
                              "band between 100 and 150, and another visualization for the band between 175 and 200."
-                             "Default is [25, 100000].")
+                             "Default is [25, 1000].")
     parser.add_argument("--point-ids", nargs="+", type=int, default=[0, 1],
                         help="Input list of points IDs. Default is [0, 1].")
     parser.add_argument("--filter-type", type=str, default="bandpass",
