@@ -7,19 +7,19 @@
 To run FSI simulations with `turtleFSI`, users typically need to create a problem file that contains information about input parameters and boundary conditions. How to create your own problem file is explained in details [here](https://turtlefsi2.readthedocs.io/en/latest/using_turtleFSI.html#create-your-own-problem-file). With the problem file and the mesh from pre-processing step in hand, you can now run FSI simulation with `turtleFSI` as follows:
 
 ```console
-turtleFSI -p [name_of_the_problem_file (without .py)]
+turtleFSI -p name_of_the_problem_file (without .py)
 ```
 
 It is also possible to run `turtleFSI` with Message Passing Interface (MPI) for possibly speeding up the simulation. To run `turtleFSI` with MPI, please use:
 
 ```console
-mpirun -np [number_of_cpu] -p [name_of_the_problem_file (without .py)]
+mpirun -np [number_of_cpu] -p name_of_the_problem_file (without .py)
 ```
 
 `turtleFSI` also supports using config file for changing the parameter without modifying the original problem file. To run a problem file with config file, please use:
 
 ```console
-turtleFSI -p [name_of_the_problem_file (without .py)] -c [path_to_config_file]
+turtleFSI -p name_of_the_problem_file (without .py) -c path_to_config_file
 ```
 
 An example of config file is located [here](https://github.com/KVSlab/turtleFSI/tree/master/docs/examples).
