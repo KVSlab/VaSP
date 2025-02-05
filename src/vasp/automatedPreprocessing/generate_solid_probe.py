@@ -1,3 +1,6 @@
+# Copyright (c) 2025 Simula Research Laboratory
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 import argparse
 import h5py
 from pathlib import Path

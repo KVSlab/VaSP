@@ -1,3 +1,6 @@
+# Copyright (c) 2025 Simula Research Laboratory
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """
 Problem file for predeforming mesh, i.e approximating a zero-pressure geometry.
 Here, we inflate the geometry to P_final and v_max final, representing the cycle-average

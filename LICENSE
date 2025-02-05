@@ -678,3 +678,8 @@ Note: Individual files contain the following tag instead of the full license tex
 
 SPDX-License-Identifier:    LGPL-3.0-or-later
 This enables machine processing of license information based on the SPDX License Identifiers that are here available: http://spdx.org/licenses/
+
+Additionally, the following files are licensed under the listed license:
+
+- src/vasp/automatedPostprocessing/postprocessing_h5py/chroma_filters.py is licensed under the ISC license, see here: https://github.com/librosa/librosa/blob/main/LICENSE.md
+- src/vasp/automatedPreprocessing/vmtkmeshgeneratorfsi.py is licensed under the BSD license, see here: http://www.vmtk.org/license.html
