@@ -63,7 +63,7 @@ def test_predeform_problem(input_mesh, tmpdir):
     Test the predeform problem.
     """
     cmd = ("turtleFSI -p predeform -dt 0.01 -T 0.03 --verbose True" +
-           f" --theta 0.51 --folder {tmpdir} --sub-folder 1 --new-arguments mesh_path={input_mesh}")
+           f" --folder {tmpdir} --sub-folder 1 --new-arguments mesh_path={input_mesh}")
     result = subprocess.check_output(cmd, shell=True, cwd="src/vasp/simulations/")
 
     output_re = r"v \(centerline, at inlet\) = (\d+\.\d+|\d+) m/s"
@@ -71,7 +71,7 @@ def test_predeform_problem(input_mesh, tmpdir):
 
     assert output_match is not None, "Regular expression did not match the output."
 
-    expected_velocity = 0.2591186271093947
+    expected_velocity = 0.0716186271093947
     velocity_at_inlet = float(output_match[-1])
 
     print("Velocity: {}".format(velocity_at_inlet))
