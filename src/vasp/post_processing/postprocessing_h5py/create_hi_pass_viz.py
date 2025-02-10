@@ -20,9 +20,9 @@ from numpy import linalg as LA
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
-from vasp.automatedPostprocessing.postprocessing_common import read_parameters_from_file
-from vasp.automatedPostprocessing.postprocessing_h5py.spectrograms import butter_bandpass_filter
-from vasp.automatedPostprocessing.postprocessing_h5py.postprocessing_common_h5py import create_transformed_matrix, \
+from vasp.post_processing.postprocessing_common import read_parameters_from_file
+from vasp.post_processing.postprocessing_h5py.spectrograms import butter_bandpass_filter
+from vasp.post_processing.postprocessing_h5py.postprocessing_common_h5py import create_transformed_matrix, \
     create_point_trace, create_xdmf_file, calculate_windowed_rms, get_eig, create_checkpoint_xdmf_file
 
 

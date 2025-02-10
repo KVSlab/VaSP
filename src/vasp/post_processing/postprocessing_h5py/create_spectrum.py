@@ -12,8 +12,8 @@ from typing import Optional, Union
 import numpy as np
 import matplotlib.pyplot as plt
 
-from vasp.automatedPostprocessing.postprocessing_h5py import spectrograms as spec
-from vasp.automatedPostprocessing.postprocessing_common import read_parameters_from_file
+from vasp.post_processing.postprocessing_h5py import spectrograms as spec
+from vasp.post_processing.postprocessing_common import read_parameters_from_file
 
 
 def create_spectrum(case_name: str, quantity: str, df, start_t: float, end_t: float, num_windows_per_sec: float,

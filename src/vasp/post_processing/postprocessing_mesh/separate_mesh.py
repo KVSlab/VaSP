@@ -8,7 +8,7 @@ import h5py
 from pathlib import Path
 from typing import Union
 
-from vasp.automatedPostprocessing.postprocessing_mesh import postprocessing_mesh_common
+from vasp.post_processing.postprocessing_mesh import postprocessing_mesh_common
 
 from dolfin import MPI, Mesh, MeshFunction, HDF5File, SubMesh, File
 

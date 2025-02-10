@@ -25,7 +25,7 @@ from vampy.automatedPreprocessing.simulate import run_simulation
 from vampy.automatedPreprocessing.visualize import visualize_model
 from vampy.simulation.simulation_common import print_mesh_information
 
-from vasp.automatedPreprocessing.preprocessing_common import generate_mesh, distance_to_spheres_solid_thickness, \
+from vasp.pre_processing.preprocessing_common import generate_mesh, distance_to_spheres_solid_thickness, \
     dist_sphere_spheres, convert_xml_mesh_to_hdf5, convert_vtu_mesh_to_xdmf, edge_length_evaluator, \
     check_flatten_boundary, map_thickness_to_mesh, update_entity_ids_by_thickness
 from vasp.simulations.simulation_common import load_mesh_and_data

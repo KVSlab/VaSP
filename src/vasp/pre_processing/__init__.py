@@ -6,7 +6,7 @@ from . import preprocessing_common
 from . import generate_solid_probe
 
 __all__ = [
-    "automatedPreprocessing",
+    "pre_processing",
     "preprocessing_common",
     "generate_solid_probe",
 ]

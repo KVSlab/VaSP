@@ -683,8 +683,8 @@ Additional Licensing Information:
 
 Some files in this package are released under different licenses. Below is a list of such files along with their respective licenses:
 
-- src/vasp/automatedPostprocessing/postprocessing_h5py/chroma_filters.py - Licensed under the ICS License.
-- src/vasp/automatedPreprocessing/vmtkmeshgeneratorfsi.py - Licensed under the BSD License.
+- src/vasp/post_processing/postprocessing_h5py/chroma_filters.py - Licensed under the ICS License.
+- src/vasp/pre_processing/vmtkmeshgeneratorfsi.py - Licensed under the BSD License.
 
 Full text of these licenses is included below.
 
