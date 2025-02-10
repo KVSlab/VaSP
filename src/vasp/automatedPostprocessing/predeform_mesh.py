@@ -1,7 +1,5 @@
-# File under GNU GPL (v3) licence, see LICENSE file for details.
-# This software is distributed WITHOUT ANY WARRANTY; without even
-# the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
-# PURPOSE.
+# Copyright (c) 2025 Simula Research Laboratory
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 """
 This script is used to predeform the mesh for an FSI simulation. It assumes
