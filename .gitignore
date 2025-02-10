@@ -1,5 +1,3 @@
-*.config
-
 # Mesh files
 *.vtu
 *.xml
