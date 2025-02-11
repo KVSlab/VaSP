@@ -13,7 +13,7 @@ import numpy as np
 import h5py
 from pathlib import Path
 
-from vasp.post_processing.postprocessing_mesh import postprocessing_mesh_common
+from vasp.postprocessing.postprocessing_mesh import postprocessing_mesh_common
 
 from dolfin import MPI, Mesh, MeshFunction, HDF5File, refine, adapt, parameters
 

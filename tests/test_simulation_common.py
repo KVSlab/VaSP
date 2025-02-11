@@ -4,7 +4,7 @@ import pytest
 import numpy as np
 from dolfin import Mesh, cpp
 
-from vasp.pre_processing.automated_preprocessing import read_command_line, \
+from vasp.preprocessing.preprocessing import read_command_line, \
     run_pre_processing
 from vasp.simulations.simulation_common import load_mesh_and_data, load_mesh_info, \
     load_probe_points

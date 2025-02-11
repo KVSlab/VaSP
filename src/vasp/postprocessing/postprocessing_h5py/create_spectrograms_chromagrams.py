@@ -14,8 +14,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-from vasp.post_processing.postprocessing_h5py import spectrograms as spec
-from vasp.post_processing.postprocessing_common import read_parameters_from_file
+from vasp.postprocessing.postprocessing_h5py import spectrograms as spec
+from vasp.postprocessing.postprocessing_common import read_parameters_from_file
 
 
 def create_spectrogram_composite(case_name: str, quantity: str, df: pd.DataFrame, start_t: float, end_t: float,

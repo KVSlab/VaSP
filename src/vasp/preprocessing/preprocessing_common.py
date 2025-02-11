@@ -12,7 +12,7 @@ from dolfin import Mesh, MeshFunction, File, HDF5File, FunctionSpace, Function, 
 from vmtk import vmtkdistancetospheres, vmtkdijkstradistancetopoints
 from morphman import vmtkscripts, write_polydata
 
-from vasp.pre_processing.vmtkmeshgeneratorfsi import vmtkMeshGeneratorFsi
+from vasp.preprocessing.vmtkmeshgeneratorfsi import vmtkMeshGeneratorFsi
 from vasp.simulations.simulation_common import load_mesh_and_data
 
 from vtk import vtkPolyData
