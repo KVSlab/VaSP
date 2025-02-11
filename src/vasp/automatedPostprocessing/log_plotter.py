@@ -216,22 +216,28 @@ def parse_dictionary_from_log(log_file: str) -> dict:
     parsed_dict = {}
     entry_lines = []
     in_entry = False
+    brace_count = 0  # Track opening and closing braces
 
     with open(log_file, 'r') as file:
         for line in file:
             line = line.strip()
 
-            # Check if the line starts a new dictionary entry
-            if line.startswith('{'):
+            # Detect start of dictionary
+            if line.startswith('{') and not in_entry:
                 in_entry = True
+                brace_count = 1
                 entry_lines = [line]
-            elif in_entry:
-                entry_lines.append(line)
+                continue
 
-                # Check if the line ends the current dictionary entry
-                if line.endswith('}'):
-                    # Combine the lines and modify for JSON compatibility
+            if in_entry:
+                entry_lines.append(line)
+                brace_count += line.count('{') - line.count('}')
+
+                # When braces are balanced, we have captured the full dictionary
+                if brace_count == 0:
                     entry_str = '\n'.join(entry_lines)
+
+                    # Convert to JSON format
                     entry_str = (
                         entry_str.replace("'", '"')
                         .replace("None", "null")
@@ -239,14 +245,14 @@ def parse_dictionary_from_log(log_file: str) -> dict:
                         .replace("False", "false")
                     )
 
-                    # Handle PosixPath objects by converting them to strings
-                    entry_str = re.sub(r'"(restart_folder)":\s+PosixPath\("([^"]+)"\)', r'"\1": "\2"', entry_str)
+                    # Handle PosixPath objects (if present)
+                    entry_str = re.sub(r'PosixPath\("([^"]+)"\)', r'"\1"', entry_str)
 
                     try:
                         entry_dict = json.loads(entry_str)
                         if isinstance(entry_dict, dict):
                             parsed_dict.update(entry_dict)
-                            break  # Exit the loop since there is only one dictionary
+                            break  # Exit after capturing the first dictionary
                         else:
                             logging.warning(f"WARNING: Entry is not a valid dictionary: {entry_str}")
                     except json.JSONDecodeError as e:
