@@ -25,7 +25,9 @@ its latest `Docker` image supported by Windows, Linux, and macOS, as explained [
 The documentation is hosted [here](https://kvslab.github.io/VaSP/).
 
 ## License
-This software is licensed under the GNU GPL, version 3 or (at your option) any later version.
+This software is licensed under the **GNU General Public License (GPL), version 3 or (at your option) any later version**.
+
+For more details, see the [`LICENSE`](LICENSE) file in this repository.
 
 ## Authors
 * [David Bruneau](https://github.com/dbruneau-mie)
