@@ -18,8 +18,8 @@ from dolfin import Mesh, HDF5File, VectorFunctionSpace, Function, MPI, parameter
     LUSolver, FunctionAssigner, BoundaryMesh
 
 from vampy.automatedPostprocessing.postprocessing_common import get_dataset_names
-from vasp.automatedPostprocessing.postprocessing_common import read_parameters_from_file
-from vasp.automatedPostprocessing.postprocessing_fenics.postprocessing_fenics_common import project_dg
+from vasp.postprocessing.postprocessing_common import read_parameters_from_file
+from vasp.postprocessing.postprocessing_fenics.postprocessing_fenics_common import project_dg
 
 # set compiler arguments
 # this was necessary for num_sub_spaces() to work with MPI by Kei 2024

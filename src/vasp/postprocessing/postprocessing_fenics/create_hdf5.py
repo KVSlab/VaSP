@@ -15,7 +15,7 @@ import logging
 import argparse
 from tqdm import tqdm
 
-from vasp.automatedPostprocessing.postprocessing_common import get_domain_ids, output_file_lists
+from vasp.postprocessing.postprocessing_common import get_domain_ids, output_file_lists
 from dolfin import Mesh, HDF5File, VectorFunctionSpace, Function, MPI, parameters
 
 

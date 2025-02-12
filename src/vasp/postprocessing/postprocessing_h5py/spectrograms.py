@@ -21,11 +21,11 @@ from scipy.interpolate import RectBivariateSpline
 from scipy.io import wavfile
 from tqdm import tqdm
 
-from vasp.automatedPostprocessing.postprocessing_h5py.chroma_filters import normalize, chroma_filterbank
-from vasp.automatedPostprocessing.postprocessing_h5py.postprocessing_common_h5py import create_transformed_matrix, \
+from vasp.postprocessing.postprocessing_h5py.chroma_filters import normalize, chroma_filterbank
+from vasp.postprocessing.postprocessing_h5py.postprocessing_h5py_common import create_transformed_matrix, \
     read_npz_files, get_surface_topology_coords, get_coords, get_interface_ids, \
     get_domain_ids_specified_region
-from vasp.automatedPostprocessing.postprocessing_common import get_domain_ids
+from vasp.postprocessing.postprocessing_common import get_domain_ids
 
 
 def read_command_line_spec() -> configargparse.Namespace:
