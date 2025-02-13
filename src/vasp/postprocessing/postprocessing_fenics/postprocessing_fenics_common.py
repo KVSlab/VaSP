@@ -21,7 +21,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--stride", type=int, default=1, help="Save frequency of simulation")
     parser.add_argument("-st", "--start-time", type=float, default=None, help="Desired start time for postprocessing")
     parser.add_argument("-et", "--end-time", type=float, default=None, help="Desired end time for postprocessing")
-    parser.add_argument("--extract-solid-only", action="store_true", help="Extract solid displacement only")
+    parser.add_argument("--extract-entire-domain", action="store_true", help="Extract displacement from entire domain")
     parser.add_argument("--log-level", type=int, default=20,
                         help="Specify the log level (default is 20, which is INFO)")
 
