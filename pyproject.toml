@@ -20,19 +20,19 @@ dependencies = [
 ]
 
 [project.scripts]
-vasp-generate-mesh = "vasp.automatedPreprocessing.automated_preprocessing:main_meshing"
-vasp-generate-solid-probe = "vasp.automatedPreprocessing.generate_solid_probe:main"
-vasp-predeform-mesh = "vasp.automatedPostprocessing.predeform_mesh:main"
-vasp-refine-mesh = "vasp.automatedPostprocessing.postprocessing_mesh.create_refined_mesh:main"
-vasp-separate-mesh = "vasp.automatedPostprocessing.postprocessing_mesh.separate_mesh:main"
-vasp-log-plotter = "vasp.automatedPostprocessing.log_plotter:main"
-vasp-create-hdf5 = "vasp.automatedPostprocessing.postprocessing_fenics.create_hdf5:main"
-vasp-create-separate-domain-viz = "vasp.automatedPostprocessing.postprocessing_fenics.create_separate_domain_visualization:main"
-vasp-compute-stress = "vasp.automatedPostprocessing.postprocessing_fenics.compute_stress_strain:main"
-vasp-compute-hemo = "vasp.automatedPostprocessing.postprocessing_fenics.compute_hemodynamics:main"
-vasp-create-spectrograms-chromagrams = "vasp.automatedPostprocessing.postprocessing_h5py.create_spectrograms_chromagrams:main"
-vasp-create-spectrum = "vasp.automatedPostprocessing.postprocessing_h5py.create_spectrum:main"
-vasp-create-hi-pass-viz = "vasp.automatedPostprocessing.postprocessing_h5py.create_hi_pass_viz:main"
+vasp-generate-mesh = "vasp.preprocessing.preprocessing:main_meshing"
+vasp-generate-solid-probe = "vasp.preprocessing.generate_solid_probe:main"
+vasp-predeform-mesh = "vasp.postprocessing.predeform_mesh:main"
+vasp-refine-mesh = "vasp.postprocessing.postprocessing_mesh.create_refined_mesh:main"
+vasp-separate-mesh = "vasp.postprocessing.postprocessing_mesh.separate_mesh:main"
+vasp-log-plotter = "vasp.postprocessing.log_plotter:main"
+vasp-create-hdf5 = "vasp.postprocessing.postprocessing_fenics.create_hdf5:main"
+vasp-create-separate-domain-viz = "vasp.postprocessing.postprocessing_fenics.create_separate_domain_visualization:main"
+vasp-compute-stress = "vasp.postprocessing.postprocessing_fenics.compute_stress_strain:main"
+vasp-compute-hemo = "vasp.postprocessing.postprocessing_fenics.compute_hemodynamics:main"
+vasp-create-spectrograms-chromagrams = "vasp.postprocessing.postprocessing_h5py.create_spectrograms_chromagrams:main"
+vasp-create-spectrum = "vasp.postprocessing.postprocessing_h5py.create_spectrum:main"
+vasp-create-hi-pass-viz = "vasp.postprocessing.postprocessing_h5py.create_hi_pass_viz:main"
 
 [project.optional-dependencies]
 test = ["flake8", 'mypy', "pytest", "pytest-cov", "pytest-xdist"]

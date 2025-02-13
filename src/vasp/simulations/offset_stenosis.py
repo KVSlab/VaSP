@@ -186,6 +186,7 @@ def create_bcs(t, DVP, mesh, boundaries, mu_f,
     dSS = Measure("dS", domain=mesh, subdomain_data=boundaries)
     interface_pressure = InterfacePressure(t=0.0, t_ramp_start=0.0, t_ramp_end=0.2, An=An_P,
                                            Bn=Bn_P, period=T_Cycle, P_mean=P_mean, degree=p_deg)
+    # NOTE: ('+') implicitly assumes that the solid domain has a higher domain ID than the fluid domain
     F_solid_linear += interface_pressure * inner(n('+'), psi('+')) * dSS(fsi_id)
 
     # Create inlet subdomain for computing the flow rate inside post_solve

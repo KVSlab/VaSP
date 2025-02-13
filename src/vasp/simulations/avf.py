@@ -275,6 +275,7 @@ def create_bcs(DVP, mesh, boundaries, T, dt, fsi_id, inlet_id1, inlet_id2, rigid
                           p_t_ramp_end=p_t_ramp_end, degree=p_deg)
     dSS = Measure("dS", domain=mesh, subdomain_data=boundaries)
     n = FacetNormal(mesh)
+    # NOTE: ('+') implicitly assumes that the solid domain has a higher domain ID than the fluid domain
     F_solid_linear += p_out_bc_val * inner(n('+'), psi('+')) * dSS(fsi_id[0]) + p_out_bc_val * \
         inner(n('+'), psi('+')) * dSS(fsi_id[1])
 

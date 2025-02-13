@@ -11,8 +11,8 @@ from ufl.form import Form
 from turtleFSI.modules import common
 
 from vampy.automatedPostprocessing.postprocessing_common import get_dataset_names
-from vasp.automatedPostprocessing.postprocessing_common import read_parameters_from_file
-from vasp.automatedPostprocessing.postprocessing_fenics.postprocessing_fenics_common import project_dg
+from vasp.postprocessing.postprocessing_common import read_parameters_from_file
+from vasp.postprocessing.postprocessing_fenics.postprocessing_fenics_common import project_dg
 
 # set compiler arguments
 parameters["reorder_dofs_serial"] = False
