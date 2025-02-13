@@ -15,7 +15,7 @@ vasp-log-plotter simulation.log --plot-all --save --output-directory Results --f
 """
 
 import re
-import json
+import ast
 import argparse
 import logging
 from pathlib import Path
@@ -205,6 +205,8 @@ def parse_dictionary_from_log(log_file: str) -> dict:
     """
     Parse a dictionary-like content from a log file and return it as a dictionary.
 
+    Uses ast.literal_eval to safely evaluate Python literals.
+
     Args:
         log_file (str): Path to the log file.
 
@@ -212,51 +214,48 @@ def parse_dictionary_from_log(log_file: str) -> dict:
         dict: Parsed dictionary.
     """
     logging.info(f"--- Parsing dictionary from '{log_file}'")
-
     parsed_dict = {}
     entry_lines = []
+    brace_count = 0
     in_entry = False
-    brace_count = 0  # Track opening and closing braces
 
     with open(log_file, 'r') as file:
         for line in file:
-            line = line.strip()
-
-            # Detect start of dictionary
-            if line.startswith('{') and not in_entry:
-                in_entry = True
-                brace_count = 1
-                entry_lines = [line]
-                continue
-
-            if in_entry:
+            # Use the original line (or its stripped version) for checking the start.
+            stripped_line = line.lstrip()
+            if not in_entry:
+                # Look for the start of the dictionary.
+                if stripped_line.startswith('{'):
+                    in_entry = True
+                    entry_lines = [line]
+                    # Initialize the brace counter.
+                    brace_count = line.count('{') - line.count('}')
+            else:
                 entry_lines.append(line)
+                # Update the brace counter.
                 brace_count += line.count('{') - line.count('}')
-
-                # When braces are balanced, we have captured the full dictionary
+                # When the count returns to 0, we assume the dictionary is complete.
                 if brace_count == 0:
-                    entry_str = '\n'.join(entry_lines)
+                    # Combine the lines. Newlines are fine for ast.literal_eval.
+                    entry_str = ''.join(entry_lines)
 
-                    # Convert to JSON format
-                    entry_str = (
-                        entry_str.replace("'", '"')
-                        .replace("None", "null")
-                        .replace("True", "true")
-                        .replace("False", "false")
-                    )
-
-                    # Handle PosixPath objects (if present)
-                    entry_str = re.sub(r'PosixPath\("([^"]+)"\)', r'"\1"', entry_str)
+                    # Preprocess if necessary (e.g., handle PosixPath strings)
+                    entry_str = re.sub(r'"(restart_folder)":\s+PosixPath\("([^"]+)"\)', r'"\1": "\2"', entry_str)
 
                     try:
-                        entry_dict = json.loads(entry_str)
+                        entry_dict = ast.literal_eval(entry_str)
                         if isinstance(entry_dict, dict):
                             parsed_dict.update(entry_dict)
-                            break  # Exit after capturing the first dictionary
+                            # We assume only one dictionary is in the log.
+                            break
                         else:
                             logging.warning(f"WARNING: Entry is not a valid dictionary: {entry_str}")
-                    except json.JSONDecodeError as e:
-                        logging.warning(f"WARNING: JSONDecodeError while parsing entry: {e}")
+                    except Exception as e:
+                        logging.warning(f"WARNING: Error while parsing entry: {e}")
+
+                    # Reset for any future entries.
+                    in_entry = False
+                    entry_lines = []
 
     return parsed_dict
 
