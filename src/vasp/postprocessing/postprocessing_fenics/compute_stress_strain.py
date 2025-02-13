@@ -1,38 +1,27 @@
 # Copyright (c) 2023 David Bruneau
 # Modified by Kei Yamamoto 2023
 # SPDX-License-Identifier: GPL-3.0-or-later
-
+# following two imports need to come before dolfin
+from mpi4py import MPI
+from petsc4py import PETSc  # noqa: F401
+import logging
 from pathlib import Path
-import argparse
 from dolfin import MPI, TensorFunctionSpace, VectorFunctionSpace, FunctionSpace, \
     Function, Mesh, HDF5File, Measure, MeshFunction, as_tensor, XDMFFile, PETScDMCollection, \
-    TrialFunction, TestFunction, inner, LocalSolver, parameters
+    TrialFunction, TestFunction, inner, LocalSolver, parameters  # noqa: F811
 from ufl.form import Form
 from turtleFSI.modules import common
 
 from vampy.automatedPostprocessing.postprocessing_common import get_dataset_names
 from vasp.postprocessing.postprocessing_common import read_parameters_from_file
-from vasp.postprocessing.postprocessing_fenics.postprocessing_fenics_common import project_dg
+from vasp.postprocessing.postprocessing_fenics.postprocessing_fenics_common import project_dg, parse_arguments
+from vasp.postprocessing.postprocessing_fenics.create_hdf5 import create_hdf5
 
 # set compiler arguments
 parameters["reorder_dofs_serial"] = False
 parameters["form_compiler"]["cpp_optimize"] = True
 parameters["form_compiler"]["optimize"] = True
 parameters["form_compiler"]["quadrature_degree"] = 6
-
-
-def parse_arguments():
-    """Read arguments from commandline"""
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-
-    parser.add_argument("--folder", type=Path, help="Path to simulation results folder")
-    parser.add_argument('--mesh-path', type=Path, default=None,
-                        help="Path to the mesh file. If not given (None), " +
-                             "it will assume that mesh is located <folder>/Mesh/mesh.h5)")
-    parser.add_argument("--stride", type=int, default=1, help="Save frequency of output data")
-    args = parser.parse_args()
-
-    return args
 
 
 def solve_dg(a: Form, L: Form, T: TensorFunctionSpace) -> Function:
@@ -97,7 +86,7 @@ def compute_stress(visualization_separate_domain_folder: Path, mesh_path: Path, 
 
     mesh_name = mesh_path.stem
     solid_mesh_path = mesh_path.parent / f"{mesh_name}_solid.h5" if solid_only else mesh_path
-    mesh = Mesh()
+    mesh = Mesh(MPI.comm_world)
     with HDF5File(MPI.comm_world, str(solid_mesh_path), "r") as mesh_file:
         mesh_file.read(mesh, "/mesh", False)
         domains = MeshFunction("size_t", mesh, mesh.topology().dim())
@@ -301,17 +290,61 @@ def main() -> None:
     args = parse_arguments()
     folder_path = args.folder
 
-    visualization_separate_domain_folder = args.folder / "Visualization_separate_domain"
-    assert (
-        visualization_separate_domain_folder.exists()
-    ), f"Visualization_separate_domain folder {visualization_separate_domain_folder} not found."
+    assert folder_path.exists(), f"Folder {folder_path} not found."
 
+    visualization_separate_domain_folder = args.folder / "Visualization_separate_domain"
     parameters = read_parameters_from_file(args.folder)
     if parameters is None:
         raise RuntimeError("Error reading parameters from file.")
+
+    if visualization_separate_domain_folder.exists():
+        if MPI.rank(MPI.comm_world) == 0:
+            print("--- Visualization_separate_domain folder found \n")
     else:
-        solid_properties = parameters["solid_properties"]
-        fluid_properties = parameters["fluid_properties"]
+        if MPI.rank(MPI.comm_world) == 0:
+            print("--- Visualization_separate_domain folder not found \n")
+            folder_path = Path(args.folder)
+            visualization_path = folder_path / "Visualization"
+
+            # extract necessary parameters
+            save_deg = parameters["save_deg"]
+            dt = parameters["dt"]
+            save_step = parameters["save_step"]
+            save_time_step = dt * save_step
+            logging.info(f"save_time_step: {save_time_step} \n")
+            fluid_domain_id = parameters["dx_f_id"]
+            solid_domain_id = parameters["dx_s_id"]
+
+            logging.info(f"--- Fluid domain ID: {fluid_domain_id} and Solid domain ID: {solid_domain_id} \n")
+
+            if args.mesh_path:
+                mesh_path = Path(args.mesh_path)
+                logging.info("--- Using user-defined mesh \n")
+                assert mesh_path.exists(), f"Mesh file {mesh_path} not found."
+            elif save_deg == 2:
+                mesh_path = folder_path / "Mesh" / "mesh_refined.h5"
+                logging.info("--- Using refined mesh \n")
+                assert mesh_path.exists(), f"Mesh file {mesh_path} not found."
+            else:
+                mesh_path = folder_path / "Mesh" / "mesh.h5"
+                logging.info("--- Using non-refined mesh \n")
+                assert mesh_path.exists(), f"Mesh file {mesh_path} not found."
+
+            if args.extract_entire_domain:
+                extract_solid_only = False
+            else:
+                extract_solid_only = True
+
+            print(f"save_time_step: {save_time_step} \n")
+            # call from single processor
+            print("--- Creating HDF5 file for fluid velocity and solid displacement \n")
+            create_hdf5(visualization_path, mesh_path, save_time_step, args.stride, args.start_time, args.end_time,
+                        extract_solid_only, fluid_domain_id, solid_domain_id)
+
+    MPI.comm_world.barrier()
+
+    solid_properties = parameters["solid_properties"]
+    fluid_properties = parameters["fluid_properties"]
 
     if args.mesh_path:
         mesh_path = Path(args.mesh_path)
