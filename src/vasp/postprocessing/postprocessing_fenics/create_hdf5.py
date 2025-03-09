@@ -12,38 +12,15 @@ import h5py
 from pathlib import Path
 import json
 import logging
-import argparse
 from tqdm import tqdm
 
-from vasp.automatedPostprocessing.postprocessing_common import get_domain_ids, output_file_lists
+from vasp.postprocessing.postprocessing_common import get_domain_ids, output_file_lists
+from vasp.postprocessing.postprocessing_fenics.postprocessing_fenics_common import parse_arguments
 from dolfin import Mesh, HDF5File, VectorFunctionSpace, Function, MPI, parameters
 
 
 # set compiler arguments
 parameters["reorder_dofs_serial"] = False
-
-
-def parse_arguments() -> argparse.Namespace:
-    """
-    Parse command line arguments.
-
-    Returns:
-        argparse.Namespace: Parsed command-line arguments.
-    """
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("--folder", type=Path, help="Path to simulation results")
-    parser.add_argument('--mesh-path', type=Path, default=None,
-                        help="Path to the mesh file. If not given (None), " +
-                             "it will assume that mesh is located <folder>/Mesh/mesh.h5)")
-    parser.add_argument("--stride", type=int, default=1, help="Save frequency of simulation")
-    parser.add_argument("-st", "--start-time", type=float, default=None, help="Desired start time for postprocessing")
-    parser.add_argument("-et", "--end-time", type=float, default=None, help="Desired end time for postprocessing")
-    parser.add_argument("--extract-entire-domain", action="store_true",
-                        help="Extract displacement for the entire domain")
-    parser.add_argument("--log-level", type=int, default=20,
-                        help="Specify the log level (default is 20, which is INFO)")
-
-    return parser.parse_args()
 
 
 def create_hdf5(visualization_path, mesh_path, save_time_step, stride, start_time, end_time, extract_solid_only,
@@ -63,7 +40,6 @@ def create_hdf5(visualization_path, mesh_path, save_time_step, stride, start_tim
         fluid_domain_id (int or list): ID of the fluid domain
         solid_domain_id (int or list): ID of the solid domain
     """
-
     # Define mesh path related variables
     fluid_domain_path = mesh_path.with_name(mesh_path.stem + "_fluid.h5")
     if extract_solid_only:
@@ -77,12 +53,12 @@ def create_hdf5(visualization_path, mesh_path, save_time_step, stride, start_tim
 
     # Read fluid and solid mesh
     logging.info("--- Reading fluid and solid mesh files \n")
-    mesh_fluid = Mesh()
-    with HDF5File(MPI.comm_world, str(fluid_domain_path), "r") as mesh_file:
+    mesh_fluid = Mesh(MPI.comm_self)
+    with HDF5File(MPI.comm_self, str(fluid_domain_path), "r") as mesh_file:
         mesh_file.read(mesh_fluid, "mesh", False)
 
-    mesh_solid = Mesh()
-    with HDF5File(MPI.comm_world, str(solid_domain_path), "r") as mesh_file:
+    mesh_solid = Mesh(MPI.comm_self)
+    with HDF5File(MPI.comm_self, str(solid_domain_path), "r") as mesh_file:
         mesh_file.read(mesh_solid, "mesh", False)
 
     # Define function spaces and functions
@@ -91,7 +67,6 @@ def create_hdf5(visualization_path, mesh_path, save_time_step, stride, start_tim
     Vs = VectorFunctionSpace(mesh_solid, "CG", 1)
     u = Function(Vf)
     d = Function(Vs)
-
     # Define paths for velocity and displacement files
     xdmf_file_v = visualization_path / "velocity.xdmf"
     xdmf_file_d = visualization_path / "displacement.xdmf"
@@ -100,7 +75,6 @@ def create_hdf5(visualization_path, mesh_path, save_time_step, stride, start_tim
     logging.info("--- Getting information about h5 files \n")
     h5file_name_list, timevalue_list, index_list = output_file_lists(xdmf_file_v)
     h5file_name_list_d, _, index_list_d = output_file_lists(xdmf_file_d)
-
     fluid_ids, solid_ids, all_ids = get_domain_ids(mesh_path, fluid_domain_id, solid_domain_id)
 
     # Remove this if statement since it can be done when we are using d_ids
@@ -131,7 +105,7 @@ def create_hdf5(visualization_path, mesh_path, save_time_step, stride, start_tim
 
     # save fluid mesh as mesh.h5 for computing flow metrics indices later with VaMPy
     mesh_save_path = visualization_separate_domain_folder / "mesh.h5"
-    with HDF5File(MPI.comm_world, str(mesh_save_path), "w") as mesh_file:
+    with HDF5File(MPI.comm_self, str(mesh_save_path), "w") as mesh_file:
         mesh_file.write(mesh_fluid, "mesh")
 
     # Initialize h5 file names that might differ during the loop
@@ -195,12 +169,12 @@ def create_hdf5(visualization_path, mesh_path, save_time_step, stride, start_tim
         file_mode = "a" if file_counter > start_time_index else "w"
 
         # Save velocity
-        viz_u_file = HDF5File(MPI.comm_world, str(u_output_path), file_mode=file_mode)
+        viz_u_file = HDF5File(MPI.comm_self, str(u_output_path), file_mode=file_mode)
         viz_u_file.write(u, "/velocity", time)
         viz_u_file.close()
 
         # Save displacment
-        viz_d_file = HDF5File(MPI.comm_world, str(d_output_path), file_mode=file_mode)
+        viz_d_file = HDF5File(MPI.comm_self, str(d_output_path), file_mode=file_mode)
         viz_d_file.write(d, "/displacement", time)
         viz_d_file.close()
 

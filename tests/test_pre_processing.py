@@ -7,7 +7,7 @@ import vtk
 from dolfin import Mesh, HDF5File, XDMFFile, FunctionSpace, Function
 from vampy.automatedPreprocessing.preprocessing_common import read_polydata
 
-from vasp.automatedPreprocessing.automated_preprocessing import read_command_line, \
+from vasp.preprocessing.preprocessing import read_command_line, \
     run_pre_processing
 
 # Define test cases for testing command line options for vasp-generate-mesh script

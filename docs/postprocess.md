@@ -3,13 +3,13 @@
 # Post-processing
 
 After the FSI simulations, the last step of `VaSP` is post-processing the results.  
-The `src/vasp/automatedPostprocessing` directory is organized into several sub-packages and modules, each dedicated to different aspects of postprocessing for the `VaSP` project.  
+The `src/vasp/postprocessing` directory is organized into several sub-packages and modules, each dedicated to different aspects of postprocessing for the `VaSP` project.  
 The primary focus is on handling mesh data (`postprocessing_mesh`), postprocessing using FEniCS (`postprocessing_fenics`), and postprocessing with HDF5 files (`postprocessing_h5py`). Here’s an outline of the structure:
 
 ```
 src/
 └── vasp/
-    └── automatedPostprocessing/
+    └── postprocessing/
         ├── __init__.py
         ├── log_plotter.py
         ├── postprocessing_common.py
@@ -35,13 +35,13 @@ src/
             ├── create_hi_pass_viz.py
             ├── create_spectrograms_chromagrams.py
             ├── create_spectrum.py
-            ├── postprocessing_common_h5py.py
+            ├── postprocessing_h5py_common.py
             └── spectrograms.py
 ```
 
 In the following, we will give an overview and explanations for each scripts.
 
-## **Top-Level Directory: `automatedPostprocessing`**
+## **Top-Level Directory: `postprocessing`**
 
    - **General Utilities**: Contains general utility scripts `log_plotter.py`, `predeform_mesh.py`, and `postprocessing_common.py`.  
 

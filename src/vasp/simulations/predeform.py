@@ -203,6 +203,7 @@ def create_bcs(DVP, mesh, boundaries, t_start_v, t_end_v, t_start_p, t_end_p, P_
     dSS = Measure("dS", domain=mesh, subdomain_data=boundaries)
     n = FacetNormal(mesh)
     # defined on the reference domain
+    # NOTE: ('+') implicitly assumes that the solid domain has a higher domain ID than the fluid domain
     F_solid_linear += p_out_bc_val * inner(n("+"), psi("+")) * dSS(fsi_id)
 
     # Fluid velocity BCs
