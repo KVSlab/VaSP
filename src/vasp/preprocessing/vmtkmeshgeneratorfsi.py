@@ -154,7 +154,7 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
             os.close(1)
             os.close(2)
             output = os.read(r_stdout, 100000).decode()
-            error_output = os.read(r_stderr, 100000).decode()
+            _ = os.read(r_stderr, 100000)  # discard stderr output for now
         finally:
             os.dup2(old_stdout, 1)
             os.dup2(old_stderr, 2)
@@ -174,7 +174,7 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
 
         smallest_volume = extract(r"Smallest volume:\s+([\d.e+-]+)")
         largest_volume = extract(r"Largest volume:\s+([\d.e+-]+)")
-        smallest_aspect = extract(r"Smallest aspect ratio:\s+([\d.e+-]+)")
+        _ = extract(r"Smallest aspect ratio:\s+([\d.e+-]+)")  # not currently used
         largest_aspect = extract(r"Largest aspect ratio:\s+([\d.e+-]+)")
         smallest_dihedral = extract(r"Smallest dihedral:\s+([\d.e+-]+)")
         largest_dihedral = extract(r"Largest dihedral:\s+([\d.e+-]+)")
