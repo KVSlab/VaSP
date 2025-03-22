@@ -24,6 +24,8 @@ import vtk
 from vmtk import vtkvmtk, vmtkscripts, pypes
 import sys
 import numpy as np
+import os
+import re
 
 
 class vmtkMeshGeneratorFsi(pypes.pypeScript):
@@ -133,6 +135,67 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
             ['CellEntityIdsArrayName', 'entityidsarray', 'str', 1],
             ['RemeshedSurface', 'remeshedsurface', 'vtkPolyData', 1, '', 'the output surface', 'vmtksurfacewriter'],
         ])
+
+    def _run_and_analyze_tetgen(self, tetgen):
+        """
+        Execute TetGen and analyze the printed output for mesh quality.
+        """
+        old_stdout = os.dup(1)
+        old_stderr = os.dup(2)
+        r_stdout, w_stdout = os.pipe()
+        r_stderr, w_stderr = os.pipe()
+        os.dup2(w_stdout, 1)
+        os.dup2(w_stderr, 2)
+        os.close(w_stdout)
+        os.close(w_stderr)
+
+        try:
+            tetgen.Execute()
+            os.close(1)
+            os.close(2)
+            output = os.read(r_stdout, 100000).decode()
+            error_output = os.read(r_stderr, 100000).decode()
+        finally:
+            os.dup2(old_stdout, 1)
+            os.dup2(old_stderr, 2)
+            os.close(old_stdout)
+            os.close(old_stderr)
+
+        if output:
+            self._parse_tetgen_output(output)
+
+    def _parse_tetgen_output(self, text):
+        """
+        Parse TetGen output and print warnings for low-quality elements.
+        """
+        def extract(pattern):
+            match = re.search(pattern, text)
+            return float(match.group(1)) if match else None
+
+        smallest_volume = extract(r"Smallest volume:\s+([\d.e+-]+)")
+        largest_volume = extract(r"Largest volume:\s+([\d.e+-]+)")
+        smallest_aspect = extract(r"Smallest aspect ratio:\s+([\d.e+-]+)")
+        largest_aspect = extract(r"Largest aspect ratio:\s+([\d.e+-]+)")
+        smallest_dihedral = extract(r"Smallest dihedral:\s+([\d.e+-]+)")
+        largest_dihedral = extract(r"Largest dihedral:\s+([\d.e+-]+)")
+        smallest_facangle = extract(r"Smallest facangle:\s+([\d.e+-]+)")
+        largest_facangle = extract(r"Largest facangle:\s+([\d.e+-]+)")
+
+        self.PrintLog("TetGen mesh quality analysis:")
+        if largest_aspect and largest_aspect > 10:
+            self.PrintLog(f"  Warning: High aspect ratio (max {largest_aspect:.2f})")
+        if smallest_dihedral and smallest_dihedral < 10:
+            self.PrintLog(f"  Warning: Small dihedral angle (min {smallest_dihedral:.2f}°)")
+        if largest_dihedral and largest_dihedral > 160:
+            self.PrintLog(f"  Warning: Large dihedral angle (max {largest_dihedral:.2f}°)")
+        if smallest_facangle and smallest_facangle < 20:
+            self.PrintLog(f"  Warning: Small face angle (min {smallest_facangle:.2f}°)")
+        if largest_facangle and largest_facangle > 140:
+            self.PrintLog(f"  Warning: Large face angle (max {largest_facangle:.2f}°)")
+        if smallest_volume and largest_volume:
+            ratio = smallest_volume / largest_volume
+            if ratio < 0.01:
+                self.PrintLog(f"  Warning: Smallest volume is <1% of largest volume (ratio {ratio:.4f})")
 
     def Execute(self):
 
@@ -368,7 +431,9 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
             tetgen.OutputSurfaceElements = 1
             tetgen.OutputVolumeElements = 1
             tetgen.RegionAttrib = 0
-            tetgen.Execute()
+            tetgen.Verbose = 1
+
+            self._run_and_analyze_tetgen(tetgen)
 
             if tetgen.Mesh.GetNumberOfCells() == 0 and surfaceToMesh.Mesh.GetNumberOfCells() > 0:
                 self.PrintError('Running TetGen failed. Try to re-mesh.')
@@ -453,8 +518,9 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
             tetgen.RemoveSliver = 1
             tetgen.OutputSurfaceElements = 1
             tetgen.OutputVolumeElements = 1
+            tetgen.Verbose = 1
 
-            tetgen.Execute()
+            self._run_and_analyze_tetgen(tetgen)
 
             self.Mesh = tetgen.Mesh
 
