@@ -11,13 +11,29 @@
 
 ## Installation on Linux or macOS
 
+The easiest way to install `VaSP` and its dependencies is via `conda-forge`. Run the following command in your terminal:
+
+```
+conda create -n your_environment -c conda-forge vasp
+```
+
+Once the installation is complete, activate the newly created environment:
+
+```
+conda activate your_environment
+```
+
+### Alternative: Manual Installation from Source
+
+If you prefer to install `VaSP` from source, follow these steps:
+
 ### Step 1:  Clone the `VaSP` repository
 
 Start by downloading and navigating to the root directory of `VaSP` with the following command in your terminal:
 
 ``` console
-$ git clone https://github.com/KVSLab/VaSP.git
-$ cd VaSP
+git clone https://github.com/KVSLab/VaSP.git
+cd VaSP
 ```
 
 ### Step 2:  Create a `conda` environment
@@ -26,7 +42,7 @@ Once you have installed `conda`, create a new environment for `VaSP` with all it
 command in your terminal:
 
 ``` console
-$ conda env update --file environment.yml --name your_environment
+conda env update --file environment.yml --name your_environment
 ```
 
 ### Step 3: Activate the `conda` environment
@@ -35,7 +51,7 @@ After the configuration of the `conda` environment is finished, activate the new
 following command:
 
 ``` console
-$ conda activate your_environment
+conda activate your_environment
 ```
 
 ### Step 4: Install `VaSP` inside the `conda` environment using `pip`
@@ -43,7 +59,7 @@ $ conda activate your_environment
 Finally, you can install the `VaSP` package inside your environment using `pip`:
 
 ``` console
-$ python3 -m pip install .
+python3 -m pip install .
 ```
 
 ### Step 5: Verify the installation
@@ -52,8 +68,8 @@ You can verify that `VaSP` is installed correctly by downloading the test depend
 following commands:
 
 ``` console
-$ python3 -m pip install .[test]
-$ python3 -m pytest tests 
+python3 -m pip install .[test]
+python3 -m pytest tests 
 ```
 
 ## Installation on Windows
@@ -72,7 +88,7 @@ If you want to make changes to any of the scripts included in `VaSP`, you can in
 machine by supplying the `--editable` flag:
 
 ```
-$ python3 -m pip install --editable .
+python3 -m pip install --editable .
 ```
 
 The `--editable` flag installs the project in editable mode meaning that any changes to the original package will be
