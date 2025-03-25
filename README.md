@@ -13,12 +13,16 @@
 The Vascular Fluid-Structure Interaction Simulation Pipeline (VaSP) is a toolkit for simulating fluid-structure interactions (FSI) in vascular systems. It streamlines the process from pre-processing to post-processing of vascular FSI simulations.
 Starting with medical image-based surface meshes, VaSP uses extended version of [VMTK](http://www.vmtk.org) to generate volumetric FSI meshes. It then runs FSI simulations using [turtleFSI](https://github.com/KVSlab/turtleFSI). For post-processing, VaSP employs [FEniCS](https://fenicsproject.org/) and other Python packages to compute hemodynamic indices like wall shear stress and stress/strain. By integrating these tools, VaSP aims to simplify vascular FSI analyses.
 
-
 ## Installation
-VaSP is a Python package for Python >= 3.10, with main dependencies to [VaMPy](https://github.com/KVSlab/VaMPy)
-and [turtleFSI](https://github.com/KVSlab/turtleFSI). VaSP and its dependencies can be installed with `conda` on Linux and
-macOS as explained [here](https://kvslab.github.io/VaSP/conda.html). The package can also be installed and run through
-its latest `Docker` image supported by Windows, Linux, and macOS, as explained [here](https://kvslab.github.io/VaSP/docker.html).
+VaSP is a Python package for Python >= 3.10, with main dependencies to [VaMPy](https://github.com/KVSlab/VaMPy)  
+and [turtleFSI](https://github.com/KVSlab/turtleFSI). VaSP and its dependencies can be installed with `conda` on Linux and  
+macOS using the following command:
+
+```
+conda create -n your_environment -c conda-forge vasp
+```
+
+More details on installation via `conda` can be found [here](https://kvslab.github.io/VaSP/conda.html). The package can also be installed and run through its latest `Docker` image supported by Windows, Linux, and macOS, as explained [here](https://kvslab.github.io/VaSP/docker.html).
 
 
 ## Documentation
