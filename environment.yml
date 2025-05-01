@@ -19,6 +19,7 @@ dependencies:
   - hdf5=1.12.2
   - mpi4py=3.1.4
   - expat=2.5.0
+  - sympy=1.13.3
   - pip:
       - git+https://github.com/KVSlab/VaMPy.git
       - git+https://github.com/KVSlab/turtleFSI.git
