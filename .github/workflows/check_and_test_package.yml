@@ -80,7 +80,7 @@ jobs:
 
       - name: Upgrade pip and setuptools
         run: |
-          python3 -m pip install pip setuptools --upgrade
+          python -m pip install --break-system-packages pip setuptools --upgrade
 
       # See: https://github.com/marketplace/actions/setup-miniconda
       - name: Setup Conda environment
