@@ -20,7 +20,7 @@ from numpy import linalg as LA
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
-from vasp.postprocessing.postprocessing_common import read_parameters_from_file
+from vasp.postprocessing.postprocessing_common import read_parameters_from_file, output_file_lists
 from vasp.postprocessing.postprocessing_h5py.spectrograms import butter_bandpass_filter
 from vasp.postprocessing.postprocessing_h5py.postprocessing_h5py_common import create_transformed_matrix, \
     create_point_trace, create_xdmf_file, calculate_windowed_rms, get_eig, create_checkpoint_xdmf_file
@@ -62,7 +62,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
 
     if quantity in {"d", "v"}:
         component_names = ["mag", "x", "y", "z"]
-    elif quantity == "strain":
+    elif quantity in {"strain", "stress"}:
         component_names = ["11", "12", "22", "23", "33", "31"]
     else:
         component_names = ["mag"]
@@ -91,6 +91,8 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
         viz_type = "pressure"
     elif quantity == "strain":
         viz_type = "GreenLagrangeStrain"
+    elif quantity == "stress":
+        viz_type = "TrueStress"
     else:
         raise ValueError("Input 'd', 'v', 'p', 'strain', or for quantity")
 
@@ -105,11 +107,11 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
     output_file_name = f"{viz_type}.h5"
     output_path = Path(output_folder) / output_file_name
 
-    if amplitude and quantity != "strain":
+    if amplitude and quantity not in {"strain", "stress"}:
         viz_type_amplitude = f"{viz_type}_amplitude"
         output_file_name_amplitude = f"{viz_type_amplitude}.h5"
         output_path_amplitude = Path(output_folder) / output_file_name_amplitude
-    elif amplitude and quantity == "strain":
+    elif amplitude and quantity in {"strain", "stress"}:
         viz_type_amplitude = f"{viz_type}_amplitude"
         viz_type_magnitude = f"{viz_type}_max_principal_amplitude"
         output_file_name_amplitude = f"{viz_type_amplitude}.h5"
@@ -156,7 +158,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
             logging.debug(f"--- The file at {output_path_amplitude} already exists; overwriting.")
             output_path_amplitude.unlink()
 
-        if quantity == "strain" and output_path_magnitude.exists() and overwrite:
+        if quantity in {"strain", "stress"} and output_path_magnitude.exists() and overwrite:
             logging.debug(f"--- The file at {output_path_amplitude} already exists; overwriting.")
             output_path_magnitude.unlink()
 
@@ -164,7 +166,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
     vector_data = h5py.File(output_path, "a", libver="latest")
     vector_data_amplitude = h5py.File(output_path_amplitude, "a", libver="latest") if amplitude else None
     vector_data_mps = h5py.File(output_path_magnitude, "a", libver="latest") \
-        if quantity == "strain" and amplitude else None
+        if quantity in {"strain", "stress"} and amplitude else None
 
     logging.info("--- Creating mesh arrays for visualization...")
 
@@ -214,12 +216,12 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
 
     # If amplitude is selected, calculate moving RMS amplitude for the results
     if amplitude:
-        rms_magnitude = np.zeros((n_nodes_fsi, num_ts)) if quantity != "strain" else \
+        rms_magnitude = np.zeros((n_nodes_fsi, num_ts)) if quantity not in {"strain", "stress"} else \
             np.zeros((int(n_cells_fsi * 4), num_ts))
         components_data_amplitude = np.zeros_like(components_data)
         if not filter_type_single == "lowpass":
             # NOTE: Fixing the window size to 250 for now. It would be better to make this a parameter.
-            window_size = 250  # This is approximately 1/4th of the value used in the spectrograms (992)
+            window_size = 250 if quantity not in {"strain", "stress"} else 50
             for idy in tqdm(range(components_data[0].shape[0]), desc="--- Calculating amplitude", unit=" node"):
                 for component_index, component_data in enumerate(components_data):
                     components_data_amplitude[component_index][idy, :] = \
@@ -241,7 +243,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
                 v_array_amplitude[:, 0] = components_data_amplitude[0][:, idx]
                 rms_magnitude[:, idx] = components_data_amplitude[0][:, idx]
 
-        elif quantity == "strain":
+        elif quantity in {"strain", "stress"}:
             # first open dof_info (dict)
             if idx == 0:
                 assert dof_info is not None
@@ -344,7 +346,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
     if quantity in {"d", "v", "p"}:
         create_xdmf_file(num_ts, time_between_files, start_t, n_elements_fsi,
                          n_nodes_fsi, att_type, viz_type, output_folder)
-    elif quantity == "strain":
+    elif quantity in {"strain", "stress"}:
         assert dof_info is not None
         n_nodes = dof_info["mesh/geometry"].shape[0]
         create_checkpoint_xdmf_file(num_ts, time_between_files, start_t, n_elements_fsi,
@@ -357,7 +359,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
         if quantity in {"d", "v", "p"}:
             create_xdmf_file(num_ts, time_between_files, start_t, n_elements_fsi,
                              n_nodes_fsi, att_type, viz_type_amplitude, output_folder)
-        elif quantity == "strain":
+        elif quantity in {"strain", "stress"}:
             assert dof_info is not None
             n_nodes = dof_info["mesh/geometry"].shape[0]
             create_checkpoint_xdmf_file(num_ts, time_between_files, start_t, n_elements_fsi,
@@ -373,7 +375,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
         output_amplitudes = np.zeros((num_ts, 13))
 
         for idx in tqdm(range(num_ts), desc="--- Saving data", unit=" timestep"):
-            output_amplitudes[idx, 0] = idx * time_between_files
+            output_amplitudes[idx, 0] = idx * time_between_files + start_t
             output_amplitudes[idx, 1] = np.percentile(rms_magnitude[:, idx], 95)
             output_amplitudes[idx, 2] = np.percentile(rms_magnitude[:, idx], 5)
             output_amplitudes[idx, 3] = np.percentile(rms_magnitude[:, idx], 100)
@@ -413,7 +415,7 @@ def create_hi_pass_viz(formatted_data_folder: Path, output_folder: Path, mesh_pa
         plt.savefig(amp_graph_file)
         plt.close()
 
-        if quantity == "strain":
+        if quantity in {"strain", "stress"}:
             logging.info("--- Saving MPS amplitude to file...")
             assert dof_info is not None
             n_nodes = dof_info["mesh/geometry"].shape[0]
@@ -564,7 +566,7 @@ def main():
 
     # In case of strain, modify the path to the solid mesh as the strain might be
     # computed for the solid domain only
-    if quantity == "strain":
+    if quantity == "strain" or "stress":
         try:
             file_path_d = visualization_separate_domain_folder / "d_solid.h5"
             assert file_path_d.exists(), f"Displacement file {file_path_d} not found."
@@ -591,9 +593,9 @@ def main():
     logging.info("--- Preparing data...")
     dof_info = None
     dof_info_amplitude = None
-    if formatted_data_path.exists() and quantity != "strain":
+    if formatted_data_path.exists() and quantity not in ["strain", "stress"]:
         logging.info(f"--- Formatted data already exists at: {formatted_data_path}\n")
-    elif formatted_data_path.exists() and quantity == "strain":
+    elif formatted_data_path.exists() and quantity in ["strain", "stress"]:
         logging.info(f"--- Formatted data already exists at: {formatted_data_path}\n")
         dof_info_path = formatted_data_folder / "dof_info.pkl"
         with open(dof_info_path, "rb") as f:
@@ -605,7 +607,7 @@ def main():
         # Determine mesh paths based on save_deg
         if save_deg == 1:
             mesh_path_solid = mesh_path_solid_sd1
-        if quantity == "strain":
+        if quantity in ["strain", "stress"]:
             _, dof_info, dof_info_amplitude = create_transformed_matrix(visualization_stress_strain_folder,
                                                                         formatted_data_folder, mesh_path_solid,
                                                                         case_name, start_time,
@@ -618,9 +620,20 @@ def main():
 
     # Get the desired time between output files (reduce output frequency by "stride")
     # time_between_output_files = time_between_input_files * stride
-    time_between_output_files = dt * stride  # FIXME: Is it okay to use dt here instead of time_between_input_files?
+    # time_between_output_files = dt * stride  # FIXME: Is it okay to use dt here instead of time_between_input_files?
+    # time_between_output_files = dt * 5  # FIXME: Is it okay to use dt here instead of time_between_input_files?
+    if quantity == "strain":
+        xdmf_file_path = visualization_stress_strain_folder / "GreenLagrangeStrain.xdmf"
+        h5_ts, time_ts, index_ts = output_file_lists(xdmf_file_path)
+        time_between_output_files = time_ts[2] - time_ts[1]
+    elif quantity == "stress":
+        xdmf_file_path = visualization_stress_strain_folder / "TrueStress.xdmf"
+        h5_ts, time_ts, index_ts = output_file_lists(xdmf_file_path)
+        time_between_output_files = time_ts[2] - time_ts[1]
+    else:
+        time_between_output_files = dt * stride
 
-    if quantity != "strain":
+    if quantity not in ["strain", "stress"]:
         logging.info("--- Creating point traces...")
         try:
             create_point_trace(str(formatted_data_folder), str(visualization_separate_domain_folder), point_ids,
@@ -642,7 +655,7 @@ def main():
                                time_between_output_files, dof_info, dof_info_amplitude, start_time,
                                quantity, lower_freq, higher_freq, amplitude=amplitude, filter_type="multiband",
                                pass_stop_list=pass_stop_list, overwrite=overwrite)
-    elif quantity == "strain":
+    elif quantity in ["strain", "stress"]:
         logging.info(f"--- Creating high-pass visualizations for {quantity}...")
         for i in range(len(lower_freq)):
             create_hi_pass_viz(formatted_data_folder, visualization_hi_pass_folder, mesh_path_solid,

@@ -202,13 +202,14 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
         'p': 'pressure.xdmf',
         'wss': 'WSS.xdmf',
         'mps': 'MaxPrincipalStrain.xdmf',
-        'strain': 'GreenLagrangeStrain.xdmf'
+        'strain': 'GreenLagrangeStrain.xdmf',
+        'stress': 'TrueStress.xdmf'
     }
 
     if quantity in xdmf_files:
         xdmf_path = input_path / xdmf_files[quantity]
     else:
-        raise ValueError("Invalid value for quantity. Please use 'd', 'v', 'p', 'wss', 'mps', or 'strain'.")
+        raise ValueError("Invalid value for quantity. Please use 'd', 'v', 'p', 'wss', 'stress', or 'strain'.")
 
     # Get information about h5 files associated with xdmf file and also information about the timesteps
     logging.info("--- Getting information about h5 files...")
@@ -224,8 +225,8 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
     # Define a dictionary with format strings for array names
     quantity_to_array = {
         "wss": "WSS/WSS_{}/vector",
-        "mps": "MaxPrincipalStrain/MaxPrincipalStrain_{}/vector",
-        "strain": "GreenLagrangeStrain/GreenLagrangeStrain_{}/vector"
+        "stress": "TrueStress/TrueStress_{}/vector",
+        "strain": "GreenLagrangeStrain/GreenLagrangeStrain_{}/vector",
     }
 
     # In case of wss, mps, strain, we need to get the more information from h5 file
@@ -241,12 +242,12 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
     dof_info = [first_data + "/" + name for name in dof_info_name]
 
     # get information about dofs
-    if quantity in {"wss", "mps", "strain"}:
+    if quantity in {"wss", "stress", "strain"}:
         dof_info_dict = {name: np.array(vector_data[key][:]) for name, key in zip(dof_info_name, dof_info)}
     else:
         dof_info_dict = None
 
-    if quantity in {"wss", "mps", "strain"}:
+    if quantity in {"wss", "stress", "strain"}:
         xdmf_path_amplitude = input_path / xdmf_files["mps"]
         h5_ts_amplitude, _, _ = output_file_lists(xdmf_path_amplitude)
         first_h5_file_amplitude = input_path / h5_ts_amplitude[0]
@@ -264,11 +265,11 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
     format_string = quantity_to_array.get(quantity, 'VisualisationVector/{}')
     array_name = format_string.format(0)
 
-    if quantity in {"wss", "mps", "strain"}:
+    if quantity in {"wss", "stress", "strain"}:
         ids = np.arange(len(vector_data[array_name][:]))
 
     vector_array = vector_data[array_name][:, :]
-    if quantity == "strain":
+    if quantity in {"stress", "strain"}:
         reshaped_num_rows = int((vector_array.shape[0]) / 9)
         vector_array = vector_array.reshape((reshaped_num_rows, 9))
 
@@ -282,13 +283,13 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
     num_rows = vector_array.shape[0]
     if quantity in {"d", "v", "p"}:
         num_cols = int((end_t - start_t) / (time_between_files * stride)) - 1
-    elif quantity in {"wss", "mps", "strain"}:
+    elif quantity in {"wss", "stress", "strain"}:
         num_cols = num_ts - 1
 
     # Pre-allocate the arrays for the formatted data
     if quantity in {"v", "d"}:
         quantity_x, quantity_y, quantity_z = [np.zeros((num_rows, num_cols)) for _ in range(3)]
-    elif quantity == "strain":
+    elif quantity in {"stress", "strain"}:
         quantity_11, quantity_12, quantity_22, quantity_23, quantity_33, quantity_31 = \
             [np.zeros((num_rows, num_cols)) for _ in range(6)]
 
@@ -309,9 +310,9 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
         stop = num_ts
     # In case of post-processed data, start-t and end-t are depend on how the user run `create_hdf5.py`
     # Therefore, we need to set start and stop based on the number of timesteps in the h5 files
-    if quantity in {"wss", "mps", "strain"}:
+    if quantity in {"wss", "stress", "strain"}:
         start = 0
-        stop = num_ts
+        stop = num_ts - 1
 
     # Initialize tqdm with the total number of iterations
     progress_bar = tqdm(total=stop - start, desc="--- Transferring timestep", unit="step")
@@ -340,7 +341,7 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
                 # Get required data depending on whether pressure, displacement, or velocity
                 if quantity in {"p", "wss", "mps"}:
                     quantity_magnitude[:, idx_zeroed] = vector_array_full[ids, 0]
-                elif quantity == "strain":
+                elif quantity in {"stress", "strain"}:
                     # NOTE: here vector array is just one-d array and that's why we need to reshape it
                     # h5 file is strcutured in a different way than the other quantities
                     vector_array = vector_array_full[ids, :]
@@ -376,7 +377,7 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
     if quantity in {"d", "v"}:
         formatted_data = [quantity_magnitude, quantity_x, quantity_y, quantity_z]
         component_names = ["mag", "x", "y", "z"]
-    elif quantity == "strain":
+    elif quantity in {"stress", "strain"}:
         formatted_data = [quantity_11, quantity_12, quantity_22, quantity_23, quantity_33, quantity_31]
         component_names = ["11", "12", "22", "23", "33", "31"]
     else:
@@ -392,13 +393,13 @@ def create_transformed_matrix(input_path: Union[str, Path], output_folder: Union
             output_path.unlink()
 
         # Store output in npz file
-        if quantity in {"v", "d", "strain"}:
+        if quantity in {"v", "d", "strain", "stress"}:
             np.savez_compressed(output_path, component=formatted_data[i])
         else:
             np.savez_compressed(output_path, component=quantity_magnitude)
 
     # save dof_info_dict in case of strain
-    if quantity == "strain":
+    if quantity in {"stress", "strain"}:
         with open(output_folder / "dof_info.pkl", "wb") as f:
             pickle.dump(dof_info_dict, f)
         with open(output_folder / "dof_info_amplitude.pkl", "wb") as f:
