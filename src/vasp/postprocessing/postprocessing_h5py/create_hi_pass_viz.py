@@ -566,7 +566,7 @@ def main():
 
     # In case of strain, modify the path to the solid mesh as the strain might be
     # computed for the solid domain only
-    if quantity == "strain" or "stress":
+    if quantity in {"strain", "stress"}:
         try:
             file_path_d = visualization_separate_domain_folder / "d_solid.h5"
             assert file_path_d.exists(), f"Displacement file {file_path_d} not found."
