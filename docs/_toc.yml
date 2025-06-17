@@ -15,6 +15,7 @@ parts:
   - caption: Using VaSP
     chapters:
     - file: preprocess
+    - file: prestress
     - file: simulation
     - file: postprocess
     - file: features
