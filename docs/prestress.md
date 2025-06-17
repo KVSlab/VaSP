@@ -7,7 +7,7 @@ First, users need to run the `src/vasp/simulations/predeform.py` script to perfo
 Second, run the following command to generate the pre-deformed mesh:
 
 ```console
-vasp-generate-mesh --folder /predeform_resutls/1/
+vasp-predeform-mesh --folder /predeform_resutls/1/
 ```
 
 where `--folder` specifies the path containing the results of the pre-deformation simulation. This command will the inverse of the displacements obtained in the first step to the original mesh, thereby obtaining the stress-free reference configuration required for main FSI simulations.
