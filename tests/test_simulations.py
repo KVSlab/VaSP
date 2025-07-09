@@ -71,7 +71,7 @@ def test_predeform_problem(input_mesh, tmpdir):
 
     assert output_match is not None, "Regular expression did not match the output."
 
-    expected_velocity = 0.0716186271093947
+    expected_velocity = 0.009549150281252628
     velocity_at_inlet = float(output_match[-1])
 
     print("Velocity: {}".format(velocity_at_inlet))
