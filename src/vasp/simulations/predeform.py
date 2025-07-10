@@ -37,14 +37,14 @@ def set_problem_parameters(default_variables, **namespace):
             T=1.0,  # Simulation end time
             dt=0.01,  # Time step size
             theta=1.0,  # backward Euler time integration
-            save_step=10,  # Save frequency of files for visualisation
+            save_step=10,  # Save frequency of files for visualization
             checkpoint_step=50,  # Save frequency of checkpoint files
             # Linear solver parameters
             linear_solver="mumps",
             atol=1e-6,  # Absolute tolerance in the Newton solver
             rtol=1e-6,  # Relative tolerance in the Newton solver
-            recompute=20,  # Recompute the Jacobian matix within time steps
-            recompute_tstep=20,  # Recompute the Jacobian matix over time steps
+            recompute=20,  # Recompute the Jacobian matrix within time steps
+            recompute_tstep=20,  # Recompute the Jacobian matrix over time steps
             lmbda=0.5,  # Damping parameter for the Newton solver
             # boundary condition parameters
             mesh_path="mesh/cylinder.h5",
@@ -56,11 +56,11 @@ def set_problem_parameters(default_variables, **namespace):
             # Fluid parameters
             rho_f=1.025e3,  # Fluid density [kg/m3]
             mu_f=3.5e-3,  # Fluid dynamic viscosity [Pa.s]
-            dx_f_id=1,  # ID of marker in the fluid domain. When reading the mesh, the fuid domain is assigned with a 1.
+            dx_f_id=1,  # ID of marker in the fluid domain.
             # Pre-deform parameters
-            v_max_final=0.75,  # Final max centerline velocity of parabolic profile
+            v_max_final=0.1,  # Final max centerline velocity of parabolic profile
             # should be the cycle-averaged average velocity for your main simulation
-            P_final=10000,  # Steady State pressure applied to wall
+            P_final=11332.4,  # Steady State pressure applied to wall
             # should be your cycle-averaged gage pressure for your main simulation
             t_start_v=0.0,  # Start time for ramping up velocity
             t_end_v=0.2,  # End time for ramping up velocity
