@@ -10,7 +10,7 @@ import numpy as np
 from vampy.simulation.Womersley import make_womersley_bcs, compute_boundary_geometry_acrn
 from vampy.simulation.simulation_common import print_mesh_information
 from turtleFSI.problems import *
-from dolfin import HDF5File, Mesh, MeshFunction, facets, assemble, sqrt, FacetNormal, ds, \
+from dolfin import HDF5File, Mesh, MeshFunction, assemble, FacetNormal, ds, \
     DirichletBC, Measure, inner, parameters, VectorFunctionSpace, Function, XDMFFile
 
 from vasp.simulations.simulation_common import load_probe_points, calculate_and_print_flow_properties, \
@@ -53,7 +53,6 @@ def set_problem_parameters(default_variables, **namespace):
         inlet_id=2,  # inlet id for the fluid
         inlet_outlet_s_id=11,  # inlet and outlet id for solid
         fsi_id=22,  # id for fsi surface
-        rigid_id=11,  # "rigid wall" id for the fluid
         outer_id=33,  # id for the outer surface of the solid
         # Fluid parameters
         Q_mean=1.25E-06,
@@ -71,9 +70,10 @@ def set_problem_parameters(default_variables, **namespace):
         nu_s=nu_s_val,  # Solid Poisson ratio [-]
         lambda_s=lambda_s_val,  # Solid Young's modulus [Pa]
         dx_s_id=2,  # ID of marker in the solid domain
-        # FSI parameters
-        fsi_region=[0.123, 0.134, 0.063, 0.004],  # x, y, and z coordinate of FSI region center,
-                                                  # and radius of FSI region sphere
+        k_s=[1E5],  # elastic constant of Robin [N/m^3]
+        c_s=[10],  # viscous constant of Robin [N.s/m^3]
+        ds_s_id=[33],  # ID of marker for the Robin boundary condition
+        robin_bc=True,  # Use Robin boundary condition for the solid
         # Simulation parameters
         folder="aneurysm_results",  # Folder name generated for the simulation
         mesh_path="mesh/file_aneurysm.h5",
@@ -87,7 +87,7 @@ def set_problem_parameters(default_variables, **namespace):
     return default_variables
 
 
-def get_mesh_domain_and_boundaries(mesh_path, fsi_region, fsi_id, rigid_id, outer_id, **namespace):
+def get_mesh_domain_and_boundaries(mesh_path, **namespace):
 
     # Read mesh
     mesh = Mesh()
@@ -99,22 +99,6 @@ def get_mesh_domain_and_boundaries(mesh_path, fsi_region, fsi_id, rigid_id, oute
     hdf.read(domains, "/domains")
 
     print_mesh_information(mesh)
-
-    # Only consider FSI in domain within this sphere
-    sph_x = fsi_region[0]
-    sph_y = fsi_region[1]
-    sph_z = fsi_region[2]
-    sph_rad = fsi_region[3]
-
-    i = 0
-    for submesh_facet in facets(mesh):
-        idx_facet = boundaries.array()[i]
-        if idx_facet == fsi_id or idx_facet == outer_id:
-            mid = submesh_facet.midpoint()
-            dist_sph_center = sqrt((mid.x() - sph_x) ** 2 + (mid.y() - sph_y) ** 2 + (mid.z() - sph_z) ** 2)
-            if dist_sph_center > sph_rad:
-                boundaries.array()[i] = rigid_id  # changed "fsi" idx to "rigid wall" idx
-        i += 1
 
     return mesh, domains, boundaries
 
@@ -144,10 +128,9 @@ def create_bcs(t, DVP, mesh, boundaries, mu_f,
     # Solid Displacement BCs
     d_inlet = DirichletBC(DVP.sub(0), (0.0, 0.0, 0.0), boundaries, inlet_id)
     d_inlet_s = DirichletBC(DVP.sub(0), (0.0, 0.0, 0.0), boundaries, inlet_outlet_s_id)
-    d_rigid = DirichletBC(DVP.sub(0), (0.0, 0.0, 0.0), boundaries, rigid_id)
 
     # Assemble boundary conditions
-    bcs = u_inlet + [d_inlet, u_inlet_s, d_inlet_s, d_rigid]
+    bcs = u_inlet + [d_inlet, u_inlet_s, d_inlet_s]
 
     # Load Fourier coefficients for the pressure
     An_P, Bn_P = np.loadtxt(Path(__file__).parent / P_FC_File).T
