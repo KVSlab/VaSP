@@ -105,7 +105,7 @@ def get_mesh_domain_and_boundaries(mesh_path, **namespace):
 
 def create_bcs(t, DVP, mesh, boundaries, mu_f,
                fsi_id, inlet_id, inlet_outlet_s_id,
-               rigid_id, psi, F_solid_linear, p_deg, FC_file,
+               psi, F_solid_linear, p_deg, FC_file,
                Q_mean, P_FC_File, P_mean, T_Cycle, **namespace):
 
     # Load fourier coefficients for the velocity and scale by flow rate
