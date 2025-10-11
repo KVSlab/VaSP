@@ -1,0 +1,38 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the following paper."
+type: software
+title: "VaSP - Vascular Fluid-Structure Interaction Pipeline"
+version: "0.1.0"
+license: "GPL-3.0-or-later"
+repository-code: "https://github.com/KVSlab/VaSP"
+url: "https://kvslab.github.io/VaSP/"
+authors:
+  - family-names: Yamamoto
+    given-names: Kei
+  - family-names: Ring
+    given-names: Johannes
+  - family-names: Bruneau
+    given-names: David A.
+  - family-names: Dokken
+    given-names: Jørgen S.
+preferred-citation:
+  type: article
+  title: "VaSP: Vascular Fluid–Structure Interaction Pipeline"
+  authors:
+    - family-names: Yamamoto
+      given-names: Kei
+    - family-names: Bruneau
+      given-names: David A.
+    - family-names: Ring
+      given-names: Johannes
+    - family-names: Dokken
+      given-names: Jørgen S.
+    - family-names: Valen-Sendstad
+      given-names: Kristian
+  journal: SoftwareX
+  volume: "32"
+  pages: "102392"
+  year: 2025
+  doi: "10.1016/j.softx.2025.102392"
+  issn: "2352-7110"
+  url: "https://www.sciencedirect.com/science/article/pii/S2352711025003589"

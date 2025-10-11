@@ -28,6 +28,25 @@ More details on installation via `conda` can be found [here](https://kvslab.gith
 ## Documentation
 The documentation is hosted [here](https://kvslab.github.io/VaSP/).
 
+## Citation
+If you use VaSP in your research, please cite:
+
+```bibtex
+@article{Yamamoto2025VaSP,
+  title   = {VaSP: Vascular Fluid–Structure Interaction Pipeline},
+  author  = {Yamamoto, Kei and Bruneau, David A. and Ring, Johannes and Dokken, Jørgen S. and Valen-Sendstad, Kristian},
+  journal = {SoftwareX},
+  volume  = {32},
+  pages   = {102392},
+  year    = {2025},
+  issn    = {2352-7110},
+  doi     = {10.1016/j.softx.2025.102392},
+  url     = {https://www.sciencedirect.com/science/article/pii/S2352711025003589}
+}
+```
+
+The paper is available [here](https://doi.org/10.1016/j.softx.2025.102392).
+
 ## License
 This software is licensed under the **GNU General Public License (GPL), version 3 or (at your option) any later version**.
 
