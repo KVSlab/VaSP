@@ -28,7 +28,7 @@ jobs:
     continue-on-error: true
 
     steps:
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.10'
 
@@ -71,7 +71,7 @@ jobs:
         shell: bash -l {0}
 
     steps:
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.10'
 
