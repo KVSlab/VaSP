@@ -11,7 +11,7 @@
 
 ## Description
 The Vascular Fluid-Structure Interaction Simulation Pipeline (VaSP) is a toolkit for simulating fluid-structure interactions (FSI) in vascular systems. It streamlines the process from pre-processing to post-processing of vascular FSI simulations.
-Starting with medical image-based surface meshes, VaSP uses extended version of [VMTK](http://www.vmtk.org) to generate volumetric FSI meshes. It then runs FSI simulations using [turtleFSI](https://github.com/KVSlab/turtleFSI). For post-processing, VaSP employs [FEniCS](https://fenicsproject.org/) and other Python packages to compute hemodynamic indices like wall shear stress and stress/strain. By integrating these tools, VaSP aims to simplify vascular FSI analyses.
+Starting with medical image-based surface meshes, VaSP uses extended version of [VMTK](https://vmtk.github.io/) to generate volumetric FSI meshes. It then runs FSI simulations using [turtleFSI](https://github.com/KVSlab/turtleFSI). For post-processing, VaSP employs [FEniCS](https://fenicsproject.org/) and other Python packages to compute hemodynamic indices like wall shear stress and stress/strain. By integrating these tools, VaSP aims to simplify vascular FSI analyses.
 
 ## Installation
 VaSP is a Python package for Python >= 3.10, with main dependencies to [VaMPy](https://github.com/KVSlab/VaMPy)  
