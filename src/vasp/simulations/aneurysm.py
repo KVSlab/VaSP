@@ -14,7 +14,7 @@ from dolfin import HDF5File, Mesh, MeshFunction, assemble, FacetNormal, ds, \
     DirichletBC, Measure, inner, parameters, VectorFunctionSpace, Function, XDMFFile
 
 from vasp.simulations.simulation_common import load_probe_points, calculate_and_print_flow_properties, \
-    print_probe_points, InterfacePressure, compute_minimum_jacobian
+    print_probe_points, InterfacePressure, compute_minimum_jacobian, check_material_parameters
 
 # set compiler arguments
 parameters["form_compiler"]["quadrature_degree"] = 6
@@ -58,6 +58,10 @@ def set_problem_parameters(default_variables, **namespace):
         Q_mean=1.25E-06,
         P_mean=11200,
         T_Cycle=0.951,  # Used to define length of flow waveform
+        # Predeform load, only used by predeform.py (turtleFSI -p predeform --main_problem=aneurysm).
+        # NOTE: example values, change them according to the case
+        P_final=11332.4,  # Cycle-averaged pressure applied to the wall [Pa]
+        v_max_final=0.1,  # Cycle-averaged centerline velocity at the inlet [m/s]
         rho_f=1.000E3,  # Fluid density [kg/m3]
         mu_f=3.5E-3,  # Fluid dynamic viscosity [Pa.s]
         dx_f_id=1,  # ID of marker in the fluid domain
@@ -65,6 +69,7 @@ def set_problem_parameters(default_variables, **namespace):
         extrapolation="laplace",
         extrapolation_sub_type="constant",
         # Solid parameters
+        material_model="StVenantKirchoff",  # Solid material model
         rho_s=1.0E3,  # Solid density [kg/m3]
         mu_s=mu_s_val,  # Solid shear modulus or 2nd Lame Coef. [Pa]
         nu_s=nu_s_val,  # Solid Poisson ratio [-]
@@ -151,6 +156,8 @@ def create_bcs(t, DVP, mesh, boundaries, mu_f,
 
 
 def initiate(mesh_path, scale_probe, mesh, v_deg, p_deg, **namespace):
+    # Check the material and Robin parameters (the material models are printed by turtleFSI)
+    check_material_parameters(**namespace)
 
     probe_points = load_probe_points(mesh_path)
     # In case the probe points are in mm, scale them to meters

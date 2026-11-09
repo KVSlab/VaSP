@@ -73,8 +73,11 @@ def set_problem_parameters(default_variables, **namespace):
 Moreover, we use patient-specific boundary conditions for the AVF model. The following code snippet shows how to define the boundary conditions for the AVF model:
 
 ```python
-def create_bcs(DVP, mesh, boundaries, T, dt, fsi_id, inlet_id1, inlet_id2, rigid_id, psi, F_solid_linear,
+def create_bcs(DVP, mesh, boundaries, T, dt, fsi_id, inlet_id, rigid_id, psi, F_solid_linear,
                vel_t_ramp, p_t_ramp_start, p_t_ramp_end, p_deg, v_deg, patient_data_path, **namespace):
+    # inlet ids: inlet_id = [inlet 1 (PA), inlet 2 (DA)]
+    inlet_id1, inlet_id2 = inlet_id
+
     # read patient-specific data
     patient_data = np.loadtxt(patient_data_path, skiprows=1, delimiter=",", usecols=(0, 1, 2))
     v_PA = patient_data[:, 0]

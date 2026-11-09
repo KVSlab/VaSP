@@ -8,7 +8,7 @@ Here is a brief description of each problem file:
 
 2. `offset_stenosis.py`: This is a simple yet physiologically relevant problem that simulates blood flow through a stenosed artery. This problem is further described in the [tutorials](https://kvslab.github.io/VaSP/offset_stenosis.html#tutorial-offset-stenosis).
 
-3. `predeform.py`: This problem is used to perform a pre-deformation simulation of a medical image-based surface mesh. The pre-deformation is necessary to generate a realistic initial configuration for the FSI simulation.
+3. `predeform.py`: This problem is used to perform a pre-deformation simulation of a medical image-based surface mesh. The pre-deformation is necessary to generate a realistic initial configuration for the FSI simulation. The material models and parameters, the Robin boundary condition, the load (`P_final` and `v_max_final`) and the mesh are taken from the problem file of the main simulation, e.g. `turtleFSI -p predeform --main_problem=aneurysm`.
 
 4. `aneurysm.py`: This problem simulates blood flow and its interaction with vascular wall through an artery with an aneurysm. This problem is further described in the [tutorials](https://kvslab.github.io/VaSP/aneurysm.html#tutorial-aneurysm).
 

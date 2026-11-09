@@ -62,7 +62,7 @@ def test_predeform_problem(input_mesh, tmpdir):
     """
     Test the predeform problem.
     """
-    cmd = ("turtleFSI -p predeform -dt 0.01 -T 0.03 --verbose True" +
+    cmd = ("turtleFSI -p predeform --main_problem=cylinder -dt 0.01 -T 0.03 --verbose True" +
            f" --folder {tmpdir} --sub-folder 1 --new-arguments mesh_path={input_mesh}")
     result = subprocess.check_output(cmd, shell=True, cwd="src/vasp/simulations/")
     check_velocity_cfl_reynolds(result)
