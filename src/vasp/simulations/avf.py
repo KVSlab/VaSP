@@ -11,7 +11,7 @@ from dolfin import HDF5File, Mesh, MeshFunction, facets, UserExpression, FacetNo
     DirichletBC, Measure, inner, parameters, assemble, Constant, SpatialCoordinate
 
 from vasp.simulations.simulation_common import load_probe_points, calculate_and_print_flow_properties, \
-    print_probe_points, compute_minimum_jacobian
+    print_probe_points, compute_minimum_jacobian, check_material_parameters
 
 # set compiler arguments
 parameters["form_compiler"]["quadrature_degree"] = 6
@@ -49,8 +49,11 @@ def set_problem_parameters(default_variables, **namespace):
         recompute=30,  # Recompute the Jacobian matix within time steps
         recompute_tstep=10,  # Number of time steps before recompute Jacobian
         # boundary condition parameters
-        inlet_id1=3,  # inlet 1 id (PA)
-        inlet_id2=2,  # inlet 2 id (DA)
+        inlet_id=[3, 2],  # inlet ids: [inlet 1 (PA), inlet 2 (DA)], used by create_bcs and by predeform.py
+        # NOTE: the two inlets used to be defined as separate parameters (below). The predeform only reads inlet_id,
+        #       so with them "turtleFSI -p predeform --main_problem=avf" stops with "inlet_id is not defined".
+        # inlet_id1=3,  # inlet 1 id (PA)
+        # inlet_id2=2,  # inlet 2 id (DA)
         outlet_id1=4,  # outlet id (V)
         rigid_id=[11, 1011],  # "rigid wall" id for the fluid and mesh problem
         fsi_id=[22, 1022],  # fsi interface
@@ -60,6 +63,10 @@ def set_problem_parameters(default_variables, **namespace):
         vel_t_ramp=0.2,  # time for velocity ramp
         p_t_ramp_start=0.05,  # pressure ramp start time
         p_t_ramp_end=0.2,  # pressure ramp end time
+        # Predeform load, only used by predeform.py (turtleFSI -p predeform --main_problem=avf).
+        # NOTE: example values, change them according to the case
+        P_final=11332.4,  # Cycle-averaged pressure applied to the wall [Pa]
+        v_max_final=0.1,  # Cycle-averaged centerline velocity at the inlets [m/s], one value or one per inlet
         # Fluid parameters
         rho_f=1.025E3,  # Fluid density [kg/m3]
         mu_f=3.5E-3,  # Fluid dynamic viscosity [Pa.s]
@@ -80,8 +87,8 @@ def set_problem_parameters(default_variables, **namespace):
                            "lambda_s": lambda_s_val_vein, "C01": 0.003e6, "C10": 0.0, "C11": 0.538e6}],
         # Robin BC parameters
         robin_bc=True,  # Robin BC
-        k_s=1E5,  # elastic response necesary for RobinBC
-        c_s=1E1,  # viscoelastic response necesary for RobinBC
+        k_s=[1E5, 1E5],  # elastic response necesary for RobinBC (one value per ID in ds_s_id)
+        c_s=[1E1, 1E1],  # viscoelastic response necesary for RobinBC (one value per ID in ds_s_id)
         # FSI parameters
         fsi_region=[0.33642, 0.0873934, 0.0369964, 0.002],  # [x, y, z, radius]
         # Simulation parameters
@@ -216,11 +223,14 @@ class InnerP(UserExpression):
 
 
 # Define boundary conditions
-def create_bcs(DVP, mesh, boundaries, T, dt, fsi_id, inlet_id1, inlet_id2, rigid_id, psi, F_solid_linear,
+def create_bcs(DVP, mesh, boundaries, T, dt, fsi_id, inlet_id, rigid_id, psi, F_solid_linear,
                vel_t_ramp, p_t_ramp_start, p_t_ramp_end, p_deg, v_deg, patient_data_path, **namespace):
 
     if MPI.rank(MPI.comm_world) == 0:
         print("Create bcs")
+
+    # Inlet ids: inlet_id = [inlet 1 (PA), inlet 2 (DA)]
+    inlet_id1, inlet_id2 = inlet_id
 
     # Fluid velocity BCs
     dsi1 = ds(inlet_id1, domain=mesh, subdomain_data=boundaries)
@@ -290,6 +300,8 @@ def create_bcs(DVP, mesh, boundaries, T, dt, fsi_id, inlet_id1, inlet_id2, rigid
 
 
 def initiate(mesh_path, scale_probe, **namespace):
+    # Check the material and Robin parameters (the material models are printed by turtleFSI)
+    check_material_parameters(**namespace)
 
     probe_points = load_probe_points(mesh_path)
     # In case the probe points are in mm, scale them to meters

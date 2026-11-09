@@ -1,4 +1,5 @@
 import json
+import math
 from typing import List, Union, Tuple, NamedTuple
 from pathlib import Path
 
@@ -399,3 +400,175 @@ class InterfacePressure(UserExpression):
 
     def value_shape(self):
         return ()
+
+
+# Parameters required by each solid material model of turtleFSI (see Piola1 in turtleFSI/modules/common.py)
+SOLID_MODEL_PARAMETERS = {
+    "StVenantKirchoff": ("rho_s", "mu_s", "lambda_s"),
+    "StVenantKirchoffEnergy": ("rho_s", "mu_s", "lambda_s"),
+    "NeoHookean": ("rho_s", "mu_s", "lambda_s"),
+    "MooneyRivlin": ("rho_s", "mu_s", "lambda_s", "C01", "C10", "C11"),
+    "Gent": ("rho_s", "mu_s", "Jm"),
+}
+
+# Parameters required by the viscoelastic forms of turtleFSI (see Svisc_D in turtleFSI/modules/common.py)
+VISCOELASTIC_FORMS = ("Form1", "Form2")
+VISCOELASTIC_PARAMETERS = ("mu_visc_s", "lambda_visc_s")
+
+# Parameters that must be strictly positive
+POSITIVE_PARAMETERS = ("rho_s", "mu_s", "Jm")
+
+
+def as_list(value) -> list:
+    """
+    Return value as a list: None -> [], a list or tuple -> list, anything else -> [value].
+    """
+    if value is None:
+        return []
+    if isinstance(value, (list, tuple)):
+        return list(value)
+    return [value]
+
+
+def _is_number(value) -> bool:
+    return (isinstance(value, (int, float, np.integer, np.floating)) and not isinstance(value, bool)
+            and math.isfinite(value))
+
+
+def check_solid_properties(solid_properties: Union[dict, list], dx_s_id: Union[int, list]) -> None:
+    """
+    Check the solid properties of each solid region, and raise an error listing all the problems found.
+
+    turtleFSI pairs solid_properties[i] with dx_s_id[i] by position, and only fails with a KeyError
+    (or not at all) when a parameter is missing. This function makes these problems explicit.
+
+    Args:
+        solid_properties (dict or list): Solid properties of each solid region, as used by turtleFSI.
+        dx_s_id (int or list): ID(s) of the solid region(s).
+
+    Raises:
+        ValueError: If a material model is missing or unknown, if a required parameter is missing or
+            invalid, or if solid_properties and dx_s_id do not match.
+    """
+    errors = solid_properties_errors(solid_properties, dx_s_id)
+    if errors:
+        raise ValueError("Invalid solid material parameters:\n  - " + "\n  - ".join(errors))
+
+
+def solid_properties_errors(solid_properties: Union[dict, list], dx_s_id: Union[int, list]) -> List[str]:
+    """
+    Same checks as check_solid_properties, but return the list of problems found instead of raising.
+    """
+    properties = as_list(solid_properties)
+    ids = as_list(dx_s_id)
+    errors = []
+
+    if len(properties) != len(ids):
+        errors.append(f"{len(properties)} entries in solid_properties but {len(ids)} solid region(s) in "
+                      f"dx_s_id={dx_s_id}: there must be one entry per solid region")
+
+    for i, region_properties in enumerate(properties):
+        if not isinstance(region_properties, dict):
+            errors.append(f"solid_properties[{i}]={region_properties!r} is not a dictionary")
+            continue
+        region = ids[i] if i < len(ids) else region_properties.get("dx_s_id", f"#{i}")
+        prefix = f"solid region dx_s_id={region}"
+
+        if "dx_s_id" in region_properties and i < len(ids) and region_properties["dx_s_id"] != ids[i]:
+            errors.append(f"{prefix}: solid_properties[{i}] has dx_s_id={region_properties['dx_s_id']}, but turtleFSI "
+                          f"pairs solid_properties and dx_s_id by position (dx_s_id[{i}]={ids[i]})")
+
+        model = region_properties.get("material_model")
+        if model is None:
+            errors.append(f"{prefix}: material_model is not defined")
+            continue
+        if model not in SOLID_MODEL_PARAMETERS:
+            errors.append(f"{prefix}: unknown material_model '{model}', choose from {list(SOLID_MODEL_PARAMETERS)}")
+            continue
+
+        required = list(SOLID_MODEL_PARAMETERS[model])
+        viscoelasticity = region_properties.get("viscoelasticity")
+        if viscoelasticity in VISCOELASTIC_FORMS:
+            required += VISCOELASTIC_PARAMETERS
+        elif viscoelasticity not in (None, "None"):
+            errors.append(f"{prefix}: unknown viscoelasticity '{viscoelasticity}', choose from "
+                          f"{list(VISCOELASTIC_FORMS)} or leave it out")
+
+        missing = [key for key in required if key not in region_properties]
+        if missing:
+            errors.append(f"{prefix} ({model}): missing {', '.join(missing)}")
+
+        for key in required:
+            if key not in region_properties:
+                continue
+            value = region_properties[key]
+            if not _is_number(value):
+                errors.append(f"{prefix} ({model}): {key}={value!r} is not a finite number")
+            elif key in POSITIVE_PARAMETERS and value <= 0:
+                errors.append(f"{prefix} ({model}): {key}={value} must be positive")
+
+    return errors
+
+
+def check_robin_parameters(robin_bc: bool, k_s, c_s, ds_s_id) -> None:
+    """
+    Check the parameters of the Robin boundary condition of the solid, if it is used.
+
+    Without ds_s_id, turtleFSI applies the Robin condition on the whole exterior boundary of the mesh,
+    including the fluid inlets and outlets, without any error.
+
+    Args:
+        robin_bc (bool): True if the Robin boundary condition is used.
+        k_s (list): Elastic coefficient for each boundary in ds_s_id.
+        c_s (list): Viscous coefficient for each boundary in ds_s_id.
+        ds_s_id (int or list): ID(s) of the boundaries where the Robin condition is applied.
+
+    Raises:
+        ValueError: If robin_bc is True and the parameters are missing or inconsistent.
+    """
+    errors = robin_parameters_errors(robin_bc, k_s, c_s, ds_s_id)
+    if errors:
+        raise ValueError("Invalid Robin boundary condition parameters:\n  - " + "\n  - ".join(errors))
+
+
+def robin_parameters_errors(robin_bc: bool, k_s, c_s, ds_s_id) -> List[str]:
+    """
+    Same checks as check_robin_parameters, but return the list of problems found instead of raising.
+    A value of None means that the parameter is not defined.
+    """
+    if not robin_bc:
+        return []
+
+    errors = []
+    if ds_s_id is None:
+        errors.append("robin_bc=True but ds_s_id is not defined: give the ID(s) of the boundaries where the "
+                      "Robin condition is applied (otherwise turtleFSI applies it on the whole exterior boundary, "
+                      "including the fluid inlets and outlets)")
+    n_ids = len(as_list(ds_s_id))
+
+    for name, value in (("k_s", k_s), ("c_s", c_s)):
+        if value is None:
+            errors.append(f"robin_bc=True but {name} is not defined: give one value per ID in ds_s_id")
+            continue
+        if not isinstance(value, (list, tuple)):
+            errors.append(f"{name}={value!r} must be a list with one value per ID in ds_s_id")
+            continue
+        if ds_s_id is not None and len(value) != n_ids:
+            errors.append(f"{name} has {len(value)} value(s) but ds_s_id={ds_s_id} has {n_ids} ID(s)")
+        not_numbers = [v for v in value if not _is_number(v)]
+        if not_numbers:
+            errors.append(f"{name} contains values that are not finite numbers: {not_numbers}")
+
+    return errors
+
+
+def check_material_parameters(solid_properties: list, dx_s_id_list: list, robin_bc: bool = False, k_s=None,
+                              c_s=None, ds_s_id=None, **namespace) -> None:
+    """
+    Check the solid material parameters and the Robin boundary condition parameters used in the simulation.
+    Meant to be called from the initiate() function of a problem file, i.e. after turtleFSI has assigned the
+    properties to each region: initiate(**namespace) -> check_material_parameters(**namespace).
+    The material models used are printed by turtleFSI (print_material_models in turtleFSI/modules/domain.py).
+    """
+    check_solid_properties(solid_properties, dx_s_id_list)
+    check_robin_parameters(robin_bc, k_s, c_s, ds_s_id)

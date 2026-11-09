@@ -9,7 +9,7 @@ from turtleFSI.problems import *
 from dolfin import HDF5File, Mesh, MeshFunction, assemble, UserExpression, FacetNormal, ds, \
     DirichletBC, Measure, inner, parameters, SpatialCoordinate, Constant
 
-from vasp.simulations.simulation_common import calculate_and_print_flow_properties
+from vasp.simulations.simulation_common import calculate_and_print_flow_properties, check_material_parameters
 
 # set compiler arguments
 parameters["form_compiler"]["quadrature_degree"] = 6
@@ -56,6 +56,7 @@ def set_problem_parameters(default_variables, **namespace):
             v_max_final=0.75,  # Steady state, maximum centerline velocity of parabolic profile
             P_final=10000,  # Steady State pressure applied to wall
             # Solid parameters
+            material_model="StVenantKirchoff",  # Solid material model
             rho_s=1.0e3,  # Solid density [kg/m3]
             mu_s=mu_s_val,  # Solid shear modulus or 2nd Lame Coef. [Pa]
             nu_s=nu_s_val,  # Solid Poisson ratio [-]
@@ -84,6 +85,12 @@ def get_mesh_domain_and_boundaries(mesh_path, **namespace):
     hdf.read(domains, "/domains")
 
     return mesh, domains, boundaries
+
+
+def initiate(**namespace):
+    # Check the material and Robin parameters (the material models are printed by turtleFSI)
+    check_material_parameters(**namespace)
+    return {}
 
 
 class VelInPara(UserExpression):
