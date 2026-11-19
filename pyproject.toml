@@ -37,7 +37,7 @@ vasp-create-hi-pass-viz = "vasp.postprocessing.postprocessing_h5py.create_hi_pas
 [project.optional-dependencies]
 test = ["flake8", 'mypy', "pytest", "pytest-cov", "pytest-xdist"]
 
-docs = ["jupyter-book"]
+docs = ["jupyter-book<2"]
 
 [tool.pytest.ini_options]
 addopts = [
